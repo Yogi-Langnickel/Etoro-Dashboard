@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Builds
+.next/
+dist/
+build/
+coverage/
+
+# Local env and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cert
+secrets/
+
+# Logs and runtime output
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Private financial data
+exports/
+reports/private/
+fixtures/private/
+screenshots/private/
+

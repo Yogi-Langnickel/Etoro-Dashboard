@@ -1,0 +1,19 @@
+{
+  "name": "etoro-dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Security-first dashboard for viewing and interacting with eToro API data.",
+  "scripts": {
+    "check": "npm run lint && npm run typecheck && npm test",
+    "lint": "echo \"TODO: add lint command after app stack is selected\"",
+    "typecheck": "echo \"TODO: add typecheck command after app stack is selected\"",
+    "test": "echo \"TODO: add tests after app stack is selected\""
+  },
+  "keywords": [
+    "etoro",
+    "dashboard",
+    "finance"
+  ],
+  "license": "UNLICENSED"
+}
+
