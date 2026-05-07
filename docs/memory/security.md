@@ -35,3 +35,4 @@ High-impact risks:
 ## Current Audit Notes
 
 - 2026-05-07: `npm install --package-lock-only` created the initial lockfile and `npm audit --audit-level=moderate` passed with no vulnerabilities.
+- 2026-05-08: Branch integration rule recorded. Do not work directly on `master` or `main`; create/use a scoped branch and merge completed deliverables into `develop`.

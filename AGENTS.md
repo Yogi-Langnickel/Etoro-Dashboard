@@ -21,6 +21,9 @@ Read `SECURITY.md` before changing authentication, API credentials, eToro integr
 - Do not add dependencies that handle credentials, auth, finance, or cryptography without checking maintenance status and security posture.
 - Do not disable type checking, linting, security checks, CSRF protection, auth checks, or TLS verification.
 - Do not edit generated, dependency, vendor, or build-output files unless explicitly required.
+- Do not make code, documentation, memory, dependency, or configuration changes directly on `master` or `main`.
+- If a session starts on `master` or `main`, create or switch to a scoped `feature/`, `fix/`, `chore/`, or `docs/` branch before editing.
+- Completed deliverables target `develop`; `master` is release/promotion only and requires explicit user direction.
 
 ## Recommended Architecture
 

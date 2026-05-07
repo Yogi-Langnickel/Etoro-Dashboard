@@ -12,6 +12,8 @@ Last updated: 2026-05-07
 - Implementation has not started; this is a scaffold and planning state.
 - Official eToro API documentation must be verified before implementing live API behavior.
 - Default feature posture is read-only. Trading and account mutation features must stay disabled until explicitly designed, audited, and feature-gated.
+- Do not work directly on `master` or `main`; create/use a scoped branch and merge completed deliverables into `develop`.
+- `master` is release/promotion only and requires explicit user direction.
 
 ## Read Next
 
@@ -29,4 +31,3 @@ Last updated: 2026-05-07
 - Choose app stack. Recommended default: TypeScript + Next.js or another server-capable web stack, with all eToro API calls server-side.
 - Confirm whether this dashboard is read-only only, or whether order/trading actions are in scope later.
 - Confirm authentication model for dashboard users if it will be accessible beyond the local machine.
-
