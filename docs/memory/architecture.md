@@ -16,11 +16,10 @@ Recommended architecture:
 ## Suggested First Milestones
 
 1. Select stack and scaffold app.
-2. Add server-only eToro client shell with credential loading and redacted errors.
-3. Add read-only health/check endpoint.
-4. Add watchlist and instrument lookup views.
-5. Add portfolio snapshot view.
-6. Add market data charts.
-7. Add audit logs and export controls.
-8. Only then evaluate trading actions.
-
+1. Add server-only eToro client shell with credential loading and redacted errors.
+1. Add read-only health/check endpoint.
+1. Add watchlist and instrument lookup views.
+1. Add portfolio snapshot view.
+1. Add market data charts.
+1. Add audit logs and export controls.
+1. Only then evaluate trading actions.

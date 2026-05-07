@@ -28,6 +28,12 @@ This is a financial dashboard that may read portfolio data and may eventually pl
 - Separate read-only dashboard features from mutation-capable trading features.
 - Add tests for authentication failures, rate limits, malformed API responses, and redaction behavior before adding trading actions.
 
+## Markdown Quality
+
+- Keep Markdown files clean for markdownlint.
+- Surround lists with blank lines (`MD032`).
+- Use `1.` for each ordered-list item unless the repository lint config explicitly requires sequential numbering (`MD029`).
+
 ## Required Checks Before Shipping Financial Features
 
 - Threat model updated in `docs/memory/security.md`.
@@ -35,4 +41,3 @@ This is a financial dashboard that may read portfolio data and may eventually pl
 - Validation commands documented in `docs/agent-memory.md`.
 - No secret material appears in `git diff`, fixtures, docs, tests, or screenshots.
 - Public repo suitability reviewed before pushing.
-

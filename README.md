@@ -18,15 +18,14 @@ Project scaffold only. No live eToro integration has been implemented yet.
 Start with a read-only dashboard:
 
 1. API health and credential validation.
-2. Watchlists and instrument lookup.
-3. Portfolio snapshot and P/L views.
-4. Market data charts.
-5. Audit-safe export/reporting.
-6. Trading actions only after read-only flows, security checks, and confirmation UX are stable.
+1. Watchlists and instrument lookup.
+1. Portfolio snapshot and P/L views.
+1. Market data charts.
+1. Audit-safe export/reporting.
+1. Trading actions only after read-only flows, security checks, and confirmation UX are stable.
 
 ## Security
 
 Copy `.env.example` to `.env.local` for local development and fill values there. Do not commit real `.env` files.
 
 Credential rules and AI coding instructions live in `AGENTS.md`.
-
