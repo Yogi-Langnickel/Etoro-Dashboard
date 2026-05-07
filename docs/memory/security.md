@@ -32,3 +32,6 @@ High-impact risks:
 - Confirm no `.env.local`, private fixtures, or reports are staged.
 - Confirm README and docs do not include real keys or private account identifiers.
 
+## Current Audit Notes
+
+- 2026-05-07: `npm install --package-lock-only` created the initial lockfile and `npm audit --audit-level=moderate` passed with no vulnerabilities.

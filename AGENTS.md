@@ -6,6 +6,8 @@ Read this file first before inspecting or changing the project. Then read `docs/
 
 This is a financial dashboard that may read portfolio data and may eventually place orders through the eToro API. Treat the project as security-sensitive even when the GitHub repository is public.
 
+Read `SECURITY.md` before changing authentication, API credentials, eToro integration, persistence, exports, logging, or trading/order behavior.
+
 ## Non-Negotiable Rules
 
 - Never commit secrets, API keys, user keys, OAuth tokens, refresh tokens, cookies, private account identifiers, real portfolio exports, brokerage statements, screenshots with private balances, or production `.env` files.

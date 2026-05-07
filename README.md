@@ -28,4 +28,4 @@ Start with a read-only dashboard:
 
 Copy `.env.example` to `.env.local` for local development and fill values there. Do not commit real `.env` files.
 
-Credential rules and AI coding instructions live in `AGENTS.md`.
+Credential rules and AI coding instructions live in `AGENTS.md`. Repository security policy lives in `SECURITY.md`.
