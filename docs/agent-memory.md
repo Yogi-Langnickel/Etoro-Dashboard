@@ -15,7 +15,7 @@ Last updated: 2026-05-07
 - Default feature posture is read-only. Trading and account mutation features must stay disabled until explicitly designed, audited, and feature-gated.
 - Do not work directly on `master` or `main`; create/use a scoped branch and merge completed deliverables into `develop`.
 - `master` is release/promotion only and requires explicit user direction.
-- Orchestrated agent work must end with every touched repo clean; substantial merges into `develop` require two persona review iterations before merge.
+- Orchestrated implementation work is done only when reviewed work is merged into `develop` and every touched repo is clean; substantial merges require two persona review iterations before merge.
 
 ## Read Next
 

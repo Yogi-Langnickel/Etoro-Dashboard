@@ -25,7 +25,7 @@ Read `SECURITY.md` before changing authentication, API credentials, eToro integr
 - If a session starts on `master` or `main`, create or switch to a scoped `feature/`, `fix/`, `chore/`, or `docs/` branch before editing.
 - Completed deliverables target `develop`; `master` is release/promotion only and requires explicit user direction.
 - Developer agents must not merge substantial work into `develop` until two complete persona review iterations have run, required feedback has been addressed, and remaining feedback has been classified with rationale.
-- The orchestrating assistant owns final integration quality: maintain a touched-repository inventory, review each agent's diff, run appropriate validation, commit scoped completed work, and verify every touched worktree is clean before ending the task.
+- The orchestrating assistant owns final integration quality: maintain a touched-repository inventory, review each agent's diff, run appropriate validation, commit scoped completed work, complete the two-pass review gate, merge reviewed implementation work into `develop`, and verify every touched worktree is clean before ending the task.
 - End every task with a free, clean workstation: `git status --short --branch` must be clean in each touched repository. Exceptions are allowed only for explicit user clarifications or genuine user-resolved blockers, and the final report must state the exact question or action needed.
 
 ## Recommended Architecture
