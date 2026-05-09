@@ -10,10 +10,12 @@ Last updated: 2026-05-07
 - Intended repository visibility: public is acceptable only if no secrets, private financial data, screenshots, or account identifiers are committed.
 - Product: security-first financial dashboard for viewing and interacting with eToro API data.
 - Implementation has not started; this is a scaffold and planning state.
+- Dashboard implementation plan lives in `docs/dashboard-implementation-plan.md`.
 - Official eToro API documentation must be verified before implementing live API behavior.
 - Default feature posture is read-only. Trading and account mutation features must stay disabled until explicitly designed, audited, and feature-gated.
 - Do not work directly on `master` or `main`; create/use a scoped branch and merge completed deliverables into `develop`.
 - `master` is release/promotion only and requires explicit user direction.
+- Orchestrated agent work must end with every touched repo clean; substantial merges into `develop` require two persona review iterations before merge.
 
 ## Read Next
 
