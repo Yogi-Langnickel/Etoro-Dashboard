@@ -30,4 +30,4 @@ Copy `.env.example` to `.env.local` for local development and fill values there.
 
 Credential rules and AI coding instructions live in `AGENTS.md`. Repository security policy lives in `SECURITY.md`.
 
-Incident review and durable bug-learning workflow lives in `docs/incidents/README.md` and `docs/memory/bug-learning.md`.
+Incident review and durable bug-learning workflow lives in `docs/incidents/README.md` and `docs/memory/bug-learning.md`. New incident and qualifying bug lessons include transferability notes so the orchestrator can promote broadly useful learnings to workspace memory or affected repositories.

@@ -16,8 +16,11 @@ Last updated: 2026-05-09
 - Every incident requires an incident review in `docs/incidents/`.
 - Any bug or defect that reaches `develop` is a QA/test incident and requires incident review plus durable learning unless explicitly waived with rationale.
 - Non-incident bugs still require durable learning when the root cause is likely to recur, confusing, security-sensitive, test-gap-related, or affects shared behavior.
+- Incident reviews and qualifying non-incident bug lessons must include a transferability assessment: `local-only`, `workspace-general`, `family/cross-repo`, or `named repo targets`.
+- Subagent closeout must report whether new learning is transferable and suggest propagation targets.
 - Do not work directly on `master` or `main`; create/use a scoped branch and merge completed deliverables into `develop`.
 - `master` is release/promotion only and requires explicit user direction.
+- Orchestrators review new learnings after agent closeout and promote transferable items to workspace memory or affected repositories before final handoff when applicable.
 - Orchestrated implementation work is done only when reviewed work is merged into `develop` and every touched repo is clean; substantial merges require two persona review iterations before merge.
 
 ## Read Next

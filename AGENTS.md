@@ -28,7 +28,8 @@ Read `SECURITY.md` before changing authentication, API credentials, eToro integr
 - Every incident must get an incident review in `docs/incidents/`; production, security, data-integrity, workflow, and QA/test failures are examples, not limits on the rule.
 - Any bug or defect that reaches `develop` is a QA/test incident and requires an incident review plus durable learning unless explicitly waived with rationale.
 - Non-incident bugs that did not reach `develop` require lightweight durable learning when the root cause is likely to recur, confusing, security-sensitive, caused by or revealed a test gap, or affected shared behavior.
-- The orchestrating assistant owns final integration quality: maintain a touched-repository inventory, review each agent's diff, run appropriate validation, commit scoped completed work, complete the two-pass review gate, merge reviewed implementation work into `develop`, and verify every touched worktree is clean before ending the task.
+- Every incident review and every qualifying non-incident bug lesson must include a transferability assessment: `local-only`, `workspace-general`, `family/cross-repo`, or `named repo targets`.
+- The orchestrating assistant owns final integration quality: maintain a touched-repository inventory, review each agent's diff, run appropriate validation, commit scoped completed work, complete the two-pass review gate, merge reviewed implementation work into `develop`, review new incident and bug learnings after agent closeout, promote transferable learnings to workspace memory or affected repositories, and verify every touched worktree is clean before ending the task.
 - End every task with a free, clean workstation: `git status --short --branch` must be clean in each touched repository. Exceptions are allowed only for explicit user clarifications or genuine user-resolved blockers, and the final report must state the exact question or action needed.
 
 ## Recommended Architecture
@@ -57,4 +58,5 @@ Read `SECURITY.md` before changing authentication, API credentials, eToro integr
 
 - Before fixing a defect or incident, check `docs/incidents/`, `docs/memory/bug-learning.md`, and relevant `docs/memory/` notes for similar prior history.
 - After fixing, record what changed in the durable location that future agents will read: incident review for incidents, `docs/memory/bug-learning.md` for recurring non-incident bugs, and focused memory files for domain-specific rules.
+- In closeout, state whether any new learning is transferable and list suggested propagation targets, even when the answer is `local-only`.
 - Keep the worktree clean at handoff. If unrelated user changes remain, identify them clearly instead of reverting them.

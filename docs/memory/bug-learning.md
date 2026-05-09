@@ -19,6 +19,17 @@ For a bug that is not an incident and did not reach `develop`, record a lightwei
 
 If a bug or defect reached `develop`, do not handle it here. Treat it as a QA/test incident requiring an incident review in `docs/incidents/` plus durable learning unless explicitly waived with rationale. Incident durable learning belongs in the incident review plus relevant focused memory files, TODOs, or tests, not in this non-incident file.
 
+## Transferability Assessment
+
+Every qualifying non-incident bug lesson must state whether the learning should stay local or be considered for propagation:
+
+- `local-only`: specific to this repository's current code, docs, or workflow.
+- `workspace-general`: useful across the local workspace, regardless of project domain.
+- `family/cross-repo`: reusable for public repositories, financial apps, credential handling, privacy, or security-sensitive workflows.
+- `named repo targets`: likely applies to one or more specific repositories; name the candidate repositories when known.
+
+The fixing agent records the category and suggested propagation targets. The orchestrator reviews new lessons after closeout and promotes transferable items to workspace-level memory or affected repositories when applicable.
+
 ## Before Fixing A Bug
 
 - Search this file, `docs/incidents/`, and relevant `docs/memory/` files for similar prior failures.
@@ -35,6 +46,8 @@ Add a short dated entry when the lesson qualifies. Keep entries factual and reus
 - Symptom: What failed or surprised users.
 - Root cause: The durable cause, not only the local code mistake.
 - Prevention: Test, validation, workflow, or design rule that would catch it next time.
+- Transferability: local-only | workspace-general | family/cross-repo | named repo targets.
+- Suggested propagation targets: Workspace memory, affected repos, or none.
 - Links: PR, issue, incident review, or touched docs when available.
 ```
 
