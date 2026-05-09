@@ -29,3 +29,5 @@ Start with a read-only dashboard:
 Copy `.env.example` to `.env.local` for local development and fill values there. Do not commit real `.env` files.
 
 Credential rules and AI coding instructions live in `AGENTS.md`. Repository security policy lives in `SECURITY.md`.
+
+Incident review and durable bug-learning workflow lives in `docs/incidents/README.md` and `docs/memory/bug-learning.md`.
