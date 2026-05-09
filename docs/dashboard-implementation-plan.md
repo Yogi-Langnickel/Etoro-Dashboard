@@ -1,6 +1,6 @@
 # eToro Dashboard Implementation Plan
 
-Status: draft  
+Status: draft
 Created: 2026-05-09
 
 ## Persona Review Summary

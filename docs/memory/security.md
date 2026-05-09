@@ -1,7 +1,7 @@
 # Security Notes
 
 Status: active
-Last updated: 2026-05-07
+Last updated: 2026-05-09
 
 ## Threat Model
 
