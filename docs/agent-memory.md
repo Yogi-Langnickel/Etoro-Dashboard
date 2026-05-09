@@ -1,7 +1,7 @@
 # Etoro Dashboard Agent Memory
 
 Status: active
-Last updated: 2026-05-07
+Last updated: 2026-05-09
 
 ## Current Truth
 
@@ -10,8 +10,12 @@ Last updated: 2026-05-07
 - Intended repository visibility: public is acceptable only if no secrets, private financial data, screenshots, or account identifiers are committed.
 - Product: security-first financial dashboard for viewing and interacting with eToro API data.
 - Implementation has not started; this is a scaffold and planning state.
+- Dashboard implementation plan lives in `docs/dashboard-implementation-plan.md`.
 - Official eToro API documentation must be verified before implementing live API behavior.
 - Default feature posture is read-only. Trading and account mutation features must stay disabled until explicitly designed, audited, and feature-gated.
+- Do not work directly on `master` or `main`; create/use a scoped branch and merge completed deliverables into `develop`.
+- `master` is release/promotion only and requires explicit user direction.
+- Orchestrated implementation work is done only when reviewed work is merged into `develop` and every touched repo is clean; substantial merges require two persona review iterations before merge.
 
 ## Read Next
 
@@ -29,4 +33,3 @@ Last updated: 2026-05-07
 - Choose app stack. Recommended default: TypeScript + Next.js or another server-capable web stack, with all eToro API calls server-side.
 - Confirm whether this dashboard is read-only only, or whether order/trading actions are in scope later.
 - Confirm authentication model for dashboard users if it will be accessible beyond the local machine.
-

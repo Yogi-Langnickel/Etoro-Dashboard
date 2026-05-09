@@ -21,6 +21,12 @@ Read `SECURITY.md` before changing authentication, API credentials, eToro integr
 - Do not add dependencies that handle credentials, auth, finance, or cryptography without checking maintenance status and security posture.
 - Do not disable type checking, linting, security checks, CSRF protection, auth checks, or TLS verification.
 - Do not edit generated, dependency, vendor, or build-output files unless explicitly required.
+- Do not make code, documentation, memory, dependency, or configuration changes directly on `master` or `main`.
+- If a session starts on `master` or `main`, create or switch to a scoped `feature/`, `fix/`, `chore/`, or `docs/` branch before editing.
+- Completed deliverables target `develop`; `master` is release/promotion only and requires explicit user direction.
+- Developer agents must not merge substantial work into `develop` until two complete persona review iterations have run, required feedback has been addressed, and remaining feedback has been classified with rationale.
+- The orchestrating assistant owns final integration quality: maintain a touched-repository inventory, review each agent's diff, run appropriate validation, commit scoped completed work, complete the two-pass review gate, merge reviewed implementation work into `develop`, and verify every touched worktree is clean before ending the task.
+- End every task with a free, clean workstation: `git status --short --branch` must be clean in each touched repository. Exceptions are allowed only for explicit user clarifications or genuine user-resolved blockers, and the final report must state the exact question or action needed.
 
 ## Recommended Architecture
 
