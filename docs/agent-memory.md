@@ -13,6 +13,9 @@ Last updated: 2026-05-09
 - Dashboard implementation plan lives in `docs/dashboard-implementation-plan.md`.
 - Official eToro API documentation must be verified before implementing live API behavior.
 - Default feature posture is read-only. Trading and account mutation features must stay disabled until explicitly designed, audited, and feature-gated.
+- Every incident requires an incident review in `docs/incidents/`.
+- Any bug or defect that reaches `develop` is a QA/test incident and requires incident review plus durable learning unless explicitly waived with rationale.
+- Non-incident bugs still require durable learning when the root cause is likely to recur, confusing, security-sensitive, test-gap-related, or affects shared behavior.
 - Do not work directly on `master` or `main`; create/use a scoped branch and merge completed deliverables into `develop`.
 - `master` is release/promotion only and requires explicit user direction.
 - Orchestrated implementation work is done only when reviewed work is merged into `develop` and every touched repo is clean; substantial merges require two persona review iterations before merge.
@@ -23,10 +26,13 @@ Last updated: 2026-05-09
 - `docs/memory/security.md` for threat model and financial-app controls.
 - `docs/memory/architecture.md` before choosing or changing app architecture.
 - `docs/memory/etoro-api.md` before implementing eToro calls.
+- `docs/memory/bug-learning.md` before fixing defects, and after fixes that teach a durable lesson.
+- `docs/incidents/README.md` before classifying, fixing, or closing incidents.
 
 ## Commands
 
 - `npm run check`: placeholder until app stack is selected.
+- `git diff --check`: run before handoff for documentation and whitespace validation.
 
 ## Open Decisions
 
