@@ -62,6 +62,24 @@ test("public credential status excludes secret values", async () => {
   assert.equal(serialized.includes("secret-user-key"), false);
 });
 
+test("demo trade preview flag is explicit and public", async () => {
+  const config = await loadEtoroConfig({
+    env: {
+      ETORO_API_KEY: "api-key",
+      ETORO_USER_KEY: "user-key",
+      ENABLE_DEMO_TRADE_PREVIEW: "true",
+    },
+    readFile: async () => {
+      const error = new Error("missing");
+      error.code = "ENOENT";
+      throw error;
+    },
+  });
+
+  assert.equal(config.demoTradePreviewEnabled, true);
+  assert.equal(publicCredentialStatus(config).demoTradePreviewEnabled, true);
+});
+
 test("rejects non-HTTPS provider base URLs", async () => {
   await assert.rejects(
     loadEtoroConfig({
