@@ -30,6 +30,7 @@ Public material currently describes API access for market data, portfolios, watc
 - Respect rate limits and request-id requirements when documented.
 - Treat demo and real keys as separate credentials. Use demo/read permissions for the first integration slice.
 - Keep all local integration endpoints read-only until mutation flows have a separate threat model, feature flag, audit path, and review gate.
+- When provider payloads omit display-ready balance fields, derive user-facing financial KPIs only from documented formulas and cover those formulas with regression tests.
 
 ## Questions To Confirm
 

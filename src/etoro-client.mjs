@@ -58,6 +58,10 @@ export function buildEtoroHeaders(credentials, requestId = randomUUID()) {
 }
 
 function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -83,6 +87,32 @@ function sumAmounts(items) {
     const amount = firstNumber(item?.amount, item?.invested, item?.currentInvestment);
     return total + (amount ?? 0);
   }, 0);
+}
+
+function sumExternalCosts(items) {
+  return items.reduce((total, item) => {
+    const amount = firstNumber(item?.totalExternalCosts, item?.totalExternalCost);
+    return total + (amount ?? 0);
+  }, 0);
+}
+
+function pnlAmount(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return firstNumber(value.pnL, value.pnl, value.value, value.amount);
+  }
+
+  return firstNumber(value);
+}
+
+function sumPositionPnl(items) {
+  return items.reduce((total, item) => {
+    const amount = pnlAmount(item?.unrealizedPnL ?? item?.unrealizedPnl ?? item?.pnL);
+    return total + (amount ?? 0);
+  }, 0);
+}
+
+function roundCurrency(value) {
+  return Number.isFinite(value) ? Number(value.toFixed(2)) : null;
 }
 
 function normalizeTimestamp(value) {
@@ -177,22 +207,52 @@ function normalizeDemoPnl(payload) {
   const pendingOrderAmount = sumAmounts(orders);
   const availableCash =
     credit === null ? null : Number((credit - pendingManualAmount - pendingOrderAmount).toFixed(2));
+  const mirrorAvailableNet = mirrors.reduce((total, mirror) => {
+    const availableAmount = firstNumber(mirror?.availableAmount) ?? 0;
+    const closedProfit = firstNumber(mirror?.closedPositionsNetProfit) ?? 0;
+    return total + availableAmount - closedProfit;
+  }, 0);
+  const totalInvested = roundCurrency(
+    sumAmounts(positions) +
+      sumAmounts(mirrorPositions) +
+      mirrorAvailableNet +
+      pendingManualAmount +
+      pendingOrderAmount +
+      sumExternalCosts(manualOrdersForOpen),
+  );
+  const calculatedUnrealizedPnL = roundCurrency(
+    sumPositionPnl(positions) +
+      sumPositionPnl(mirrorPositions) +
+      mirrors.reduce((total, mirror) => total + (firstNumber(mirror?.closedPositionsNetProfit) ?? 0), 0),
+  );
+  const unrealizedPnL = firstNumber(
+    portfolio.unrealizedPnL,
+    portfolio.unrealizedPnl,
+    portfolio.netProfit,
+    calculatedUnrealizedPnL,
+  );
+  const equity = firstNumber(
+    portfolio.equity,
+    portfolio.netLiq,
+    portfolio.netLiquidation,
+    availableCash !== null && totalInvested !== null && unrealizedPnL !== null
+      ? roundCurrency(availableCash + totalInvested + unrealizedPnL)
+      : null,
+  );
 
   return {
     currency: "USD",
     credit,
-    equity: firstNumber(portfolio.equity, portfolio.netLiq, portfolio.netLiquidation),
+    equity,
     realizedPnL: firstNumber(
       portfolio.realizedPnL,
       portfolio.realizedPnl,
       portfolio.realizedProfit,
     ),
-    unrealizedPnL: firstNumber(
-      portfolio.unrealizedPnL,
-      portfolio.unrealizedPnl,
-      portfolio.netProfit,
-    ),
+    unrealizedPnL,
     availableCash,
+    totalInvested,
+    calculatedUnrealizedPnL,
     positionCount: positions.length + mirrorPositions.length,
     mirrorCount: mirrors.length,
     pendingOrderCount: orders.length + allOrdersForOpen.length + allOrdersForClose.length,
