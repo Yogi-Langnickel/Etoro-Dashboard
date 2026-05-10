@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>eToro Dashboard Mock Cockpit</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="cockpit" aria-label="Read-only eToro dashboard mock">
+      <header class="topbar">
+        <section class="identity" aria-labelledby="dashboard-title">
+          <p class="eyebrow">Static operational cockpit</p>
+          <h1 id="dashboard-title">eToro Dashboard</h1>
+          <p class="subtle">Mock data only. No brokerage connection, trading route, credential storage, or account mutation exists in this view.</p>
+        </section>
+        <section class="safety-strip" aria-label="Safety and connection status">
+          <div class="status-tile ok">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>
+              <strong>Read-only</strong>
+              <small>Trading disabled</small>
+            </span>
+          </div>
+          <div class="status-tile warn">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>
+              <strong>Provider offline</strong>
+              <small>Using synthetic fixtures</small>
+            </span>
+          </div>
+          <div class="status-tile neutral">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>
+              <strong>Demo frame</strong>
+              <small>No real account IDs</small>
+            </span>
+          </div>
+          <div class="status-tile neutral">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>
+              <strong>Last sync</strong>
+              <small>Not connected</small>
+            </span>
+          </div>
+        </section>
+      </header>
+
+      <section class="kpi-grid" aria-label="Portfolio KPI summary">
+        <article class="metric">
+          <span>Mock equity</span>
+          <strong>$124,580.00</strong>
+          <small class="neutral-text">Synthetic total balance</small>
+        </article>
+        <article class="metric">
+          <span>Cash buffer</span>
+          <strong>$18,420.00</strong>
+          <small class="good-text">14.8% unallocated</small>
+        </article>
+        <article class="metric">
+          <span>Unrealized P/L</span>
+          <strong class="good-text">+$2,184.70</strong>
+          <small class="neutral-text">Mock mark-to-market</small>
+        </article>
+        <article class="metric">
+          <span>Exposure</span>
+          <strong>1.16x</strong>
+          <small class="warn-text">Leverage review required</small>
+        </article>
+        <article class="metric">
+          <span>Stale data</span>
+          <strong>3 tiles</strong>
+          <small class="warn-text">Provider timestamp missing</small>
+        </article>
+      </section>
+
+      <div class="workspace">
+        <section class="panel positions-panel" aria-labelledby="positions-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Portfolio</p>
+              <h2 id="positions-title">Positions</h2>
+            </div>
+            <span class="pill lock">Read-only table</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Instrument</th>
+                  <th>Side</th>
+                  <th>Units</th>
+                  <th>Open</th>
+                  <th>Value</th>
+                  <th>P/L</th>
+                  <th>Risk flags</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>SPY</strong>
+                    <span>US ETF</span>
+                  </td>
+                  <td>Buy</td>
+                  <td>48.20</td>
+                  <td>$482.10</td>
+                  <td>$24,984</td>
+                  <td class="good-text">+$812</td>
+                  <td><span class="pill ok">No stop exposed</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>NVDA</strong>
+                    <span>Equity CFD</span>
+                  </td>
+                  <td>Buy</td>
+                  <td>12.00</td>
+                  <td>$873.40</td>
+                  <td>$11,482</td>
+                  <td class="good-text">+$1,006</td>
+                  <td><span class="pill warn">2x leverage</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>EURUSD</strong>
+                    <span>FX</span>
+                  </td>
+                  <td>Sell</td>
+                  <td>18,000</td>
+                  <td>1.0812</td>
+                  <td>$19,462</td>
+                  <td class="bad-text">-$226</td>
+                  <td><span class="pill danger">Stale quote</span></td>
+                </tr>
+                <tr>
+                  <td>
+                    <strong>BTC</strong>
+                    <span>Crypto</span>
+                  </td>
+                  <td>Buy</td>
+                  <td>0.42</td>
+                  <td>$61,840</td>
+                  <td>$27,312</td>
+                  <td class="good-text">+$592</td>
+                  <td><span class="pill warn">High volatility</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="panel watchlist-panel" aria-labelledby="watchlist-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Monitor</p>
+              <h2 id="watchlist-title">Watchlist</h2>
+            </div>
+            <span class="pill lock">No write actions</span>
+          </div>
+          <ul class="watchlist">
+            <li>
+              <span>
+                <strong>AAPL</strong>
+                <small>Equity</small>
+              </span>
+              <span class="quote">$192.30</span>
+              <span class="good-text">+0.8%</span>
+            </li>
+            <li>
+              <span>
+                <strong>GLD</strong>
+                <small>ETF</small>
+              </span>
+              <span class="quote">$214.19</span>
+              <span class="neutral-text">0.0%</span>
+            </li>
+            <li>
+              <span>
+                <strong>USOIL</strong>
+                <small>Commodity CFD</small>
+              </span>
+              <span class="quote">$79.46</span>
+              <span class="bad-text">-1.1%</span>
+            </li>
+            <li>
+              <span>
+                <strong>QQQ</strong>
+                <small>ETF</small>
+              </span>
+              <span class="quote stale">Stale</span>
+              <span class="warn-text">Stale</span>
+            </li>
+          </ul>
+        </aside>
+
+        <section class="panel chart-panel" aria-labelledby="chart-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Market data</p>
+              <h2 id="chart-title">SPY synthetic chart</h2>
+            </div>
+            <span class="pill warn">Placeholder</span>
+          </div>
+          <div class="chart-shell" role="img" aria-label="Placeholder line chart using synthetic values">
+            <div class="chart-grid" aria-hidden="true"></div>
+            <svg viewBox="0 0 640 260" preserveAspectRatio="none" aria-hidden="true">
+              <polyline points="0,205 64,190 128,198 192,154 256,168 320,118 384,132 448,86 512,102 576,62 640,78"></polyline>
+              <path d="M0 205 L64 190 L128 198 L192 154 L256 168 L320 118 L384 132 L448 86 L512 102 L576 62 L640 78 L640 260 L0 260 Z"></path>
+            </svg>
+          </div>
+          <div class="chart-meta">
+            <span>Provider timestamp: unavailable</span>
+            <span>Fixture window: 30 days</span>
+            <span>Request ID: mock-read-7f3a</span>
+          </div>
+        </section>
+
+        <section class="panel audit-panel" aria-labelledby="audit-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Read audit</p>
+              <h2 id="audit-title">Recent activity</h2>
+            </div>
+            <span class="pill ok">Redacted</span>
+          </div>
+          <ol class="audit-list">
+            <li>
+              <span class="event-time">09:32:14</span>
+              <span>
+                <strong>Portfolio summary fixture loaded</strong>
+                <small>Status 200 · 18 ms · payload normalized</small>
+              </span>
+            </li>
+            <li>
+              <span class="event-time">09:32:13</span>
+              <span>
+                <strong>Credential check skipped</strong>
+                <small>No credential values present in browser context</small>
+              </span>
+            </li>
+            <li>
+              <span class="event-time">09:32:12</span>
+              <span>
+                <strong>Market tile marked stale</strong>
+                <small>Provider timestamp unavailable · raw response hidden</small>
+              </span>
+            </li>
+            <li>
+              <span class="event-time">09:32:11</span>
+              <span>
+                <strong>Mutation routes absent</strong>
+                <small>Orders, copy trading, and account changes unavailable</small>
+              </span>
+            </li>
+          </ol>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>
