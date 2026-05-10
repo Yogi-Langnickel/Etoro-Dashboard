@@ -9,6 +9,7 @@ Last updated: 2026-05-10
 - Location: `/Users/yogi/Coding/projects/Etoro-Dashboard`.
 - Intended repository visibility: public is acceptable only if no secrets, private financial data, screenshots, or account identifiers are committed.
 - Product: security-first financial dashboard for viewing and interacting with eToro API data.
+- Repo-local financial compliance instructions in `AGENTS.md` are hard overrides over workspace-general security guidance.
 - Implementation has started as a static read-only cockpit mock in `src/index.html` and `src/styles.css`.
 - First local live-provider slice uses a dependency-free Node server with server-only eToro credentials, read-only routes, and built-in `node:test` coverage.
 - Planned UI direction is a switchable tab workspace: Landing / Widgets, Operational Cockpit, Risk Radar, Research Desk, and a demo-first Trading tab.

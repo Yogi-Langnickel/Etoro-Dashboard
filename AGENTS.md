@@ -8,6 +8,8 @@ This is a financial dashboard that may read portfolio data and may eventually pl
 
 Read `SECURITY.md` before changing authentication, API credentials, eToro integration, persistence, exports, logging, or trading/order behavior.
 
+These repo-local financial rules are hard overrides over workspace-level general security guidance. Workspace baselines are minimums only; never downgrade this repo to generic web-app security, validation, logging, or UX-copy assumptions.
+
 ## Non-Negotiable Rules
 
 - Never commit secrets, API keys, user keys, OAuth tokens, refresh tokens, cookies, private account identifiers, real portfolio exports, brokerage statements, screenshots with private balances, or production `.env` files.
@@ -24,6 +26,7 @@ Read `SECURITY.md` before changing authentication, API credentials, eToro integr
 - Do not make code, documentation, memory, dependency, or configuration changes directly on `master` or `main`.
 - If a session starts on `master` or `main`, create or switch to a scoped `feature/`, `fix/`, `chore/`, or `docs/` branch before editing.
 - Completed deliverables target `develop`; `master` is release/promotion only and requires explicit user direction.
+- Treat work as substantial when it changes or plans behavior, architecture, API contracts, provider integration, auth, credential handling, persistence, logging, exports, financial data, trading/order behavior, UI-copy that could imply advice, dependencies, CI/release gates, or reusable workflow rules. If unsure, use the two-pass review gate.
 - Developer agents must not merge substantial work into `develop` until two complete persona review iterations have run, required feedback has been addressed, and remaining feedback has been classified with rationale.
 - Every incident must get an incident review in `docs/incidents/`; production, security, data-integrity, workflow, and QA/test failures are examples, not limits on the rule.
 - Any bug or defect that reaches `develop` is a QA/test incident and requires an incident review plus durable learning unless explicitly waived with rationale.
