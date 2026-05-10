@@ -1,7 +1,7 @@
 # Etoro Dashboard Agent Memory
 
 Status: active
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 ## Current Truth
 
@@ -9,7 +9,7 @@ Last updated: 2026-05-09
 - Location: `/Users/yogi/Coding/projects/Etoro-Dashboard`.
 - Intended repository visibility: public is acceptable only if no secrets, private financial data, screenshots, or account identifiers are committed.
 - Product: security-first financial dashboard for viewing and interacting with eToro API data.
-- Implementation has not started; this is a scaffold and planning state.
+- Implementation has started as a static read-only cockpit mock in `src/index.html` and `src/styles.css`; the repo still has no real app build, lint, typecheck, or test stack.
 - Dashboard implementation plan lives in `docs/dashboard-implementation-plan.md`.
 - Official eToro API documentation must be verified before implementing live API behavior.
 - Default feature posture is read-only. Trading and account mutation features must stay disabled until explicitly designed, audited, and feature-gated.
@@ -22,6 +22,7 @@ Last updated: 2026-05-09
 - `master` is release/promotion only and requires explicit user direction.
 - Orchestrators review new learnings after agent closeout and promote transferable items to workspace memory or affected repositories before final handoff when applicable.
 - Orchestrated implementation work is done only when reviewed work is merged into `develop` and every touched repo is clean; substantial merges require two persona review iterations before merge.
+- Agent/subagent implementation closeout includes review-loop notes, bug/incident-learning classification, memory/TODO updates where durable, scoped commits, push to the intended remote branch, and a clean working tree unless an explicit blocker is reported.
 
 ## Read Next
 
