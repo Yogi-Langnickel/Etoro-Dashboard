@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>eToro Dashboard Mock Cockpit</title>
     <link rel="stylesheet" href="./styles.css">
+    <script src="./app.js" defer></script>
   </head>
   <body>
     <main class="cockpit" aria-label="Read-only eToro dashboard mock">
@@ -12,7 +13,7 @@
         <section class="identity" aria-labelledby="dashboard-title">
           <p class="eyebrow">Static operational cockpit</p>
           <h1 id="dashboard-title">eToro Dashboard</h1>
-          <p class="subtle">Mock data only. No brokerage connection, trading route, credential storage, or account mutation exists in this view.</p>
+          <p class="subtle">Read-only local dashboard. eToro credentials stay on the Node server; this browser view receives normalized summaries only.</p>
         </section>
         <section class="safety-strip" aria-label="Safety and connection status">
           <div class="status-tile ok">
@@ -22,21 +23,21 @@
               <small>Trading disabled</small>
             </span>
           </div>
-          <div class="status-tile warn">
+          <div class="status-tile warn" id="provider-status">
             <span class="status-dot" aria-hidden="true"></span>
             <span>
               <strong>Provider offline</strong>
               <small>Using synthetic fixtures</small>
             </span>
           </div>
-          <div class="status-tile neutral">
+          <div class="status-tile neutral" id="demo-status">
             <span class="status-dot" aria-hidden="true"></span>
             <span>
               <strong>Demo frame</strong>
               <small>No real account IDs</small>
             </span>
           </div>
-          <div class="status-tile neutral">
+          <div class="status-tile neutral" id="last-sync">
             <span class="status-dot" aria-hidden="true"></span>
             <span>
               <strong>Last sync</strong>
@@ -48,28 +49,28 @@
 
       <section class="kpi-grid" aria-label="Portfolio KPI summary">
         <article class="metric">
-          <span>Mock equity</span>
-          <strong>$124,580.00</strong>
+          <span id="mock-equity-label">Mock equity</span>
+          <strong id="mock-equity">$124,580.00</strong>
           <small class="neutral-text">Synthetic total balance</small>
         </article>
         <article class="metric">
           <span>Cash buffer</span>
-          <strong>$18,420.00</strong>
+          <strong id="cash-buffer">$18,420.00</strong>
           <small class="good-text">14.8% unallocated</small>
         </article>
         <article class="metric">
           <span>Unrealized P/L</span>
-          <strong class="good-text">+$2,184.70</strong>
+          <strong class="good-text" id="unrealized-pnl">+$2,184.70</strong>
           <small class="neutral-text">Mock mark-to-market</small>
         </article>
         <article class="metric">
           <span>Exposure</span>
-          <strong>1.16x</strong>
+          <strong id="exposure">1.16x</strong>
           <small class="warn-text">Leverage review required</small>
         </article>
         <article class="metric">
           <span>Stale data</span>
-          <strong>3 tiles</strong>
+          <strong id="stale-data">3 tiles</strong>
           <small class="warn-text">Provider timestamp missing</small>
         </article>
       </section>
@@ -81,7 +82,7 @@
               <p class="eyebrow">Portfolio</p>
               <h2 id="positions-title">Positions</h2>
             </div>
-            <span class="pill lock">Read-only table</span>
+            <button class="icon-button" id="refresh-etoro" type="button">Refresh</button>
           </div>
           <div class="table-wrap">
             <table>
@@ -210,9 +211,10 @@
             </svg>
           </div>
           <div class="chart-meta">
-            <span>Provider timestamp: unavailable</span>
+            <span id="chart-provider">Provider timestamp: unavailable</span>
             <span>Fixture window: 30 days</span>
-            <span>Request ID: mock-read-7f3a</span>
+            <span id="source-detail">No server credentials</span>
+            <span id="chart-request">Request ID: mock-read-7f3a</span>
           </div>
         </section>
 
@@ -224,7 +226,7 @@
             </div>
             <span class="pill ok">Redacted</span>
           </div>
-          <ol class="audit-list">
+          <ol class="audit-list" id="audit-list">
             <li>
               <span class="event-time">09:32:14</span>
               <span>

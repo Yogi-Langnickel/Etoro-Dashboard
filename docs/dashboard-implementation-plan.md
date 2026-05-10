@@ -62,6 +62,14 @@ Do not add `/api/trading/*` routes in the first milestone.
 
 ## Implementation Phases
 
+### Phase 0.5: Local Read-Only API Spike
+
+- Add a dependency-free Node server before selecting the final app framework.
+- Load local demo credentials from `${HOME}/.config/etoro/credentials.json` or `ETORO_CREDENTIALS_FILE`.
+- Implement server-only eToro calls for identity and demo P/L using official headers.
+- Keep browser responses normalized and redacted.
+- Use this slice to validate credential handling, provider reachability, and response shape before broader stack selection.
+
 ### Phase 0: Decisions
 
 - Confirm read-only milestone scope.
@@ -123,7 +131,8 @@ Run these before using real credentials:
 ## TODO Backlog
 
 - [ ] Replace placeholder package scripts with real lint, typecheck, unit test, audit, and check commands before implementation begins.
-- [ ] Confirm official eToro API access mode, scopes, demo availability, endpoint contracts, and permitted use before adding live-provider code.
+- [ ] Confirm official eToro API access mode, scopes, demo availability, endpoint contracts, and permitted use before broad live-provider implementation.
+- [ ] Validate the local read-only API spike against a demo/read eToro key.
 - [ ] Add server-only environment validation and import guards so credentials cannot enter browser bundles.
 - [ ] Create synthetic fixtures and DTO contract tests before rendering real portfolio, watchlist, or market data.
 - [ ] Build the first dashboard slice as read-only: health/safety bar, portfolio summary placeholder, positions table, stale-data state, and redacted audit trail.

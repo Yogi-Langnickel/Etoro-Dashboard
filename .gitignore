@@ -18,6 +18,8 @@ coverage/
 *.crt
 *.cert
 secrets/
+credentials*.json
+*.credentials.json
 
 # Logs and runtime output
 *.log
@@ -36,4 +38,3 @@ exports/
 reports/private/
 fixtures/private/
 screenshots/private/
-

@@ -1,7 +1,7 @@
 # Security Notes
 
 Status: active
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 ## Threat Model
 
@@ -18,6 +18,8 @@ High-impact risks:
 
 - Server-side API boundary for all eToro requests.
 - `.env.local` or deployment secret store for credentials; `.env*` ignored except `.env.example`.
+- Local eToro demo credentials may also be stored outside the repo at `${HOME}/.config/etoro/credentials.json` with user-only permissions.
+- Credentialed provider clients must pin allowed hosts before sending API keys or user keys.
 - Trading feature flags default to false: `ENABLE_TRADING_ACTIONS=false`, `ENABLE_LIVE_ORDERS=false`.
 - Validate all external API responses before use.
 - Redact sensitive fields in logs and errors.
@@ -31,6 +33,7 @@ High-impact risks:
 - Review `git diff` for credential-like values, account data, screenshots, and private exports.
 - Confirm no `.env.local`, private fixtures, or reports are staged.
 - Confirm README and docs do not include real keys or private account identifiers.
+- Confirm browser responses do not include `x-api-key`, `x-user-key`, credential file contents, or provider authorization headers.
 
 ## Current Audit Notes
 

@@ -4,7 +4,35 @@ Security-first dashboard for viewing and interacting with eToro API data.
 
 ## Status
 
-Project scaffold only. No live eToro integration has been implemented yet.
+First read-only local integration slice is in progress. The dashboard can run through a local Node server that keeps eToro credentials server-side and exposes only normalized demo/account summaries to the browser.
+
+## Local Demo Credentials
+
+Do not paste eToro keys into chat or commit them to the repo. Store your demo/read credentials at `${HOME}/.config/etoro/credentials.json`:
+
+```json
+{
+  "baseUrl": "https://public-api.etoro.com",
+  "publicApiKey": "YOUR_PUBLIC_API_KEY",
+  "userKey": "YOUR_DEMO_READ_USER_KEY"
+}
+```
+
+Set user-only permissions:
+
+```sh
+mkdir -p "${HOME}/.config/etoro"
+chmod 700 "${HOME}/.config/etoro"
+chmod 600 "${HOME}/.config/etoro/credentials.json"
+```
+
+Run locally:
+
+```sh
+npm run start
+```
+
+Then open `http://localhost:4173`. The app also accepts `ETORO_CREDENTIALS_FILE` if you want a different credential path.
 
 ## Goals
 
@@ -26,7 +54,7 @@ Start with a read-only dashboard:
 
 ## Security
 
-Copy `.env.example` to `.env.local` for local development and fill values there. Do not commit real `.env` files.
+Prefer `${HOME}/.config/etoro/credentials.json` for local credentials. `.env.local` is still ignored if environment overrides are needed. Do not commit real `.env` files or credential JSON files.
 
 Credential rules and AI coding instructions live in `AGENTS.md`. Repository security policy lives in `SECURITY.md`.
 
