@@ -13,7 +13,27 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/status",
   "/api/etoro/identity",
   "/api/etoro/demo/pnl",
+  "/api/etoro/demo/trading/status",
 ]);
+
+const PLANNED_DEMO_TRADING_ENDPOINTS = Object.freeze({
+  marketOpenByAmount: Object.freeze({
+    method: "POST",
+    path: "/api/v1/trading/execution/demo/market-open-orders/by-amount",
+  }),
+  marketOpenByUnits: Object.freeze({
+    method: "POST",
+    path: "/api/v1/trading/execution/demo/market-open-orders/by-units",
+  }),
+  marketClosePosition: Object.freeze({
+    method: "POST",
+    path: "/api/v1/trading/execution/demo/market-close-orders/positions/{positionId}",
+  }),
+  orderInfo: Object.freeze({
+    method: "GET",
+    path: "/api/v1/trading/info/demo/orders/{orderId}",
+  }),
+});
 
 const CONTENT_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -158,6 +178,26 @@ async function handleApiRoute(pathname, response, options) {
           baseUrl: config.baseUrl,
           endpoints: readOnlyEndpointSummary(),
         },
+      });
+      return;
+    }
+
+    if (pathname === "/api/etoro/demo/trading/status") {
+      sendJson(response, 200, {
+        ok: true,
+        mode: "demo-trading-planning",
+        demoOnly: true,
+        mutationRoutesEnabled: false,
+        credentialStatus: publicCredentialStatus(config),
+        plannedProviderEndpoints: PLANNED_DEMO_TRADING_ENDPOINTS,
+        requiredControls: [
+          "demo-only route namespace",
+          "explicit feature flag",
+          "confirmation step",
+          "request id audit",
+          "order result polling",
+          "raw payload redaction",
+        ],
       });
       return;
     }

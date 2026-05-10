@@ -11,6 +11,7 @@ Last updated: 2026-05-10
 - Product: security-first financial dashboard for viewing and interacting with eToro API data.
 - Implementation has started as a static read-only cockpit mock in `src/index.html` and `src/styles.css`.
 - First local live-provider slice uses a dependency-free Node server with server-only eToro credentials, read-only routes, and built-in `node:test` coverage.
+- The dashboard has a dedicated demo trading tab, but execution routes remain absent until a separate feature-flagged write flow is designed and reviewed.
 - Dashboard implementation plan lives in `docs/dashboard-implementation-plan.md`.
 - Official eToro API documentation must be verified before implementing live API behavior.
 - Default feature posture is read-only. Trading and account mutation features must stay disabled until explicitly designed, audited, and feature-gated.

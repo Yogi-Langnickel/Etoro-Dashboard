@@ -112,7 +112,8 @@ Do not add `/api/trading/*` routes in the first milestone.
 
 ### Phase 6: Trading Evaluation
 
-- Design demo trading separately before implementation.
+- Add a dedicated demo trading tab before execution routes.
+- Design demo trading execution separately before enabling submissions.
 - Keep `ENABLE_TRADING_ACTIONS=false` by default.
 - Require confirmation UX, idempotency, request IDs, audit logs, sandbox tests, and a dedicated review gate before any mutation route exists.
 
@@ -138,7 +139,7 @@ Run these before using real credentials:
 - [ ] Build the first dashboard slice as read-only: health/safety bar, portfolio summary placeholder, positions table, stale-data state, and redacted audit trail.
 - [ ] Add persona review after the first dashboard slice, incorporate appropriate feedback, run a second review, then complete checks before merging to `develop`.
 - [ ] Update `docs/agent-memory.md` after each implementation slice with decisions, changed files, provider assumptions, and checks run.
-- [ ] Keep trading routes and mutation UI out of scope until a separate threat model, demo-mode proof, confirmation UX, and review gate are complete.
+- [ ] Keep trading execution routes and enabled mutation controls out of scope until a separate threat model, demo-mode proof, confirmation UX, and review gate are complete.
 
 ## Primary Risks
 
