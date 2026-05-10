@@ -26,7 +26,17 @@ Initial libraries:
 
 ## Product Shape
 
-First screen sections:
+The dashboard should grow as a tabbed workspace rather than a single fixed view. Start with the operational cockpit, then add focused views behind tabs as their API contracts stabilize.
+
+Planned tabs:
+
+1. Landing / Widgets: modular overview with key figures and draggable widget layout later. Widget interactions can open compact detail popovers for small information or navigate to a deeper tab/page when the data volume is larger.
+1. Operational Cockpit: dense first-build dashboard for scanning account state, provider status, positions, watchlists, market chart, and redacted audit events.
+1. Risk Radar: exposure-first view with allocation, concentration, leverage/margin indicators, stale-data warnings, and P/L movement.
+1. Research Desk: watchlist, instrument discovery, symbol cards, market chart, social/read-only research feed where legally permitted, and planning states.
+1. Trading: dedicated demo-first trading workspace with preview, confirmation, status, and audit. Execution must stay gated until the write-flow review checklist is complete.
+
+Operational cockpit sections:
 
 1. Connection and safety bar: API health, credential presence, environment, read-only mode, real/demo mode, last successful sync, and rate-limit warnings.
 1. Portfolio overview: equity, cash, unrealized P/L, allocation, exposure, leverage, and margin indicators when available from official endpoints.
@@ -36,7 +46,18 @@ First screen sections:
 1. Read audit: endpoint category, request ID, status, latency, and redacted error code. Do not show account identifiers or raw provider payloads.
 1. Settings: credential validation status and feature flags only. Never display credential values.
 
-## Data And API Boundary
+## Backend Boundary
+
+The dashboard needs a server-side backend boundary. Near term, this can remain inside the web app as route handlers or the current Node server. It does not need a separately deployed service until hosting, bot execution, multi-user auth, or durable audit storage makes that valuable.
+
+Backend responsibilities:
+
+- Keep eToro credentials and provider headers server-side.
+- Expose typed DTOs for portfolio, positions, watchlist, market, risk, research, trade preview, and audit views.
+- Cache provider reads with freshness metadata, rate-limit handling, and request coalescing so switching tabs does not create duplicate provider calls.
+- Persist audit records before any mutation route is enabled.
+- Keep trading under a separate module/route namespace with feature flags, idempotency, confirmation, and reconciliation.
+- Keep any trading bot out of request/response routes. A bot should run as a separate worker/service with its own credentials, kill switch, hard limits, durable audit, monitoring, and read-only fallback.
 
 Proposed structure:
 
@@ -44,7 +65,7 @@ Proposed structure:
 - `src/server/etoro/client.ts`: the only module allowed to call eToro APIs.
 - `src/server/etoro/schemas/*`: Zod schemas for raw provider responses.
 - `src/server/etoro/dto/*`: normalized internal DTO mappers.
-- `src/app/api/*/route.ts`: internal read-only API routes.
+- `src/app/api/*/route.ts`: internal API routes, or the equivalent Node server routes until the final framework is selected.
 - `src/features/*`: UI features consuming internal DTOs only.
 - `src/lib/redaction.ts`: shared redaction for logs, errors, and tests.
 
@@ -100,9 +121,16 @@ Do not add `/api/trading/*` routes in the first milestone.
 
 ### Phase 4: Dashboard UI
 
-- Build the dashboard shell, safety bar, overview metrics, positions table, watchlists, and market chart.
+- Build the dashboard shell, tab navigation, safety bar, overview metrics, positions table, watchlists, and market chart.
 - Add loading, empty, stale, partial-error, unauthorized, and rate-limited states.
 - Add responsive and accessibility checks.
+
+### Phase 4.5: Tabbed Views
+
+- Add the Landing / Widgets overview with a static widget layout first.
+- Add Risk Radar and Research Desk using backend DTOs and shared freshness metadata.
+- Keep all tabs backed by cached server responses rather than direct client/provider calls.
+- Add widget interaction rules: popovers for compact detail, deep navigation for larger datasets.
 
 ### Phase 5: Audit And Export Controls
 
@@ -116,6 +144,13 @@ Do not add `/api/trading/*` routes in the first milestone.
 - Design demo trading execution separately before enabling submissions.
 - Keep `ENABLE_TRADING_ACTIONS=false` by default.
 - Require confirmation UX, idempotency, request IDs, audit logs, sandbox tests, and a dedicated review gate before any mutation route exists.
+
+### Phase 7: Trading Bot Evaluation
+
+- Treat the trading bot as a separate service/worker, not a UI component or route handler.
+- Confirm eToro API terms, automation permissions, account scope, and jurisdiction constraints before any implementation.
+- Require user auth, CSRF protection, request limits, body limits, origin policy, durable audit, idempotency, reconciliation, kill switch, hard risk limits, monitoring, alerting, and compliance review.
+- Keep bot controls disabled until sandbox proof shows live routes cannot be reached accidentally.
 
 ## Required Checks
 
@@ -137,9 +172,12 @@ Run these before using real credentials:
 - [ ] Add server-only environment validation and import guards so credentials cannot enter browser bundles.
 - [ ] Create synthetic fixtures and DTO contract tests before rendering real portfolio, watchlist, or market data.
 - [ ] Build the first dashboard slice as read-only: health/safety bar, portfolio summary placeholder, positions table, stale-data state, and redacted audit trail.
+- [ ] Build switchable tabs for Landing / Widgets, Operational Cockpit, Risk Radar, Research Desk, and Trading once backend DTOs are stable.
+- [ ] Add backend caching, freshness metadata, and request coalescing before tabs independently consume live provider data.
 - [ ] Add persona review after the first dashboard slice, incorporate appropriate feedback, run a second review, then complete checks before merging to `develop`.
 - [ ] Update `docs/agent-memory.md` after each implementation slice with decisions, changed files, provider assumptions, and checks run.
 - [ ] Keep trading execution routes and enabled mutation controls out of scope until a separate threat model, demo-mode proof, confirmation UX, and review gate are complete.
+- [ ] Keep trading-bot work out of scope until backend/audit/compliance gates and a worker architecture are approved.
 
 ## Primary Risks
 
