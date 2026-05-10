@@ -3,11 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "description": "Security-first dashboard for viewing and interacting with eToro API data.",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "check": "npm run lint && npm run typecheck && npm test",
-    "lint": "echo \"TODO: add lint command after app stack is selected\"",
-    "typecheck": "echo \"TODO: add typecheck command after app stack is selected\"",
-    "test": "echo \"TODO: add tests after app stack is selected\""
+    "lint": "node scripts/check-syntax.mjs",
+    "start": "node src/server.mjs",
+    "test": "node --test",
+    "typecheck": "node scripts/check-syntax.mjs"
   },
   "keywords": [
     "etoro",
@@ -16,4 +20,3 @@
   ],
   "license": "UNLICENSED"
 }
-

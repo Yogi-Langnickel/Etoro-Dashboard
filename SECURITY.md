@@ -10,6 +10,7 @@ Do not file public issues with eToro API credentials, user keys, OAuth tokens, a
 
 - Never commit `.env`, API keys, user keys, OAuth tokens, refresh tokens, cookies, private account identifiers, portfolio exports, brokerage statements, or screenshots with private balances.
 - Keep all eToro credentials and privileged API calls server-side.
+- Store local demo credentials outside the repository, preferably at `${HOME}/.config/etoro/credentials.json` with `chmod 600`.
 - Default to read-only behavior.
 - Keep trading, order placement, order cancellation, copy-trading, and account mutation disabled unless explicitly designed, feature-gated, confirmed, audited, and tested against a safe environment.
 - Validate and normalize every eToro API response before UI use or persistence.
@@ -18,7 +19,6 @@ Do not file public issues with eToro API credentials, user keys, OAuth tokens, a
 ## Before Public Push Or Release
 
 - Run `npm audit --audit-level=moderate`.
-- Run the project validation gates once the app stack is selected.
+- Run `npm run check`.
 - Review `git diff` for secrets, private financial data, screenshots, reports, and private fixtures.
 - Confirm `.env.local`, private exports, private reports, and screenshots are not staged.
-

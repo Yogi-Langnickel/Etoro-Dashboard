@@ -9,7 +9,8 @@ Last updated: 2026-05-10
 - Location: `/Users/yogi/Coding/projects/Etoro-Dashboard`.
 - Intended repository visibility: public is acceptable only if no secrets, private financial data, screenshots, or account identifiers are committed.
 - Product: security-first financial dashboard for viewing and interacting with eToro API data.
-- Implementation has started as a static read-only cockpit mock in `src/index.html` and `src/styles.css`; the repo still has no real app build, lint, typecheck, or test stack.
+- Implementation has started as a static read-only cockpit mock in `src/index.html` and `src/styles.css`.
+- First local live-provider slice uses a dependency-free Node server with server-only eToro credentials, read-only routes, and built-in `node:test` coverage.
 - Dashboard implementation plan lives in `docs/dashboard-implementation-plan.md`.
 - Official eToro API documentation must be verified before implementing live API behavior.
 - Default feature posture is read-only. Trading and account mutation features must stay disabled until explicitly designed, audited, and feature-gated.
@@ -35,7 +36,8 @@ Last updated: 2026-05-10
 
 ## Commands
 
-- `npm run check`: placeholder until app stack is selected.
+- `npm run check`: syntax check plus built-in Node tests.
+- `npm run start`: serve the local read-only dashboard on `http://localhost:4173`.
 - `git diff --check`: run before handoff for documentation and whitespace validation.
 
 ## Open Decisions

@@ -1,7 +1,7 @@
 # Bug Learning Notes
 
 Status: active
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 ## Purpose
 
@@ -55,4 +55,20 @@ Do not include secrets, private account identifiers, private portfolio data, scr
 
 ## Current Lessons
 
-- None yet.
+### 2026-05-10: Credentialed Provider Clients Need Host-Pinning And Strict Contracts
+
+- Symptom: Pre-merge review found the draft eToro client would send credential headers to any configured HTTPS host and could mark malformed provider responses as successful reads.
+- Root cause: The first implementation validated transport security but not provider identity, and it treated optional-looking response fields as acceptable despite official contract requirements.
+- Prevention: Pin credentialed provider base URLs to an allow-list, validate documented required response wrappers/fields, and add regression tests for poisoned base URLs and malformed successful responses before merge.
+- Transferability: family/cross-repo.
+- Suggested propagation targets: Workspace memory for credentialed API integrations; other finance or external-provider repos.
+- Links: `src/etoro-config.mjs`, `src/etoro-client.mjs`, `test/etoro-config.test.mjs`, `test/etoro-client.test.mjs`.
+
+### 2026-05-10: Local Static Servers Must Not Serve Server Modules
+
+- Symptom: Pre-merge review found the local server could serve backend modules from `src/` as browser assets.
+- Root cause: Static serving used the source directory as its root without a public asset allow-list.
+- Prevention: Serve only known public assets, return controlled 404s for malformed or private paths, and cover server-module requests in tests.
+- Transferability: family/cross-repo.
+- Suggested propagation targets: Workspace memory for local web app scaffolds.
+- Links: `src/server.mjs`, `test/server.test.mjs`.

@@ -1,7 +1,7 @@
 # Architecture Notes
 
 Status: active
-Last updated: 2026-05-07
+Last updated: 2026-05-10
 
 ## Initial Direction
 
@@ -12,6 +12,7 @@ Recommended architecture:
 - eToro client is isolated behind a server-only module.
 - All API responses are validated and normalized before rendering.
 - Mutation-capable API calls are separated from read-only calls and feature-gated.
+- Local static servers expose only explicit public assets; backend modules and source files are not static content.
 
 ## Suggested First Milestones
 
