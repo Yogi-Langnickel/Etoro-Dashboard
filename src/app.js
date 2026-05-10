@@ -94,8 +94,8 @@ function renderPnl(payload) {
   setTile("last-sync", "ok", "Last sync", new Date(payload.provider.receivedAt).toLocaleTimeString());
 }
 
-function renderAudit(message, detail) {
-  const list = document.getElementById("audit-list");
+function renderAudit(message, detail, listId = "audit-list") {
+  const list = document.getElementById(listId);
 
   if (!list) {
     return;
@@ -120,6 +120,63 @@ function renderAudit(message, detail) {
   }
 }
 
+function renderTradingStatus(payload) {
+  const configured = Boolean(payload.credentialStatus?.configured);
+  const mutationsEnabled = Boolean(payload.mutationRoutesEnabled);
+  const endpoints = payload.plannedProviderEndpoints ?? {};
+  const endpointTarget = document.getElementById("trading-endpoints");
+
+  text("trading-credential-state", configured ? "Configured" : "Missing");
+  text("trading-mutation-state", mutationsEnabled ? "Enabled" : "Disabled");
+  text("trading-provider-scope", payload.demoOnly ? "Demo only" : "Unknown");
+  text("trade-route-status", mutationsEnabled ? "Enabled" : "Planning only");
+
+  if (endpointTarget) {
+    endpointTarget.textContent = "";
+
+    for (const [name, endpoint] of Object.entries(endpoints)) {
+      const card = document.createElement("article");
+      const label = document.createElement("span");
+      const path = document.createElement("code");
+
+      card.className = "endpoint-card";
+      label.textContent = `${endpoint.method} ${name}`;
+      path.textContent = endpoint.path;
+      card.append(label, path);
+      endpointTarget.append(card);
+    }
+  }
+
+  renderAudit(
+    mutationsEnabled ? "Demo execution route enabled" : "Demo execution route disabled",
+    "Trade ticket remains UI-only until the write route is explicitly implemented",
+    "trading-audit-list",
+  );
+}
+
+async function refreshTradingStatus() {
+  try {
+    const status = await getJson("/api/etoro/demo/trading/status");
+    renderTradingStatus(status);
+  } catch (error) {
+    text("trading-credential-state", "Unavailable");
+    renderAudit("Trading status failed", error.message, "trading-audit-list");
+  }
+}
+
+function activateTab(targetId) {
+  document.querySelectorAll("[data-tab-target]").forEach((button) => {
+    const active = button.dataset.tabTarget === targetId;
+
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  });
+
+  document.querySelectorAll("[data-tab-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.tabPanel !== targetId;
+  });
+}
+
 async function refreshEtoro() {
   const button = document.getElementById("refresh-etoro");
 
@@ -131,6 +188,7 @@ async function refreshEtoro() {
     await getJson("/api/health");
     const status = await getJson("/api/etoro/status");
     renderStatus(status);
+    await refreshTradingStatus();
 
     if (!status.credentialStatus.configured) {
       renderAudit("Credential check incomplete", "No credential values present in browser context");
@@ -145,6 +203,7 @@ async function refreshEtoro() {
     renderAudit("Demo PnL summary loaded", "Provider response normalized and raw payload hidden");
   } catch (error) {
     setTile("provider-status", "warn", "Provider offline", "Using synthetic fixtures");
+    await refreshTradingStatus();
     renderAudit("Provider read failed", error.message);
   } finally {
     if (button) {
@@ -154,4 +213,14 @@ async function refreshEtoro() {
 }
 
 document.getElementById("refresh-etoro")?.addEventListener("click", refreshEtoro);
+document.getElementById("trade-ticket")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  renderAudit("Trade submit blocked", "No local execution route exists in this slice", "trading-audit-list");
+});
+document.getElementById("trade-preview-blocked")?.addEventListener("click", () => {
+  renderAudit("Trade preview blocked", "Execution preview requires the next feature-gated write slice", "trading-audit-list");
+});
+document.querySelectorAll("[data-tab-target]").forEach((button) => {
+  button.addEventListener("click", () => activateTab(button.dataset.tabTarget));
+});
 refreshEtoro();

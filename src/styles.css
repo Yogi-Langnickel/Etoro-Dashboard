@@ -113,6 +113,45 @@ h2 {
   gap: 10px;
 }
 
+.tabbar {
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(23, 27, 34, 0.94);
+}
+
+.tab-button {
+  min-width: 112px;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tab-button.active {
+  color: var(--text);
+  background: var(--surface-strong);
+}
+
+.tab-button:focus-visible,
+.trade-ticket input:focus,
+.trade-ticket select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tab-view[hidden] {
+  display: none;
+}
+
 .status-tile {
   display: flex;
   min-height: 112px;
@@ -277,6 +316,118 @@ h2 {
   outline-offset: 2px;
 }
 
+.danger-button {
+  border-color: rgba(242, 107, 107, 0.48);
+  background: var(--bad-bg);
+}
+
+.danger-button:disabled {
+  cursor: not-allowed;
+}
+
+.trading-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+  grid-template-areas:
+    "ticket readiness"
+    "endpoints audit";
+  gap: 18px;
+}
+
+.trading-ticket-panel {
+  grid-area: ticket;
+}
+
+.trading-readiness-panel {
+  grid-area: readiness;
+}
+
+.trading-endpoints-panel {
+  grid-area: endpoints;
+}
+
+.trading-audit-panel {
+  grid-area: audit;
+}
+
+.trade-ticket {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px;
+}
+
+.trade-ticket label,
+.trade-checks label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.trade-ticket input,
+.trade-ticket select {
+  min-height: 40px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: #111820;
+  padding: 8px 10px;
+}
+
+.trade-checks {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.trade-checks label {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  text-transform: none;
+}
+
+.readiness-list,
+.endpoint-grid {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.readiness-list li,
+.endpoint-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(48, 56, 70, 0.74);
+}
+
+.readiness-list span,
+.endpoint-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.endpoint-card code {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -424,7 +575,8 @@ td span {
 
 @media (max-width: 1180px) {
   .topbar,
-  .workspace {
+  .workspace,
+  .trading-layout {
     grid-template-columns: 1fr;
   }
 
@@ -433,6 +585,14 @@ td span {
       "positions"
       "watchlist"
       "chart"
+      "audit";
+  }
+
+  .trading-layout {
+    grid-template-areas:
+      "ticket"
+      "readiness"
+      "endpoints"
       "audit";
   }
 
@@ -460,6 +620,17 @@ td span {
   .panel-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .tabbar,
+  .trade-ticket,
+  .trade-checks {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .tabbar {
+    display: grid;
   }
 
   .watchlist li,

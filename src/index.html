@@ -8,19 +8,19 @@
     <script src="./app.js" defer></script>
   </head>
   <body>
-    <main class="cockpit" aria-label="Read-only eToro dashboard mock">
+    <main class="cockpit" aria-label="Local eToro dashboard">
       <header class="topbar">
         <section class="identity" aria-labelledby="dashboard-title">
           <p class="eyebrow">Static operational cockpit</p>
           <h1 id="dashboard-title">eToro Dashboard</h1>
-          <p class="subtle">Read-only local dashboard. eToro credentials stay on the Node server; this browser view receives normalized summaries only.</p>
+          <p class="subtle">Local dashboard for demo account monitoring and gated demo-trading preparation. eToro credentials stay on the Node server.</p>
         </section>
         <section class="safety-strip" aria-label="Safety and connection status">
           <div class="status-tile ok">
             <span class="status-dot" aria-hidden="true"></span>
             <span>
-              <strong>Read-only</strong>
-              <small>Trading disabled</small>
+              <strong>Demo gated</strong>
+              <small>No live routes</small>
             </span>
           </div>
           <div class="status-tile warn" id="provider-status">
@@ -47,7 +47,12 @@
         </section>
       </header>
 
-      <section class="kpi-grid" aria-label="Portfolio KPI summary">
+      <nav class="tabbar" aria-label="Dashboard sections" role="tablist">
+        <button class="tab-button active" id="overview-tab" type="button" role="tab" aria-controls="overview-view" aria-selected="true" data-tab-target="overview-view">Overview</button>
+        <button class="tab-button" id="trading-tab" type="button" role="tab" aria-controls="trading-view" aria-selected="false" data-tab-target="trading-view">Demo Trading</button>
+      </nav>
+
+      <section class="kpi-grid tab-view" id="overview-view" role="tabpanel" aria-labelledby="overview-tab" data-tab-panel="overview-view" aria-label="Portfolio KPI summary">
         <article class="metric">
           <span id="mock-equity-label">Mock equity</span>
           <strong id="mock-equity">$124,580.00</strong>
@@ -75,7 +80,7 @@
         </article>
       </section>
 
-      <div class="workspace">
+      <div class="workspace tab-view" data-tab-panel="overview-view">
         <section class="panel positions-panel" aria-labelledby="positions-title">
           <div class="panel-header">
             <div>
@@ -258,6 +263,129 @@
           </ol>
         </section>
       </div>
+
+      <section class="trading-layout tab-view" id="trading-view" role="tabpanel" aria-labelledby="trading-tab" data-tab-panel="trading-view" hidden>
+        <section class="panel trading-ticket-panel" aria-labelledby="trading-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Demo execution</p>
+              <h2 id="trading-title">Trade ticket</h2>
+            </div>
+            <span class="pill warn" id="trade-route-status">Planning only</span>
+          </div>
+          <form class="trade-ticket" id="trade-ticket">
+            <label>
+              <span>Order type</span>
+              <select id="trade-order-type">
+                <option>Market open by amount</option>
+                <option>Market open by units</option>
+                <option>Market close position</option>
+              </select>
+            </label>
+            <label>
+              <span>Instrument ID</span>
+              <input id="trade-instrument-id" inputmode="numeric" placeholder="100000">
+            </label>
+            <label>
+              <span>Side</span>
+              <select id="trade-side">
+                <option>Buy</option>
+                <option>Sell</option>
+              </select>
+            </label>
+            <label>
+              <span>Amount</span>
+              <input id="trade-amount" inputmode="decimal" placeholder="150.00">
+            </label>
+            <label>
+              <span>Units</span>
+              <input id="trade-units" inputmode="decimal" placeholder="0.001">
+            </label>
+            <label>
+              <span>Leverage</span>
+              <input id="trade-leverage" inputmode="numeric" placeholder="1">
+            </label>
+            <label>
+              <span>Stop loss</span>
+              <input id="trade-stop-loss" inputmode="decimal" placeholder="Optional">
+            </label>
+            <label>
+              <span>Take profit</span>
+              <input id="trade-take-profit" inputmode="decimal" placeholder="Optional">
+            </label>
+            <div class="trade-checks" aria-label="Trade safeguards">
+              <label>
+                <input type="checkbox" id="trade-demo-only" checked disabled>
+                <span>Demo account only</span>
+              </label>
+              <label>
+                <input type="checkbox" id="trade-confirmation-required" checked disabled>
+                <span>Confirmation required</span>
+              </label>
+              <label>
+                <input type="checkbox" id="trade-mutation-disabled" checked disabled>
+                <span>Execution route disabled</span>
+              </label>
+            </div>
+            <button class="icon-button" id="trade-preview-blocked" type="button">Preview block</button>
+            <button class="icon-button danger-button" type="submit" disabled>Submit disabled</button>
+          </form>
+        </section>
+
+        <aside class="panel trading-readiness-panel" aria-labelledby="trading-readiness-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Controls</p>
+              <h2 id="trading-readiness-title">Readiness</h2>
+            </div>
+            <span class="pill lock">No orders</span>
+          </div>
+          <ul class="readiness-list">
+            <li>
+              <span>Credential status</span>
+              <strong id="trading-credential-state">Unknown</strong>
+            </li>
+            <li>
+              <span>Execution routes</span>
+              <strong id="trading-mutation-state">Disabled</strong>
+            </li>
+            <li>
+              <span>Provider scope</span>
+              <strong id="trading-provider-scope">Demo only</strong>
+            </li>
+          </ul>
+        </aside>
+
+        <section class="panel trading-endpoints-panel" aria-labelledby="trading-endpoints-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">API contract</p>
+              <h2 id="trading-endpoints-title">Planned demo endpoints</h2>
+            </div>
+            <span class="pill warn">Not wired</span>
+          </div>
+          <div class="endpoint-grid" id="trading-endpoints"></div>
+        </section>
+
+        <section class="panel trading-audit-panel" aria-labelledby="trading-audit-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Audit</p>
+              <h2 id="trading-audit-title">Trade safety log</h2>
+            </div>
+            <span class="pill ok">Redacted</span>
+          </div>
+          <ol class="audit-list" id="trading-audit-list">
+            <li>
+              <span class="event-time">--:--:--</span>
+              <span>
+                <strong>Execution routes absent</strong>
+                <small>Demo trade ticket is UI-only in this slice</small>
+              </span>
+            </li>
+          </ol>
+        </section>
+      </section>
     </main>
   </body>
 </html>

@@ -48,9 +48,45 @@ test("server exposes only read-only internal API routes", () => {
     "/api/etoro/status",
     "/api/etoro/identity",
     "/api/etoro/demo/pnl",
+    "/api/etoro/demo/trading/status",
   ]);
-  assert.equal(serialized.includes("order"), false);
-  assert.equal(serialized.includes("trade"), false);
+  assert.equal(serialized.includes("execution"), false);
+  assert.equal(serialized.includes("market-open"), false);
+  assert.equal(serialized.includes("market-close"), false);
+});
+
+test("demo trading status is planning-only and does not expose secrets", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/api/etoro/demo/trading/status",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.demoOnly, true);
+  assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.match(response.text, /market-open-orders/);
+  assert.match(response.text, /market-close-orders/);
+});
+
+test("demo trading status returns planning metadata without credentials", async () => {
+  const response = await callHandler(createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      configured: false,
+      credentialFileLoaded: false,
+      credentialSource: "none",
+      missing: ["apiKey", "userKey"],
+    }),
+  }), {
+    url: "/api/etoro/demo/trading/status",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.demoOnly, true);
+  assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.json.credentialStatus.configured, false);
+  assert.equal(Object.keys(response.json.plannedProviderEndpoints).length, 4);
 });
 
 test("status route never returns configured secret values", async () => {

@@ -18,6 +18,11 @@ Public material currently describes API access for market data, portfolios, watc
 - Required request headers: `x-request-id` with a UUID, `x-api-key` for the public API key, and `x-user-key` for the user-specific key.
 - Identity smoke endpoint: `GET /api/v1/me`.
 - First portfolio endpoint for the local demo slice: `GET /api/v1/trading/info/demo/pnl`.
+- Verified demo trading reference endpoints:
+  - `POST /api/v1/trading/execution/demo/market-open-orders/by-amount`.
+  - `POST /api/v1/trading/execution/demo/market-open-orders/by-units`.
+  - `POST /api/v1/trading/execution/demo/market-close-orders/positions/{positionId}`.
+  - `GET /api/v1/trading/info/demo/orders/{orderId}`.
 - Credentials for local development live outside the repo at `${HOME}/.config/etoro/credentials.json` by default.
 - Do not expose provider headers, keys, raw credentials, or raw provider errors to browser code.
 
@@ -31,9 +36,10 @@ Public material currently describes API access for market data, portfolios, watc
 - Treat demo and real keys as separate credentials. Use demo/read permissions for the first integration slice.
 - Keep all local integration endpoints read-only until mutation flows have a separate threat model, feature flag, audit path, and review gate.
 - When provider payloads omit display-ready balance fields, derive user-facing financial KPIs only from documented formulas and cover those formulas with regression tests.
+- Demo trading UI may be introduced before execution routes, but write endpoints stay absent until the feature flag, confirmation UX, order audit, and result-polling contract are implemented.
 
 ## Questions To Confirm
 
 - Is API access already enabled on the user's eToro account?
 - Which scopes are needed for the first read-only dashboard milestone?
-- Are trading/order endpoints in scope for this project, or only viewing/reporting?
+- Which first demo trading execution should be implemented: open by amount, open by units, close position, or order-status polling?

@@ -4,7 +4,7 @@ Security-first dashboard for viewing and interacting with eToro API data.
 
 ## Status
 
-First read-only local integration slice is in progress. The dashboard can run through a local Node server that keeps eToro credentials server-side and exposes only normalized demo/account summaries to the browser.
+First local integration slice is in progress. The dashboard can run through a local Node server that keeps eToro credentials server-side, exposes normalized demo/account summaries to the browser, and includes a gated demo trading tab with no execution routes yet.
 
 ## Local Demo Credentials
 
@@ -39,6 +39,7 @@ Then open `http://localhost:4173`. The app also accepts `ETORO_CREDENTIALS_FILE`
 - View portfolio, watchlist, market, and social-trading data through official eToro API endpoints.
 - Keep credentials and privileged API calls server-side.
 - Treat trading actions as opt-in, audited, and feature-gated.
+- Keep demo trade execution disabled until the ticket, confirmation, audit, and order-status flow are implemented.
 - Keep the repository safe to publish publicly by never committing secrets or private financial data.
 
 ## Current Recommendation
