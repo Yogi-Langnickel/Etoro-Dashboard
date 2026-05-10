@@ -37,6 +37,7 @@ Public material currently describes API access for market data, portfolios, watc
 - Keep all local integration endpoints read-only until mutation flows have a separate threat model, feature flag, audit path, and review gate.
 - When provider payloads omit display-ready balance fields, derive user-facing financial KPIs only from documented formulas and cover those formulas with regression tests.
 - Demo trading UI may be introduced before execution routes, but write endpoints stay absent until the feature flag, confirmation UX, order audit, and result-polling contract are implemented.
+- `ENABLE_DEMO_TRADE_PREVIEW=true` enables local ticket validation/preview only. Preview routes must not call provider execution endpoints or echo raw instrument, position, account, key, or order identifiers.
 
 ## Questions To Confirm
 

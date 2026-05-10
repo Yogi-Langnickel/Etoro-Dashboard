@@ -277,9 +277,9 @@
             <label>
               <span>Order type</span>
               <select id="trade-order-type">
-                <option>Market open by amount</option>
-                <option>Market open by units</option>
-                <option>Market close position</option>
+                <option value="marketOpenByAmount">Market open by amount</option>
+                <option value="marketOpenByUnits">Market open by units</option>
+                <option value="marketClosePosition">Market close position</option>
               </select>
             </label>
             <label>
@@ -289,8 +289,8 @@
             <label>
               <span>Side</span>
               <select id="trade-side">
-                <option>Buy</option>
-                <option>Sell</option>
+                <option value="BUY">Buy</option>
+                <option value="SELL">Sell</option>
               </select>
             </label>
             <label>
@@ -313,6 +313,10 @@
               <span>Take profit</span>
               <input id="trade-take-profit" inputmode="decimal" placeholder="Optional">
             </label>
+            <label>
+              <span>Position ID</span>
+              <input id="trade-position-id" inputmode="numeric" placeholder="Close only">
+            </label>
             <div class="trade-checks" aria-label="Trade safeguards">
               <label>
                 <input type="checkbox" id="trade-demo-only" checked disabled>
@@ -327,7 +331,7 @@
                 <span>Execution route disabled</span>
               </label>
             </div>
-            <button class="icon-button" id="trade-preview-blocked" type="button">Preview block</button>
+            <button class="icon-button" id="trade-preview-blocked" type="button">Preview ticket</button>
             <button class="icon-button danger-button" type="submit" disabled>Submit disabled</button>
           </form>
         </section>

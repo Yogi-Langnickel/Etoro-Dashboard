@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { INTERNAL_API_ROUTES, createRequestHandler } from "../src/server.mjs";
 
-async function callHandler(handler, { method = "GET", url = "/api/health" } = {}) {
+async function callHandler(handler, { method = "GET", url = "/api/health", body = "" } = {}) {
   const response = {
     body: "",
     headers: {},
@@ -16,7 +16,7 @@ async function callHandler(handler, { method = "GET", url = "/api/health" } = {}
     },
   };
 
-  await handler({ method, url }, response);
+  await handler({ method, url, body }, response);
 
   return {
     status: response.status,
@@ -40,7 +40,7 @@ function configuredHandler() {
   });
 }
 
-test("server exposes only read-only internal API routes", () => {
+test("server exposes only internal API routes and no execution routes", () => {
   const serialized = JSON.stringify(INTERNAL_API_ROUTES).toLowerCase();
 
   assert.deepEqual(INTERNAL_API_ROUTES, [
@@ -49,6 +49,7 @@ test("server exposes only read-only internal API routes", () => {
     "/api/etoro/identity",
     "/api/etoro/demo/pnl",
     "/api/etoro/demo/trading/status",
+    "/api/etoro/demo/trading/preview",
   ]);
   assert.equal(serialized.includes("execution"), false);
   assert.equal(serialized.includes("market-open"), false);
@@ -87,6 +88,88 @@ test("demo trading status returns planning metadata without credentials", async 
   assert.equal(response.json.mutationRoutesEnabled, false);
   assert.equal(response.json.credentialStatus.configured, false);
   assert.equal(Object.keys(response.json.plannedProviderEndpoints).length, 4);
+});
+
+test("demo trade preview is blocked unless explicitly enabled", async () => {
+  const response = await callHandler(configuredHandler(), {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    body: JSON.stringify({
+      orderType: "marketOpenByAmount",
+      instrumentId: "100000",
+      side: "BUY",
+      amount: "150",
+    }),
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.json.executionBlocked, true);
+  assert.equal(response.json.error.code, "DEMO_TRADE_PREVIEW_DISABLED");
+});
+
+test("enabled demo trade preview returns a redacted non-executing ticket", async () => {
+  const response = await callHandler(createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      apiKey: "server-api-secret",
+      userKey: "server-user-secret",
+      configured: true,
+      credentialFileLoaded: true,
+      credentialSource: "file",
+      demoTradePreviewEnabled: true,
+      missing: [],
+    }),
+  }), {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    body: JSON.stringify({
+      orderType: "marketOpenByAmount",
+      instrumentId: "100000",
+      side: "BUY",
+      amount: "150",
+      leverage: "1",
+      stopLoss: "120",
+      takeProfit: "180",
+    }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.mode, "demo-trade-preview");
+  assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.json.executionBlocked, true);
+  assert.equal(response.json.ticket.hasInstrumentId, true);
+  assert.equal(response.json.ticket.instrumentId, undefined);
+  assert.equal(response.json.ticket.amount, 150);
+  assert.equal(response.text.includes("100000"), false);
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.match(response.json.providerEndpoint.path, /market-open-orders\/by-amount/);
+});
+
+test("demo trade preview validates required ticket fields", async () => {
+  const response = await callHandler(createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      configured: true,
+      credentialFileLoaded: false,
+      credentialSource: "environment",
+      demoTradePreviewEnabled: true,
+      missing: [],
+    }),
+  }), {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    body: JSON.stringify({
+      orderType: "marketOpenByUnits",
+      instrumentId: "100000",
+      side: "BUY",
+    }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.json.executionBlocked, true);
+  assert.equal(response.json.error.code, "INVALID_DEMO_TRADE_PREVIEW");
+  assert.match(response.json.error.message, /requires an instrument ID and units/);
 });
 
 test("status route never returns configured secret values", async () => {

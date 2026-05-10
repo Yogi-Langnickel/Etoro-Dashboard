@@ -54,6 +54,27 @@ async function getJson(path) {
   return payload;
 }
 
+async function postJson(path, body) {
+  const response = await fetch(path, {
+    body: JSON.stringify(body),
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  const payload = await response.json();
+
+  if (!response.ok || !payload.ok) {
+    const message = payload?.error?.message ?? `Request failed with HTTP ${response.status}`;
+    const error = new Error(message);
+    error.payload = payload;
+    throw error;
+  }
+
+  return payload;
+}
+
 function renderStatus(payload) {
   const status = payload.credentialStatus;
   const configured = Boolean(status?.configured);
@@ -129,7 +150,7 @@ function renderTradingStatus(payload) {
   text("trading-credential-state", configured ? "Configured" : "Missing");
   text("trading-mutation-state", mutationsEnabled ? "Enabled" : "Disabled");
   text("trading-provider-scope", payload.demoOnly ? "Demo only" : "Unknown");
-  text("trade-route-status", mutationsEnabled ? "Enabled" : "Planning only");
+  text("trade-route-status", payload.demoTradePreviewEnabled ? "Preview enabled" : "Planning only");
 
   if (endpointTarget) {
     endpointTarget.textContent = "";
@@ -148,8 +169,8 @@ function renderTradingStatus(payload) {
   }
 
   renderAudit(
-    mutationsEnabled ? "Demo execution route enabled" : "Demo execution route disabled",
-    "Trade ticket remains UI-only until the write route is explicitly implemented",
+    payload.demoTradePreviewEnabled ? "Demo preview route enabled" : "Demo execution route disabled",
+    "Trade ticket preview never places orders; execution remains absent",
     "trading-audit-list",
   );
 }
@@ -212,13 +233,40 @@ async function refreshEtoro() {
   }
 }
 
+function ticketValue(id) {
+  return document.getElementById(id)?.value?.trim() ?? "";
+}
+
+function collectTradeTicket() {
+  return {
+    orderType: ticketValue("trade-order-type"),
+    instrumentId: ticketValue("trade-instrument-id"),
+    side: ticketValue("trade-side"),
+    amount: ticketValue("trade-amount"),
+    units: ticketValue("trade-units"),
+    leverage: ticketValue("trade-leverage"),
+    stopLoss: ticketValue("trade-stop-loss"),
+    takeProfit: ticketValue("trade-take-profit"),
+    positionId: ticketValue("trade-position-id"),
+  };
+}
+
 document.getElementById("refresh-etoro")?.addEventListener("click", refreshEtoro);
 document.getElementById("trade-ticket")?.addEventListener("submit", (event) => {
   event.preventDefault();
   renderAudit("Trade submit blocked", "No local execution route exists in this slice", "trading-audit-list");
 });
-document.getElementById("trade-preview-blocked")?.addEventListener("click", () => {
-  renderAudit("Trade preview blocked", "Execution preview requires the next feature-gated write slice", "trading-audit-list");
+document.getElementById("trade-preview-blocked")?.addEventListener("click", async () => {
+  try {
+    const preview = await postJson("/api/etoro/demo/trading/preview", collectTradeTicket());
+    renderAudit(
+      "Trade preview generated",
+      `${preview.ticket.orderType} mapped to ${preview.providerEndpoint.method}; execution blocked`,
+      "trading-audit-list",
+    );
+  } catch (error) {
+    renderAudit("Trade preview blocked", error.message, "trading-audit-list");
+  }
 });
 document.querySelectorAll("[data-tab-target]").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.tabTarget));

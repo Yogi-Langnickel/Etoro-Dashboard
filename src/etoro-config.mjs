@@ -91,6 +91,10 @@ function credentialSource({ envApiKey, envUserKey, fileApiKey, fileUserKey }) {
   return "none";
 }
 
+function parseBooleanFlag(value) {
+  return String(value ?? "").trim().toLowerCase() === "true";
+}
+
 export async function loadEtoroConfig(options = {}) {
   const env = options.env ?? process.env;
   const readFileImpl = options.readFile ?? readFile;
@@ -122,6 +126,9 @@ export async function loadEtoroConfig(options = {}) {
     apiKey,
     userKey,
     configured: missing.length === 0,
+    demoTradePreviewEnabled: parseBooleanFlag(
+      env.ENABLE_DEMO_TRADE_PREVIEW ?? fileConfig.enableDemoTradePreview,
+    ),
     credentialsFile,
     credentialFileLoaded,
     credentialSource: credentialSource({ envApiKey, envUserKey, fileApiKey, fileUserKey }),
@@ -133,6 +140,7 @@ export function publicCredentialStatus(config) {
   return {
     baseUrl: config.baseUrl,
     configured: config.configured,
+    demoTradePreviewEnabled: Boolean(config.demoTradePreviewEnabled),
     credentialFileLoaded: config.credentialFileLoaded,
     credentialSource: config.credentialSource,
     missing: [...config.missing],

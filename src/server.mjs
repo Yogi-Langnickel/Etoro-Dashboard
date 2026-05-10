@@ -14,7 +14,10 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/identity",
   "/api/etoro/demo/pnl",
   "/api/etoro/demo/trading/status",
+  "/api/etoro/demo/trading/preview",
 ]);
+
+const DEMO_TRADE_PREVIEW_ROUTE = "/api/etoro/demo/trading/preview";
 
 const PLANNED_DEMO_TRADING_ENDPOINTS = Object.freeze({
   marketOpenByAmount: Object.freeze({
@@ -142,6 +145,150 @@ function credentialsMissingResponse(config) {
   };
 }
 
+function parsePositiveNumber(value, fieldName) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${fieldName} must be a positive number`);
+  }
+
+  return parsed;
+}
+
+async function readJsonBody(request) {
+  if (typeof request.body === "string") {
+    return request.body ? JSON.parse(request.body) : {};
+  }
+
+  const chunks = [];
+
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  const body = Buffer.concat(chunks).toString("utf8");
+  return body ? JSON.parse(body) : {};
+}
+
+function buildTradePreview(payload) {
+  const orderType = String(payload?.orderType ?? "");
+  const side = String(payload?.side ?? "").toUpperCase();
+  const instrumentId = String(payload?.instrumentId ?? "").trim();
+  const positionId = String(payload?.positionId ?? "").trim();
+  const amount = parsePositiveNumber(payload?.amount, "Amount");
+  const units = parsePositiveNumber(payload?.units, "Units");
+  const leverage = parsePositiveNumber(payload?.leverage, "Leverage") ?? 1;
+  const stopLoss = parsePositiveNumber(payload?.stopLoss, "Stop loss");
+  const takeProfit = parsePositiveNumber(payload?.takeProfit, "Take profit");
+
+  if (!["BUY", "SELL"].includes(side)) {
+    throw new Error("Side must be BUY or SELL");
+  }
+
+  if (orderType === "marketOpenByAmount") {
+    if (!instrumentId || amount === null) {
+      throw new Error("Market open by amount requires an instrument ID and amount");
+    }
+
+    return {
+      providerEndpoint: PLANNED_DEMO_TRADING_ENDPOINTS.marketOpenByAmount,
+      ticket: {
+        orderType,
+        side,
+        sizingMode: "amount",
+        hasInstrumentId: true,
+        amount,
+        leverage,
+        stopLossSet: stopLoss !== null,
+        takeProfitSet: takeProfit !== null,
+      },
+    };
+  }
+
+  if (orderType === "marketOpenByUnits") {
+    if (!instrumentId || units === null) {
+      throw new Error("Market open by units requires an instrument ID and units");
+    }
+
+    return {
+      providerEndpoint: PLANNED_DEMO_TRADING_ENDPOINTS.marketOpenByUnits,
+      ticket: {
+        orderType,
+        side,
+        sizingMode: "units",
+        hasInstrumentId: true,
+        units,
+        leverage,
+        stopLossSet: stopLoss !== null,
+        takeProfitSet: takeProfit !== null,
+      },
+    };
+  }
+
+  if (orderType === "marketClosePosition") {
+    if (!positionId) {
+      throw new Error("Market close position requires a position ID");
+    }
+
+    return {
+      providerEndpoint: PLANNED_DEMO_TRADING_ENDPOINTS.marketClosePosition,
+      ticket: {
+        orderType,
+        side,
+        sizingMode: "position",
+        hasPositionId: true,
+      },
+    };
+  }
+
+  throw new Error("Unsupported demo order type");
+}
+
+async function handleTradePreview(request, response, config) {
+  if (!config.demoTradePreviewEnabled) {
+    sendJson(response, 403, {
+      ok: false,
+      mode: "demo-trade-preview",
+      mutationRoutesEnabled: false,
+      executionBlocked: true,
+      error: {
+        code: "DEMO_TRADE_PREVIEW_DISABLED",
+        message: "Demo trade preview is disabled by server configuration",
+      },
+    });
+    return;
+  }
+
+  try {
+    const preview = buildTradePreview(await readJsonBody(request));
+
+    sendJson(response, 200, {
+      ok: true,
+      mode: "demo-trade-preview",
+      demoOnly: true,
+      mutationRoutesEnabled: false,
+      executionBlocked: true,
+      ...preview,
+      requiredNextStep: "Enable the audited execution route in a separate implementation step.",
+    });
+  } catch (error) {
+    sendJson(response, 400, {
+      ok: false,
+      mode: "demo-trade-preview",
+      mutationRoutesEnabled: false,
+      executionBlocked: true,
+      error: {
+        code: "INVALID_DEMO_TRADE_PREVIEW",
+        message: error?.message ?? "Demo trade preview is invalid",
+      },
+    });
+  }
+}
+
 async function handleApiRoute(pathname, response, options) {
   const loadConfig = options.loadConfig ?? loadEtoroConfig;
   const fetchEndpoint = options.fetchEndpoint ?? fetchReadOnlyEndpoint;
@@ -188,6 +335,7 @@ async function handleApiRoute(pathname, response, options) {
         mode: "demo-trading-planning",
         demoOnly: true,
         mutationRoutesEnabled: false,
+        demoTradePreviewEnabled: Boolean(config.demoTradePreviewEnabled),
         credentialStatus: publicCredentialStatus(config),
         plannedProviderEndpoints: PLANNED_DEMO_TRADING_ENDPOINTS,
         requiredControls: [
@@ -199,6 +347,11 @@ async function handleApiRoute(pathname, response, options) {
           "raw payload redaction",
         ],
       });
+      return;
+    }
+
+    if (pathname === DEMO_TRADE_PREVIEW_ROUTE) {
+      await handleTradePreview(options.request, response, config);
       return;
     }
 
@@ -229,6 +382,20 @@ export function createRequestHandler(options = {}) {
     const pathname = url.pathname;
 
     if (pathname.startsWith("/api/")) {
+      if (pathname === DEMO_TRADE_PREVIEW_ROUTE) {
+        if (request.method !== "POST") {
+          sendJson(response, 405, {
+            ok: false,
+            mode: "demo-trade-preview",
+            error: { code: "METHOD_NOT_ALLOWED", message: "Demo trade preview requires POST" },
+          });
+          return;
+        }
+
+        await handleApiRoute(pathname, response, { ...options, request });
+        return;
+      }
+
       if (request.method !== "GET") {
         sendJson(response, 405, {
           ok: false,
