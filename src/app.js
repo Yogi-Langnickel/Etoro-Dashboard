@@ -87,8 +87,8 @@ function renderPnl(payload) {
   text("mock-equity", money(data.equity ?? data.credit));
   text("cash-buffer", money(data.availableCash));
   text("unrealized-pnl", signedMoney(data.unrealizedPnL));
-  text("exposure", `${data.positionCount} positions`);
-  text("stale-data", `${data.pendingOrderCount} pending`);
+  text("exposure", money(data.totalInvested));
+  text("stale-data", `${data.positionCount} positions`);
   text("chart-provider", data.providerUpdatedAt ? `Provider timestamp: ${data.providerUpdatedAt}` : "Provider timestamp: unavailable");
   text("chart-request", `Request ID: ${payload.provider.requestId}`);
   setTile("last-sync", "ok", "Last sync", new Date(payload.provider.receivedAt).toLocaleTimeString());

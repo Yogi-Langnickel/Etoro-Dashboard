@@ -59,9 +59,9 @@ test("demo PnL response is summarized and raw order details are not returned", a
           clientPortfolio: {
             credit: 1000,
             unrealizedPnL: 25,
-            positions: [{ instrumentId: 1 }, { instrumentId: 2 }],
+            positions: [{ amount: 300, instrumentId: 1 }, { amount: 200, instrumentId: 2 }],
             ordersForOpen: [
-              { amount: 100, mirrorID: 0, privateNote: "do not expose" },
+              { amount: 100, mirrorID: 0, privateNote: "do not expose", totalExternalCosts: 5 },
               { amount: 200, mirrorID: 5 },
             ],
             orders: [{ amount: 50 }],
@@ -73,9 +73,12 @@ test("demo PnL response is summarized and raw order details are not returned", a
 
   assert.equal(result.data.credit, 1000);
   assert.equal(result.data.availableCash, 850);
+  assert.equal(result.data.totalInvested, 655);
+  assert.equal(result.data.equity, 1530);
   assert.equal(result.data.positionCount, 2);
   assert.equal(result.data.pendingOrderCount, 3);
   assert.equal(JSON.stringify(result).includes("privateNote"), false);
+  assert.equal(JSON.stringify(result).includes("instrumentId"), false);
 });
 
 test("demo PnL response supports the documented clientPortfolio wrapper", async () => {
@@ -86,12 +89,13 @@ test("demo PnL response supports the documented clientPortfolio wrapper", async 
         JSON.stringify({
           clientPortfolio: {
             credit: 10000.5,
-            unrealizedPnL: 251,
-            positions: [{ positionId: 9001 }],
+            positions: [{ amount: 500, positionId: 9001, unrealizedPnL: { pnL: 50 } }],
             mirrors: [
               {
+                availableAmount: 100,
+                closedPositionsNetProfit: 40,
                 mirrorId: 1,
-                positions: [{ positionId: 9002 }],
+                positions: [{ amount: 250, positionId: 9002, unrealizedPnL: 25 }],
                 ordersForOpen: [{ amount: 1000 }],
                 ordersForClose: [{ orderId: 2002 }],
                 ordersForCloseMultiple: [{ orderId: 3002 }],
@@ -107,10 +111,39 @@ test("demo PnL response supports the documented clientPortfolio wrapper", async 
   });
 
   assert.equal(result.data.credit, 10000.5);
-  assert.equal(result.data.unrealizedPnL, 251);
+  assert.equal(result.data.unrealizedPnL, 115);
+  assert.equal(result.data.totalInvested, 1060);
+  assert.equal(result.data.equity, 10925.5);
   assert.equal(result.data.positionCount, 2);
   assert.equal(result.data.mirrorCount, 1);
   assert.equal(result.data.pendingOrderCount, 6);
+  assert.equal(JSON.stringify(result).includes("positionId"), false);
+  assert.equal(JSON.stringify(result).includes("mirrorId"), false);
+  assert.equal(JSON.stringify(result).includes("orderId"), false);
+});
+
+test("demo PnL ignores nullable provider totals and uses derived fallbacks", async () => {
+  const result = await fetchReadOnlyEndpoint("demoPnl", {
+    credentials,
+    fetchImpl: async () =>
+      new Response(
+        JSON.stringify({
+          clientPortfolio: {
+            credit: 1000,
+            equity: null,
+            unrealizedPnL: null,
+            positions: [{ amount: 500, positionID: 1, unrealizedPnL: 25 }],
+          },
+        }),
+        { status: 200 },
+      ),
+  });
+
+  assert.equal(result.data.availableCash, 1000);
+  assert.equal(result.data.totalInvested, 500);
+  assert.equal(result.data.unrealizedPnL, 25);
+  assert.equal(result.data.equity, 1525);
+  assert.equal(JSON.stringify(result).includes("positionID"), false);
 });
 
 test("identity requires documented account reference fields", async () => {
