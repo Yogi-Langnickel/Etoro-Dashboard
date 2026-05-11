@@ -249,9 +249,9 @@ function researchDeskStatus(config) {
       recommendations: "disabled",
     },
     watchlistPreview: [
-      { symbol: "SPY", assetClass: "ETF", state: "fixture", note: "Broad US equity exposure placeholder" },
-      { symbol: "AAPL", assetClass: "Equity", state: "fixture", note: "Large-cap symbol placeholder" },
-      { symbol: "GLD", assetClass: "ETF", state: "fixture", note: "Commodity hedge placeholder" },
+      { symbol: "SPY", assetClass: "ETF", state: "fixture", note: "Synthetic ETF row placeholder" },
+      { symbol: "AAPL", assetClass: "Equity", state: "fixture", note: "Synthetic equity row placeholder" },
+      { symbol: "GLD", assetClass: "ETF", state: "fixture", note: "Synthetic ETF row placeholder" },
     ],
     instrumentLookup: {
       enabled: false,
