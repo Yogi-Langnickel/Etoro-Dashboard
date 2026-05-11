@@ -52,6 +52,7 @@
         <button class="tab-button" id="trading-tab" type="button" role="tab" aria-controls="trading-view" aria-selected="false" data-tab-target="trading-view">Demo Trading</button>
         <button class="tab-button" id="bot-tab" type="button" role="tab" aria-controls="bot-view" aria-selected="false" data-tab-target="bot-view">Bot Monitor</button>
         <button class="tab-button" id="risk-tab" type="button" role="tab" aria-controls="risk-view" aria-selected="false" data-tab-target="risk-view">Risk Radar</button>
+        <button class="tab-button" id="research-tab" type="button" role="tab" aria-controls="research-view" aria-selected="false" data-tab-target="research-view">Research Desk</button>
       </nav>
 
       <section class="kpi-grid tab-view" id="overview-view" role="tabpanel" aria-labelledby="overview-tab" data-tab-panel="overview-view" aria-label="Portfolio KPI summary">
@@ -559,6 +560,101 @@
               <span>
                 <strong>Risk radar waiting for read-only data</strong>
                 <small>No portfolio identifiers or provider payloads are stored in the browser</small>
+              </span>
+            </li>
+          </ol>
+        </section>
+      </section>
+
+      <section class="research-layout tab-view" id="research-view" role="tabpanel" aria-labelledby="research-tab" data-tab-panel="research-view" hidden>
+        <section class="panel research-status-panel" aria-labelledby="research-status-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Research posture</p>
+              <h2 id="research-status-title">Research desk</h2>
+            </div>
+            <span class="pill lock">Read only</span>
+          </div>
+          <div class="research-hero">
+            <div>
+              <span>Watchlists</span>
+              <strong id="research-watchlists-state">Synthetic placeholder</strong>
+              <small>No watchlist writes are enabled.</small>
+            </div>
+            <div>
+              <span>Instruments</span>
+              <strong id="research-instruments-state">Synthetic placeholder</strong>
+              <small>Provider lookup stays server-side when connected.</small>
+            </div>
+            <div>
+              <span>Social feed</span>
+              <strong id="research-feed-state">Disabled</strong>
+              <small>Posting and feed reads are out of scope.</small>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel research-safeguards-panel" aria-labelledby="research-safeguards-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Controls</p>
+              <h2 id="research-safeguards-title">Safeguards</h2>
+            </div>
+            <span class="pill ok">No writes</span>
+          </div>
+          <ul class="readiness-list">
+            <li>
+              <span>Lookup route</span>
+              <strong id="research-lookup-state">Disabled</strong>
+            </li>
+            <li>
+              <span>Exact symbol lookup</span>
+              <strong id="research-symbol-state">Planned server only</strong>
+            </li>
+            <li>
+              <span>Watchlist mutation</span>
+              <strong id="research-watchlist-write-state">Blocked</strong>
+            </li>
+            <li>
+              <span>Feed posting</span>
+              <strong id="research-feed-write-state">Blocked</strong>
+            </li>
+            <li>
+              <span>Account identifiers</span>
+              <strong id="research-account-state">Redacted</strong>
+            </li>
+          </ul>
+        </aside>
+
+        <section class="panel research-watchlist-panel" aria-labelledby="research-watchlist-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Fixtures</p>
+              <h2 id="research-watchlist-title">Watchlist preview</h2>
+            </div>
+            <span class="pill warn">Synthetic</span>
+          </div>
+          <ul class="research-list" id="research-watchlist"></ul>
+          <div class="research-fields">
+            <span>Lookup fields</span>
+            <code id="research-fields">instrumentId, internalSymbolFull, displayname, marketId</code>
+          </div>
+        </section>
+
+        <section class="panel research-audit-panel" aria-labelledby="research-audit-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Audit</p>
+              <h2 id="research-audit-title">Research log</h2>
+            </div>
+            <span class="pill ok">Redacted</span>
+          </div>
+          <ol class="audit-list" id="research-audit-list">
+            <li>
+              <span class="event-time">--:--:--</span>
+              <span>
+                <strong>Research desk waiting for read-only data</strong>
+                <small>No watchlist writes, feed posts, or raw provider payloads are enabled</small>
               </span>
             </li>
           </ol>

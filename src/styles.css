@@ -352,6 +352,15 @@ h2 {
   gap: 18px;
 }
 
+.research-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  grid-template-areas:
+    "status safeguards"
+    "watchlist audit";
+  gap: 18px;
+}
+
 .trading-ticket-panel {
   grid-area: ticket;
 }
@@ -396,8 +405,25 @@ h2 {
   grid-area: audit;
 }
 
+.research-status-panel {
+  grid-area: status;
+}
+
+.research-safeguards-panel {
+  grid-area: safeguards;
+}
+
+.research-watchlist-panel {
+  grid-area: watchlist;
+}
+
+.research-audit-panel {
+  grid-area: audit;
+}
+
 .bot-hero,
-.risk-hero {
+.risk-hero,
+.research-hero {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
@@ -409,7 +435,8 @@ h2 {
 }
 
 .bot-hero > div,
-.risk-hero > div {
+.risk-hero > div,
+.research-hero > div {
   min-height: 128px;
   padding: 16px;
   border: 1px solid var(--line);
@@ -418,7 +445,8 @@ h2 {
 }
 
 .bot-hero span,
-.risk-hero span {
+.risk-hero span,
+.research-hero span {
   display: block;
   margin-bottom: 12px;
   color: var(--muted);
@@ -428,7 +456,8 @@ h2 {
 }
 
 .bot-hero strong,
-.risk-hero strong {
+.risk-hero strong,
+.research-hero strong {
   display: block;
   margin-bottom: 8px;
   font-size: 1.45rem;
@@ -484,6 +513,7 @@ h2 {
 
 .readiness-list,
 .risk-check-list,
+.research-list,
 .endpoint-grid {
   display: grid;
   gap: 0;
@@ -494,6 +524,7 @@ h2 {
 
 .readiness-list li,
 .risk-check-list li,
+.research-list li,
 .endpoint-card {
   display: grid;
   gap: 6px;
@@ -501,6 +532,7 @@ h2 {
   border-bottom: 1px solid rgba(48, 56, 70, 0.74);
 }
 
+.research-list li,
 .risk-check-list li {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -508,6 +540,7 @@ h2 {
 
 .readiness-list span,
 .risk-check-list span,
+.research-list span,
 .endpoint-card span {
   color: var(--muted);
   font-size: 0.78rem;
@@ -522,14 +555,35 @@ h2 {
 }
 
 .risk-check-list strong,
-.risk-check-list small {
+.risk-check-list small,
+.research-list strong,
+.research-list small {
   display: block;
 }
 
-.risk-check-list small {
+.risk-check-list small,
+.research-list small {
   margin-top: 4px;
   color: var(--muted);
   line-height: 1.35;
+}
+
+.research-fields {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-top: 1px solid rgba(48, 56, 70, 0.74);
+}
+
+.research-fields span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.research-fields code {
+  overflow-wrap: anywhere;
 }
 
 .table-wrap {
@@ -682,7 +736,8 @@ td span {
   .workspace,
   .trading-layout,
   .bot-layout,
-  .risk-layout {
+  .risk-layout,
+  .research-layout {
     grid-template-columns: 1fr;
   }
 
@@ -717,10 +772,19 @@ td span {
       "audit";
   }
 
+  .research-layout {
+    grid-template-areas:
+      "status"
+      "safeguards"
+      "watchlist"
+      "audit";
+  }
+
   .safety-strip,
   .kpi-grid,
   .bot-hero,
-  .risk-hero {
+  .risk-hero,
+  .research-hero {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -733,7 +797,8 @@ td span {
   .safety-strip,
   .kpi-grid,
   .bot-hero,
-  .risk-hero {
+  .risk-hero,
+  .research-hero {
     grid-template-columns: 1fr;
   }
 

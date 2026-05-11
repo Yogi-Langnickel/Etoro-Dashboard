@@ -17,6 +17,7 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/demo/trading/preview",
   "/api/etoro/bot/status",
   "/api/etoro/risk/status",
+  "/api/etoro/research/status",
 ]);
 
 const DEMO_TRADE_PREVIEW_ROUTE = "/api/etoro/demo/trading/preview";
@@ -234,6 +235,38 @@ function riskRadarStatus(config) {
   };
 }
 
+function researchDeskStatus(config) {
+  return {
+    ok: true,
+    mode: "research-desk-planning",
+    readOnly: true,
+    mutationRoutesEnabled: false,
+    credentialStatus: publicCredentialStatus(config),
+    dataSources: {
+      watchlists: "synthetic-placeholder",
+      instruments: "synthetic-placeholder",
+      socialFeed: "disabled",
+      recommendations: "disabled",
+    },
+    watchlistPreview: [
+      { symbol: "SPY", assetClass: "ETF", state: "fixture", note: "Broad US equity exposure placeholder" },
+      { symbol: "AAPL", assetClass: "Equity", state: "fixture", note: "Large-cap symbol placeholder" },
+      { symbol: "GLD", assetClass: "ETF", state: "fixture", note: "Commodity hedge placeholder" },
+    ],
+    instrumentLookup: {
+      enabled: false,
+      requiredFields: ["instrumentId", "internalSymbolFull", "displayname", "marketId"],
+      exactSymbolLookup: "planned-server-only",
+    },
+    safeguards: {
+      watchlistMutation: "blocked",
+      feedPosting: "blocked",
+      accountIdentifiers: "redacted",
+      rawProviderPayloads: "hidden",
+    },
+  };
+}
+
 function parsePositiveNumber(value, fieldName) {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -446,6 +479,11 @@ async function handleApiRoute(pathname, response, options) {
 
     if (pathname === "/api/etoro/risk/status") {
       sendJson(response, 200, riskRadarStatus(config));
+      return;
+    }
+
+    if (pathname === "/api/etoro/research/status") {
+      sendJson(response, 200, researchDeskStatus(config));
       return;
     }
 

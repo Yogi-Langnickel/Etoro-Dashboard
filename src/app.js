@@ -262,6 +262,67 @@ function renderRiskStatus(payload) {
   );
 }
 
+function renderResearchStatus(payload) {
+  const sources = payload.dataSources ?? {};
+  const lookup = payload.instrumentLookup ?? {};
+  const safeguards = payload.safeguards ?? {};
+  const preview = payload.watchlistPreview ?? [];
+  const previewTarget = document.getElementById("research-watchlist");
+  const fieldsTarget = document.getElementById("research-fields");
+
+  text("research-watchlists-state", labelize(sources.watchlists));
+  text("research-instruments-state", labelize(sources.instruments));
+  text("research-feed-state", labelize(sources.socialFeed));
+  text("research-recommendations-state", labelize(sources.recommendations));
+  text("research-lookup-state", lookup.enabled ? "Enabled" : "Disabled");
+  text("research-symbol-state", labelize(lookup.exactSymbolLookup));
+  text("research-watchlist-write-state", labelize(safeguards.watchlistMutation));
+  text("research-feed-write-state", labelize(safeguards.feedPosting));
+  text("research-account-state", labelize(safeguards.accountIdentifiers));
+
+  if (previewTarget) {
+    previewTarget.textContent = "";
+
+    for (const item of preview) {
+      const row = document.createElement("li");
+      const body = document.createElement("span");
+      const symbol = document.createElement("strong");
+      const note = document.createElement("small");
+      const pill = document.createElement("span");
+
+      symbol.textContent = item.symbol;
+      note.textContent = `${item.assetClass} - ${item.note}`;
+      pill.className = "pill lock";
+      pill.textContent = labelize(item.state);
+      body.append(symbol, note);
+      row.append(body, pill);
+      previewTarget.append(row);
+    }
+  }
+
+  if (fieldsTarget) {
+    fieldsTarget.textContent = "";
+    fieldsTarget.textContent = (lookup.requiredFields ?? []).join(", ");
+  }
+
+  renderAudit(
+    "Research desk loaded",
+    "Read-only planning DTO loaded; watchlist writes, feed posts, raw payloads, and account identifiers remain blocked",
+    "research-audit-list",
+  );
+}
+
+async function refreshResearchStatus() {
+  try {
+    const status = await getJson("/api/etoro/research/status");
+    renderResearchStatus(status);
+  } catch (error) {
+    text("research-watchlists-state", "Unavailable");
+    text("research-instruments-state", "Unavailable");
+    renderAudit("Research desk failed", error.message, "research-audit-list");
+  }
+}
+
 async function refreshRiskStatus() {
   try {
     const status = await getJson("/api/etoro/risk/status");
@@ -321,6 +382,7 @@ async function refreshEtoro() {
     await refreshTradingStatus();
     await refreshBotStatus();
     await refreshRiskStatus();
+    await refreshResearchStatus();
 
     if (!status.credentialStatus.configured) {
       renderAudit("Credential check incomplete", "No credential values present in browser context");
@@ -338,6 +400,7 @@ async function refreshEtoro() {
     await refreshTradingStatus();
     await refreshBotStatus();
     await refreshRiskStatus();
+    await refreshResearchStatus();
     renderAudit("Provider read failed", error.message);
   } finally {
     if (button) {
