@@ -343,6 +343,15 @@ h2 {
   gap: 18px;
 }
 
+.risk-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  grid-template-areas:
+    "status safeguards"
+    "checks audit";
+  gap: 18px;
+}
+
 .trading-ticket-panel {
   grid-area: ticket;
 }
@@ -371,14 +380,36 @@ h2 {
   grid-area: audit;
 }
 
-.bot-hero {
+.risk-status-panel {
+  grid-area: status;
+}
+
+.risk-safeguards-panel {
+  grid-area: safeguards;
+}
+
+.risk-checks-panel {
+  grid-area: checks;
+}
+
+.risk-audit-panel {
+  grid-area: audit;
+}
+
+.bot-hero,
+.risk-hero {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   padding: 18px;
 }
 
-.bot-hero > div {
+.risk-hero {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.bot-hero > div,
+.risk-hero > div {
   min-height: 128px;
   padding: 16px;
   border: 1px solid var(--line);
@@ -386,7 +417,8 @@ h2 {
   background: #111820;
 }
 
-.bot-hero span {
+.bot-hero span,
+.risk-hero span {
   display: block;
   margin-bottom: 12px;
   color: var(--muted);
@@ -395,7 +427,8 @@ h2 {
   text-transform: uppercase;
 }
 
-.bot-hero strong {
+.bot-hero strong,
+.risk-hero strong {
   display: block;
   margin-bottom: 8px;
   font-size: 1.45rem;
@@ -450,6 +483,7 @@ h2 {
 }
 
 .readiness-list,
+.risk-check-list,
 .endpoint-grid {
   display: grid;
   gap: 0;
@@ -459,6 +493,7 @@ h2 {
 }
 
 .readiness-list li,
+.risk-check-list li,
 .endpoint-card {
   display: grid;
   gap: 6px;
@@ -466,7 +501,13 @@ h2 {
   border-bottom: 1px solid rgba(48, 56, 70, 0.74);
 }
 
+.risk-check-list li {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
 .readiness-list span,
+.risk-check-list span,
 .endpoint-card span {
   color: var(--muted);
   font-size: 0.78rem;
@@ -478,6 +519,17 @@ h2 {
   overflow-wrap: anywhere;
   color: var(--text);
   font-size: 0.82rem;
+}
+
+.risk-check-list strong,
+.risk-check-list small {
+  display: block;
+}
+
+.risk-check-list small {
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.35;
 }
 
 .table-wrap {
@@ -629,7 +681,8 @@ td span {
   .topbar,
   .workspace,
   .trading-layout,
-  .bot-layout {
+  .bot-layout,
+  .risk-layout {
     grid-template-columns: 1fr;
   }
 
@@ -656,9 +709,18 @@ td span {
       "audit";
   }
 
+  .risk-layout {
+    grid-template-areas:
+      "status"
+      "safeguards"
+      "checks"
+      "audit";
+  }
+
   .safety-strip,
   .kpi-grid,
-  .bot-hero {
+  .bot-hero,
+  .risk-hero {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -670,7 +732,8 @@ td span {
 
   .safety-strip,
   .kpi-grid,
-  .bot-hero {
+  .bot-hero,
+  .risk-hero {
     grid-template-columns: 1fr;
   }
 

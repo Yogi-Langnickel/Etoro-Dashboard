@@ -16,6 +16,7 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/demo/trading/status",
   "/api/etoro/demo/trading/preview",
   "/api/etoro/bot/status",
+  "/api/etoro/risk/status",
 ]);
 
 const DEMO_TRADE_PREVIEW_ROUTE = "/api/etoro/demo/trading/preview";
@@ -170,6 +171,65 @@ function botMonitoringStatus(config) {
       accountMutation: "blocked",
       rawProviderPayloads: "hidden",
       accountIdentifiers: "redacted",
+    },
+  };
+}
+
+function riskRadarStatus(config) {
+  return {
+    ok: true,
+    mode: "risk-radar-planning",
+    readOnly: true,
+    demoOnly: true,
+    mutationRoutesEnabled: false,
+    livePortfolioConnected: false,
+    credentialStatus: publicCredentialStatus(config),
+    portfolioRisk: {
+      source: "synthetic-placeholder",
+      freshness: "not-connected",
+      grossExposurePct: null,
+      cashBufferPct: null,
+      largestPositionPct: null,
+      leveragedPositionCount: 0,
+      stalePositionCount: 0,
+    },
+    thresholds: {
+      grossExposurePct: 125,
+      largestPositionPct: 25,
+      cashBufferPct: 10,
+      staleDataMinutes: 15,
+    },
+    checks: [
+      {
+        id: "exposure",
+        label: "Gross exposure",
+        state: "unknown",
+        detail: "Connect a read-only demo portfolio before evaluating exposure.",
+      },
+      {
+        id: "concentration",
+        label: "Concentration",
+        state: "unknown",
+        detail: "Largest position is unavailable without portfolio reads.",
+      },
+      {
+        id: "stale-data",
+        label: "Data freshness",
+        state: "warn",
+        detail: "No provider timestamp is connected to this radar yet.",
+      },
+      {
+        id: "execution",
+        label: "Execution lock",
+        state: "ok",
+        detail: "Risk radar has no trade, close, copy, or watchlist mutation routes.",
+      },
+    ],
+    safeguards: {
+      accountIdentifiers: "redacted",
+      rawProviderPayloads: "hidden",
+      executionRoutes: "absent",
+      alerting: "local-only",
     },
   };
 }
@@ -381,6 +441,11 @@ async function handleApiRoute(pathname, response, options) {
 
     if (pathname === "/api/etoro/bot/status") {
       sendJson(response, 200, botMonitoringStatus(config));
+      return;
+    }
+
+    if (pathname === "/api/etoro/risk/status") {
+      sendJson(response, 200, riskRadarStatus(config));
       return;
     }
 

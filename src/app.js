@@ -211,6 +211,68 @@ function renderBotStatus(payload) {
   );
 }
 
+function renderRiskStatus(payload) {
+  const risk = payload.portfolioRisk ?? {};
+  const safeguards = payload.safeguards ?? {};
+  const checks = payload.checks ?? [];
+  const checkTarget = document.getElementById("risk-checks");
+
+  text("risk-source-state", labelize(risk.source));
+  text("risk-freshness-state", labelize(risk.freshness));
+  text("risk-exposure-state", risk.grossExposurePct === null ? "Unavailable" : `${risk.grossExposurePct}%`);
+  text("risk-cash-state", risk.cashBufferPct === null ? "Unavailable" : `${risk.cashBufferPct}%`);
+  text("risk-position-state", risk.largestPositionPct === null ? "Unavailable" : `${risk.largestPositionPct}%`);
+  text("risk-stale-state", String(risk.stalePositionCount ?? 0));
+  text("risk-execution-state", labelize(safeguards.executionRoutes));
+  text("risk-payload-state", labelize(safeguards.rawProviderPayloads));
+  text("risk-account-state", labelize(safeguards.accountIdentifiers));
+
+  const modePill = document.getElementById("risk-mode-pill");
+
+  if (modePill) {
+    modePill.textContent = payload.livePortfolioConnected ? "Live reads" : "Synthetic only";
+    modePill.classList.toggle("warn", !payload.livePortfolioConnected);
+    modePill.classList.toggle("lock", !payload.livePortfolioConnected);
+  }
+
+  if (checkTarget) {
+    checkTarget.textContent = "";
+
+    for (const check of checks) {
+      const item = document.createElement("li");
+      const body = document.createElement("span");
+      const title = document.createElement("strong");
+      const detail = document.createElement("small");
+      const pill = document.createElement("span");
+
+      pill.className = `pill ${check.state === "ok" ? "ok" : check.state === "warn" ? "warn" : "lock"}`;
+      pill.textContent = labelize(check.state);
+      title.textContent = check.label;
+      detail.textContent = check.detail;
+      body.append(title, detail);
+      item.append(body, pill);
+      checkTarget.append(item);
+    }
+  }
+
+  renderAudit(
+    "Risk radar loaded",
+    "Read-only DTO loaded; portfolio IDs, raw provider payloads, and execution routes remain absent",
+    "risk-audit-list",
+  );
+}
+
+async function refreshRiskStatus() {
+  try {
+    const status = await getJson("/api/etoro/risk/status");
+    renderRiskStatus(status);
+  } catch (error) {
+    text("risk-source-state", "Unavailable");
+    text("risk-freshness-state", "Unavailable");
+    renderAudit("Risk radar failed", error.message, "risk-audit-list");
+  }
+}
+
 async function refreshBotStatus() {
   try {
     const status = await getJson("/api/etoro/bot/status");
@@ -258,6 +320,7 @@ async function refreshEtoro() {
     renderStatus(status);
     await refreshTradingStatus();
     await refreshBotStatus();
+    await refreshRiskStatus();
 
     if (!status.credentialStatus.configured) {
       renderAudit("Credential check incomplete", "No credential values present in browser context");
@@ -274,6 +337,7 @@ async function refreshEtoro() {
     setTile("provider-status", "warn", "Provider offline", "Using synthetic fixtures");
     await refreshTradingStatus();
     await refreshBotStatus();
+    await refreshRiskStatus();
     renderAudit("Provider read failed", error.message);
   } finally {
     if (button) {

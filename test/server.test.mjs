@@ -51,6 +51,7 @@ test("server exposes only internal API routes and no execution routes", () => {
     "/api/etoro/demo/trading/status",
     "/api/etoro/demo/trading/preview",
     "/api/etoro/bot/status",
+    "/api/etoro/risk/status",
   ]);
   assert.equal(serialized.includes("execution"), false);
   assert.equal(serialized.includes("market-open"), false);
@@ -74,6 +75,25 @@ test("bot monitoring status is read-only, disabled, and redacted", async () => {
   assert.equal(response.json.safeguards.accountIdentifiers, "redacted");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
+});
+
+test("risk radar status is read-only, synthetic, and redacted", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/api/etoro/risk/status",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.mode, "risk-radar-planning");
+  assert.equal(response.json.readOnly, true);
+  assert.equal(response.json.demoOnly, true);
+  assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.json.livePortfolioConnected, false);
+  assert.equal(response.json.portfolioRisk.source, "synthetic-placeholder");
+  assert.equal(response.json.safeguards.executionRoutes, "absent");
+  assert.equal(response.json.safeguards.accountIdentifiers, "redacted");
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes('"accountId"'), false);
 });
 
 test("demo trading status is planning-only and does not expose secrets", async () => {

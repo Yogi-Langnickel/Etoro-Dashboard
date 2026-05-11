@@ -51,6 +51,7 @@
         <button class="tab-button active" id="overview-tab" type="button" role="tab" aria-controls="overview-view" aria-selected="true" data-tab-target="overview-view">Overview</button>
         <button class="tab-button" id="trading-tab" type="button" role="tab" aria-controls="trading-view" aria-selected="false" data-tab-target="trading-view">Demo Trading</button>
         <button class="tab-button" id="bot-tab" type="button" role="tab" aria-controls="bot-view" aria-selected="false" data-tab-target="bot-view">Bot Monitor</button>
+        <button class="tab-button" id="risk-tab" type="button" role="tab" aria-controls="risk-view" aria-selected="false" data-tab-target="risk-view">Risk Radar</button>
       </nav>
 
       <section class="kpi-grid tab-view" id="overview-view" role="tabpanel" aria-labelledby="overview-tab" data-tab-panel="overview-view" aria-label="Portfolio KPI summary">
@@ -462,6 +463,102 @@
               <span>
                 <strong>Bot monitor disabled</strong>
                 <small>Telemetry is synthetic and contains no account identifiers</small>
+              </span>
+            </li>
+          </ol>
+        </section>
+      </section>
+
+      <section class="risk-layout tab-view" id="risk-view" role="tabpanel" aria-labelledby="risk-tab" data-tab-panel="risk-view" hidden>
+        <section class="panel risk-status-panel" aria-labelledby="risk-status-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Risk posture</p>
+              <h2 id="risk-status-title">Risk radar</h2>
+            </div>
+            <span class="pill lock" id="risk-mode-pill">Synthetic only</span>
+          </div>
+          <div class="risk-hero">
+            <div>
+              <span>Source</span>
+              <strong id="risk-source-state">Synthetic placeholder</strong>
+              <small>No live portfolio reads are connected.</small>
+            </div>
+            <div>
+              <span>Freshness</span>
+              <strong id="risk-freshness-state">Not connected</strong>
+              <small>Provider timestamps are unavailable.</small>
+            </div>
+            <div>
+              <span>Gross exposure</span>
+              <strong id="risk-exposure-state">Unavailable</strong>
+              <small>Threshold target stays at 125%.</small>
+            </div>
+            <div>
+              <span>Cash buffer</span>
+              <strong id="risk-cash-state">Unavailable</strong>
+              <small>Minimum target stays at 10%.</small>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel risk-safeguards-panel" aria-labelledby="risk-safeguards-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Controls</p>
+              <h2 id="risk-safeguards-title">Safeguards</h2>
+            </div>
+            <span class="pill ok">Read only</span>
+          </div>
+          <ul class="readiness-list">
+            <li>
+              <span>Largest position</span>
+              <strong id="risk-position-state">Unavailable</strong>
+            </li>
+            <li>
+              <span>Stale positions</span>
+              <strong id="risk-stale-state">0</strong>
+            </li>
+            <li>
+              <span>Execution routes</span>
+              <strong id="risk-execution-state">Absent</strong>
+            </li>
+            <li>
+              <span>Provider payloads</span>
+              <strong id="risk-payload-state">Hidden</strong>
+            </li>
+            <li>
+              <span>Account identifiers</span>
+              <strong id="risk-account-state">Redacted</strong>
+            </li>
+          </ul>
+        </aside>
+
+        <section class="panel risk-checks-panel" aria-labelledby="risk-checks-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Checks</p>
+              <h2 id="risk-checks-title">Radar checks</h2>
+            </div>
+            <span class="pill warn">Planning</span>
+          </div>
+          <ul class="risk-check-list" id="risk-checks"></ul>
+        </section>
+
+        <section class="panel risk-audit-panel" aria-labelledby="risk-audit-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Audit</p>
+              <h2 id="risk-audit-title">Risk log</h2>
+            </div>
+            <span class="pill ok">Redacted</span>
+          </div>
+          <ol class="audit-list" id="risk-audit-list">
+            <li>
+              <span class="event-time">--:--:--</span>
+              <span>
+                <strong>Risk radar waiting for read-only data</strong>
+                <small>No portfolio identifiers or provider payloads are stored in the browser</small>
               </span>
             </li>
           </ol>
