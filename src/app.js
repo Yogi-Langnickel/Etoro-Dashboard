@@ -112,6 +112,7 @@ function renderPnl(payload) {
   text("stale-data", `${data.positionCount} positions`);
   text("chart-provider", data.providerUpdatedAt ? `Provider timestamp: ${data.providerUpdatedAt}` : "Provider timestamp: unavailable");
   text("chart-request", `Request ID: ${payload.provider.requestId}`);
+  text("chart-cache", `Cache: ${labelize(payload.cache?.state)} (${payload.cache?.ttlMs ?? 0} ms)`);
   setTile("last-sync", "ok", "Last sync", new Date(payload.provider.receivedAt).toLocaleTimeString());
 }
 

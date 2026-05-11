@@ -1,4 +1,5 @@
 import { createServer as createHttpServer } from "node:http";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +8,7 @@ import { loadEtoroConfig, publicCredentialStatus } from "./etoro-config.mjs";
 
 const STATIC_ROOT = fileURLToPath(new URL("./", import.meta.url));
 const DEFAULT_PORT = 4173;
+const DEFAULT_READ_CACHE_TTL_MS = 15_000;
 
 export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/health",
@@ -144,6 +146,86 @@ function credentialsMissingResponse(config) {
     error: {
       code: "ETORO_CREDENTIALS_MISSING",
       message: "eToro credentials are not configured on the server",
+    },
+  };
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function readOnlyCacheKey(endpointName, config) {
+  const credentialFingerprint = createHash("sha256")
+    .update(config.apiKey ?? "")
+    .update("\0")
+    .update(config.userKey ?? "")
+    .digest("hex");
+
+  return [
+    endpointName,
+    config.baseUrl,
+    config.credentialSource,
+    config.credentialFileLoaded ? "file" : "no-file",
+    credentialFingerprint,
+  ].join("|");
+}
+
+function withCacheMetadata(result, cacheState, entry) {
+  return {
+    ...cloneJson(result),
+    cache: {
+      state: cacheState,
+      cachedAt: entry.cachedAt,
+      expiresAt: entry.expiresAt,
+      ttlMs: entry.ttlMs,
+    },
+  };
+}
+
+export function createReadOnlyProviderCache({ ttlMs = DEFAULT_READ_CACHE_TTL_MS } = {}) {
+  const entries = new Map();
+
+  return {
+    async fetch(endpointName, config, fetchEndpoint) {
+      const key = readOnlyCacheKey(endpointName, config);
+      const now = Date.now();
+      const existing = entries.get(key);
+
+      if (existing?.value && existing.expiresAtMs > now) {
+        return withCacheMetadata(existing.value, "hit", existing);
+      }
+
+      if (existing?.inflight) {
+        const value = await existing.inflight;
+        const updated = entries.get(key);
+        return withCacheMetadata(value, "coalesced", updated);
+      }
+
+      const entry = {
+        cachedAt: new Date(now).toISOString(),
+        expiresAt: new Date(now + ttlMs).toISOString(),
+        expiresAtMs: now + ttlMs,
+        ttlMs,
+      };
+
+      entry.inflight = fetchEndpoint(endpointName, { credentials: config })
+        .then((value) => {
+          entry.value = cloneJson(value);
+          entry.cachedAt = new Date().toISOString();
+          entry.expiresAtMs = Date.now() + ttlMs;
+          entry.expiresAt = new Date(entry.expiresAtMs).toISOString();
+          delete entry.inflight;
+          entries.set(key, entry);
+          return entry.value;
+        })
+        .catch((error) => {
+          entries.delete(key);
+          throw error;
+        });
+
+      entries.set(key, entry);
+      const value = await entry.inflight;
+      return withCacheMetadata(value, "miss", entry);
     },
   };
 }
@@ -414,6 +496,7 @@ async function handleTradePreview(request, response, config) {
 async function handleApiRoute(pathname, response, options) {
   const loadConfig = options.loadConfig ?? loadEtoroConfig;
   const fetchEndpoint = options.fetchEndpoint ?? fetchReadOnlyEndpoint;
+  const providerCache = options.providerCache ?? createReadOnlyProviderCache();
 
   if (!INTERNAL_API_ROUTES.includes(pathname)) {
     sendJson(response, 404, {
@@ -498,7 +581,7 @@ async function handleApiRoute(pathname, response, options) {
     }
 
     const endpointName = pathname === "/api/etoro/identity" ? "identity" : "demoPnl";
-    const result = await fetchEndpoint(endpointName, { credentials: config });
+    const result = await providerCache.fetch(endpointName, config, fetchEndpoint);
     sendJson(response, 200, {
       ok: true,
       mode: "read-only",
@@ -514,6 +597,8 @@ async function handleApiRoute(pathname, response, options) {
 }
 
 export function createRequestHandler(options = {}) {
+  const providerCache = options.providerCache ?? createReadOnlyProviderCache();
+
   return async (request, response) => {
     const url = new URL(request.url, "http://localhost");
     const pathname = url.pathname;
@@ -529,7 +614,7 @@ export function createRequestHandler(options = {}) {
           return;
         }
 
-        await handleApiRoute(pathname, response, { ...options, request });
+        await handleApiRoute(pathname, response, { ...options, providerCache, request });
         return;
       }
 
@@ -542,7 +627,7 @@ export function createRequestHandler(options = {}) {
         return;
       }
 
-      await handleApiRoute(pathname, response, options);
+      await handleApiRoute(pathname, response, { ...options, providerCache });
       return;
     }
 

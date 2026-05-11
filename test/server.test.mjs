@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { INTERNAL_API_ROUTES, createRequestHandler } from "../src/server.mjs";
+import {
+  INTERNAL_API_ROUTES,
+  createReadOnlyProviderCache,
+  createRequestHandler,
+} from "../src/server.mjs";
 
 async function callHandler(handler, { method = "GET", url = "/api/health", body = "" } = {}) {
   const response = {
@@ -26,17 +30,21 @@ async function callHandler(handler, { method = "GET", url = "/api/health", body 
   };
 }
 
+async function configuredConfig() {
+  return {
+    baseUrl: "https://public-api.etoro.com",
+    apiKey: "server-api-secret",
+    userKey: "server-user-secret",
+    configured: true,
+    credentialFileLoaded: true,
+    credentialSource: "file",
+    missing: [],
+  };
+}
+
 function configuredHandler() {
   return createRequestHandler({
-    loadConfig: async () => ({
-      baseUrl: "https://public-api.etoro.com",
-      apiKey: "server-api-secret",
-      userKey: "server-user-secret",
-      configured: true,
-      credentialFileLoaded: true,
-      credentialSource: "file",
-      missing: [],
-    }),
+    loadConfig: configuredConfig,
   });
 }
 
@@ -238,6 +246,158 @@ test("status route never returns configured secret values", async () => {
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
   assert.match(response.text, /public-api\.etoro\.com/);
+});
+
+test("read-only provider responses are cached without exposing secrets", async () => {
+  let fetchCount = 0;
+  const handler = createRequestHandler({
+    loadConfig: configuredConfig,
+    providerCache: createReadOnlyProviderCache({ ttlMs: 60_000 }),
+    fetchEndpoint: async (endpointName) => {
+      fetchCount += 1;
+      return {
+        data: {
+          authenticated: true,
+          accountRefs: {
+            hasGcid: true,
+            hasRealCid: true,
+            hasDemoCid: true,
+          },
+        },
+        provider: {
+          endpoint: endpointName,
+          method: "GET",
+          path: "/api/v1/me",
+          baseUrl: "https://public-api.etoro.com",
+          status: 200,
+          requestId: `request-${fetchCount}`,
+          receivedAt: new Date().toISOString(),
+        },
+      };
+    },
+  });
+
+  const first = await callHandler(handler, { url: "/api/etoro/identity" });
+  const second = await callHandler(handler, { url: "/api/etoro/identity" });
+
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(fetchCount, 1);
+  assert.equal(first.json.cache.state, "miss");
+  assert.equal(second.json.cache.state, "hit");
+  assert.equal(second.text.includes("server-api-secret"), false);
+  assert.equal(second.text.includes("server-user-secret"), false);
+});
+
+test("concurrent read-only provider requests are coalesced", async () => {
+  let fetchCount = 0;
+  const handler = createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      apiKey: "server-api-secret",
+      userKey: "server-user-secret",
+      configured: true,
+      credentialFileLoaded: true,
+      credentialSource: "file",
+      missing: [],
+    }),
+    providerCache: createReadOnlyProviderCache({ ttlMs: 60_000 }),
+    fetchEndpoint: async (endpointName) => {
+      fetchCount += 1;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return {
+        data: {
+          currency: "USD",
+          credit: 100,
+          equity: 100,
+          realizedPnL: 0,
+          unrealizedPnL: 0,
+          availableCash: 100,
+          totalInvested: 0,
+          calculatedUnrealizedPnL: 0,
+          positionCount: 0,
+          mirrorCount: 0,
+          pendingOrderCount: 0,
+          manualPendingOrderCount: 0,
+          providerUpdatedAt: null,
+        },
+        provider: {
+          endpoint: endpointName,
+          method: "GET",
+          path: "/api/v1/trading/info/demo/pnl",
+          baseUrl: "https://public-api.etoro.com",
+          status: 200,
+          requestId: `request-${fetchCount}`,
+          receivedAt: new Date().toISOString(),
+        },
+      };
+    },
+  });
+
+  const [first, second] = await Promise.all([
+    callHandler(handler, { url: "/api/etoro/demo/pnl" }),
+    callHandler(handler, { url: "/api/etoro/demo/pnl" }),
+  ]);
+
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(fetchCount, 1);
+  assert.equal(first.json.cache.state, "miss");
+  assert.equal(second.json.cache.state, "coalesced");
+  assert.equal(second.text.includes("server-api-secret"), false);
+  assert.equal(second.text.includes("server-user-secret"), false);
+});
+
+test("read-only provider cache is separated by credential fingerprint", async () => {
+  let fetchCount = 0;
+  let userKey = "server-user-secret-a";
+  const handler = createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      apiKey: "server-api-secret",
+      userKey,
+      configured: true,
+      credentialFileLoaded: true,
+      credentialSource: "file",
+      missing: [],
+    }),
+    providerCache: createReadOnlyProviderCache({ ttlMs: 60_000 }),
+    fetchEndpoint: async (endpointName) => {
+      fetchCount += 1;
+      return {
+        data: {
+          authenticated: true,
+          accountRefs: {
+            hasGcid: true,
+            hasRealCid: true,
+            hasDemoCid: true,
+          },
+        },
+        provider: {
+          endpoint: endpointName,
+          method: "GET",
+          path: "/api/v1/me",
+          baseUrl: "https://public-api.etoro.com",
+          status: 200,
+          requestId: `request-${fetchCount}`,
+          receivedAt: new Date().toISOString(),
+        },
+      };
+    },
+  });
+
+  const first = await callHandler(handler, { url: "/api/etoro/identity" });
+  userKey = "server-user-secret-b";
+  const second = await callHandler(handler, { url: "/api/etoro/identity" });
+
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.equal(fetchCount, 2);
+  assert.equal(first.json.cache.state, "miss");
+  assert.equal(second.json.cache.state, "miss");
+  assert.equal(second.text.includes("server-api-secret"), false);
+  assert.equal(second.text.includes("server-user-secret-a"), false);
+  assert.equal(second.text.includes("server-user-secret-b"), false);
 });
 
 test("non-GET API requests are rejected", async () => {
