@@ -1,6 +1,13 @@
 # Etoro Dashboard Agent Instructions
 
-Read this file first before inspecting or changing the project. Then read `docs/agent-memory.md`, which is the compact project memory. Only lazy-load focused files in `docs/memory/` when relevant.
+Read this file first before inspecting or changing the project.
+
+Canonical memory and durable docs now live in the central workspace memory repo:
+
+- Workspace memory: `/Users/yogi/Coding/docs/workspace/agent-memory.md`
+- eToro Dashboard memory: `/Users/yogi/Coding/docs/projects/etoro-dashboard/agent-memory.md`
+
+Repo-local `docs/` files are compatibility copies for existing scripts and historical links. Prefer the central docs above for new durable memory; update repo-local copies only when a repo script, CI check, or in-repo reference still requires it.
 
 ## Project Security Classification
 
@@ -28,7 +35,7 @@ These repo-local financial rules are hard overrides over workspace-level general
 - Completed deliverables target `develop`; `master` is release/promotion only and requires explicit user direction.
 - Treat work as substantial when it changes or plans behavior, architecture, API contracts, provider integration, auth, credential handling, persistence, logging, exports, financial data, trading/order behavior, UI-copy that could imply advice, dependencies, CI/release gates, or reusable workflow rules. If unsure, use the two-pass review gate.
 - Developer agents must not merge substantial work into `develop` until two complete persona review iterations have run, required feedback has been addressed, and remaining feedback has been classified with rationale.
-- Every incident must get an incident review in `docs/incidents/`; production, security, data-integrity, workflow, and QA/test failures are examples, not limits on the rule.
+- Every incident must get an incident review in `/Users/yogi/Coding/docs/projects/etoro-dashboard/incidents/`; production, security, data-integrity, workflow, and QA/test failures are examples, not limits on the rule.
 - Any bug or defect that reaches `develop` is a QA/test incident and requires an incident review plus durable learning unless explicitly waived with rationale.
 - Non-incident bugs that did not reach `develop` require lightweight durable learning when the root cause is likely to recur, confusing, security-sensitive, caused by or revealed a test gap, or affected shared behavior.
 - Every incident review and every qualifying non-incident bug lesson must include a transferability assessment: `local-only`, `workspace-general`, `family/cross-repo`, or `named repo targets`.
@@ -51,15 +58,15 @@ These repo-local financial rules are hard overrides over workspace-level general
 
 ## Required Checks Before Shipping Financial Features
 
-- Threat model updated in `docs/memory/security.md`.
-- API contract notes updated in `docs/memory/etoro-api.md`.
-- Validation commands documented in `docs/agent-memory.md`.
+- Threat model updated in `/Users/yogi/Coding/docs/projects/etoro-dashboard/memory/security.md`.
+- API contract notes updated in `/Users/yogi/Coding/docs/projects/etoro-dashboard/memory/etoro-api.md`.
+- Validation commands documented in `/Users/yogi/Coding/docs/projects/etoro-dashboard/agent-memory.md`.
 - No secret material appears in `git diff`, fixtures, docs, tests, or screenshots.
 - Public repo suitability reviewed before pushing.
 
 ## Worker And Subagent Closeout
 
-- Before fixing a defect or incident, check `docs/incidents/`, `docs/memory/bug-learning.md`, and relevant `docs/memory/` notes for similar prior history.
-- After fixing, record what changed in the durable location that future agents will read: incident review for incidents, `docs/memory/bug-learning.md` for recurring non-incident bugs, and focused memory files for domain-specific rules.
+- Before fixing a defect or incident, check `/Users/yogi/Coding/docs/projects/etoro-dashboard/incidents/`, `/Users/yogi/Coding/docs/projects/etoro-dashboard/memory/bug-learning.md`, and relevant project memory notes for similar prior history.
+- After fixing, record what changed in the durable location that future agents will read: incident review for incidents, `/Users/yogi/Coding/docs/projects/etoro-dashboard/memory/bug-learning.md` for recurring non-incident bugs, and focused memory files for domain-specific rules.
 - In closeout, state whether any new learning is transferable and list suggested propagation targets, even when the answer is `local-only`.
 - Keep the worktree clean at handoff. If unrelated user changes remain, identify them clearly instead of reverting them.
