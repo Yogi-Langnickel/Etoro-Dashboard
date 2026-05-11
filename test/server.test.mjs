@@ -50,10 +50,30 @@ test("server exposes only internal API routes and no execution routes", () => {
     "/api/etoro/demo/pnl",
     "/api/etoro/demo/trading/status",
     "/api/etoro/demo/trading/preview",
+    "/api/etoro/bot/status",
   ]);
   assert.equal(serialized.includes("execution"), false);
   assert.equal(serialized.includes("market-open"), false);
   assert.equal(serialized.includes("market-close"), false);
+});
+
+test("bot monitoring status is read-only, disabled, and redacted", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/api/etoro/bot/status",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.mode, "bot-monitoring-planning");
+  assert.equal(response.json.readOnly, true);
+  assert.equal(response.json.botEnabled, false);
+  assert.equal(response.json.simulatedTelemetryOnly, true);
+  assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.json.telemetry.source, "synthetic-disabled");
+  assert.equal(response.json.telemetry.pendingExecutionCount, 0);
+  assert.equal(response.json.safeguards.executionRoutes, "absent");
+  assert.equal(response.json.safeguards.accountIdentifiers, "redacted");
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
 });
 
 test("demo trading status is planning-only and does not expose secrets", async () => {

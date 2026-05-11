@@ -15,6 +15,7 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/demo/pnl",
   "/api/etoro/demo/trading/status",
   "/api/etoro/demo/trading/preview",
+  "/api/etoro/bot/status",
 ]);
 
 const DEMO_TRADE_PREVIEW_ROUTE = "/api/etoro/demo/trading/preview";
@@ -141,6 +142,34 @@ function credentialsMissingResponse(config) {
     error: {
       code: "ETORO_CREDENTIALS_MISSING",
       message: "eToro credentials are not configured on the server",
+    },
+  };
+}
+
+function botMonitoringStatus(config) {
+  return {
+    ok: true,
+    mode: "bot-monitoring-planning",
+    readOnly: true,
+    demoOnly: true,
+    botEnabled: false,
+    simulatedTelemetryOnly: true,
+    mutationRoutesEnabled: false,
+    credentialStatus: publicCredentialStatus(config),
+    telemetry: {
+      source: "synthetic-disabled",
+      freshness: "not-connected",
+      lastDecisionAt: null,
+      lastProviderReadAt: null,
+      openActionCount: 0,
+      pendingExecutionCount: 0,
+    },
+    safeguards: {
+      killSwitch: "locked-disabled",
+      executionRoutes: "absent",
+      accountMutation: "blocked",
+      rawProviderPayloads: "hidden",
+      accountIdentifiers: "redacted",
     },
   };
 }
@@ -347,6 +376,11 @@ async function handleApiRoute(pathname, response, options) {
           "raw payload redaction",
         ],
       });
+      return;
+    }
+
+    if (pathname === "/api/etoro/bot/status") {
+      sendJson(response, 200, botMonitoringStatus(config));
       return;
     }
 
