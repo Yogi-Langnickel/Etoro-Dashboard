@@ -50,6 +50,7 @@
       <nav class="tabbar" aria-label="Dashboard sections" role="tablist">
         <button class="tab-button active" id="overview-tab" type="button" role="tab" aria-controls="overview-view" aria-selected="true" data-tab-target="overview-view">Overview</button>
         <button class="tab-button" id="trading-tab" type="button" role="tab" aria-controls="trading-view" aria-selected="false" data-tab-target="trading-view">Demo Trading</button>
+        <button class="tab-button" id="bot-tab" type="button" role="tab" aria-controls="bot-view" aria-selected="false" data-tab-target="bot-view">Bot Monitor</button>
       </nav>
 
       <section class="kpi-grid tab-view" id="overview-view" role="tabpanel" aria-labelledby="overview-tab" data-tab-panel="overview-view" aria-label="Portfolio KPI summary">
@@ -385,6 +386,82 @@
               <span>
                 <strong>Execution routes absent</strong>
                 <small>Demo trade ticket is UI-only in this slice</small>
+              </span>
+            </li>
+          </ol>
+        </section>
+      </section>
+
+      <section class="bot-layout tab-view" id="bot-view" role="tabpanel" aria-labelledby="bot-tab" data-tab-panel="bot-view" hidden>
+        <section class="panel bot-status-panel" aria-labelledby="bot-status-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Automation telemetry</p>
+              <h2 id="bot-status-title">Bot monitor</h2>
+            </div>
+            <span class="pill lock" id="bot-mode-pill">Disabled</span>
+          </div>
+          <div class="bot-hero">
+            <div>
+              <span>Bot state</span>
+              <strong id="bot-enabled-state">Disabled</strong>
+              <small>No automated decisions or execution routes are active.</small>
+            </div>
+            <div>
+              <span>Telemetry freshness</span>
+              <strong id="bot-freshness-state">Not connected</strong>
+              <small id="bot-telemetry-source">Synthetic disabled DTO</small>
+            </div>
+            <div>
+              <span>Pending execution</span>
+              <strong id="bot-pending-count">0</strong>
+              <small>Execution queue unavailable by design.</small>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel bot-safeguards-panel" aria-labelledby="bot-safeguards-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Controls</p>
+              <h2 id="bot-safeguards-title">Safeguards</h2>
+            </div>
+            <span class="pill warn">Planning only</span>
+          </div>
+          <ul class="readiness-list">
+            <li>
+              <span>Kill switch</span>
+              <strong id="bot-kill-switch">Locked disabled</strong>
+            </li>
+            <li>
+              <span>Execution routes</span>
+              <strong id="bot-execution-state">Absent</strong>
+            </li>
+            <li>
+              <span>Account identifiers</span>
+              <strong id="bot-account-id-state">Redacted</strong>
+            </li>
+            <li>
+              <span>Provider payloads</span>
+              <strong id="bot-payload-state">Hidden</strong>
+            </li>
+          </ul>
+        </aside>
+
+        <section class="panel bot-audit-panel" aria-labelledby="bot-audit-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Audit</p>
+              <h2 id="bot-audit-title">Monitoring log</h2>
+            </div>
+            <span class="pill ok">Redacted</span>
+          </div>
+          <ol class="audit-list" id="bot-audit-list">
+            <li>
+              <span class="event-time">--:--:--</span>
+              <span>
+                <strong>Bot monitor disabled</strong>
+                <small>Telemetry is synthetic and contains no account identifiers</small>
               </span>
             </li>
           </ol>

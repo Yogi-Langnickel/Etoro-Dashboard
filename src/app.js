@@ -175,6 +175,53 @@ function renderTradingStatus(payload) {
   );
 }
 
+function labelize(value) {
+  return String(value ?? "unknown")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function renderBotStatus(payload) {
+  const telemetry = payload.telemetry ?? {};
+  const safeguards = payload.safeguards ?? {};
+
+  text("bot-enabled-state", payload.botEnabled ? "Enabled" : "Disabled");
+  text("bot-freshness-state", labelize(telemetry.freshness));
+  text("bot-telemetry-source", labelize(telemetry.source));
+  text("bot-pending-count", String(telemetry.pendingExecutionCount ?? 0));
+  text("bot-kill-switch", labelize(safeguards.killSwitch));
+  text("bot-execution-state", labelize(safeguards.executionRoutes));
+  text("bot-account-id-state", labelize(safeguards.accountIdentifiers));
+  text("bot-payload-state", labelize(safeguards.rawProviderPayloads));
+
+  const modePill = document.getElementById("bot-mode-pill");
+
+  if (modePill) {
+    modePill.textContent = payload.simulatedTelemetryOnly ? "Synthetic only" : "Live telemetry";
+    modePill.classList.toggle("warn", !payload.simulatedTelemetryOnly);
+    modePill.classList.toggle("lock", payload.simulatedTelemetryOnly);
+  }
+
+  renderAudit(
+    payload.botEnabled ? "Bot telemetry enabled" : "Bot monitor disabled",
+    "Read-only DTO loaded; execution, account mutation, and raw payloads remain blocked",
+    "bot-audit-list",
+  );
+}
+
+async function refreshBotStatus() {
+  try {
+    const status = await getJson("/api/etoro/bot/status");
+    renderBotStatus(status);
+  } catch (error) {
+    text("bot-enabled-state", "Unavailable");
+    text("bot-freshness-state", "Unavailable");
+    renderAudit("Bot status failed", error.message, "bot-audit-list");
+  }
+}
+
 async function refreshTradingStatus() {
   try {
     const status = await getJson("/api/etoro/demo/trading/status");
@@ -210,6 +257,7 @@ async function refreshEtoro() {
     const status = await getJson("/api/etoro/status");
     renderStatus(status);
     await refreshTradingStatus();
+    await refreshBotStatus();
 
     if (!status.credentialStatus.configured) {
       renderAudit("Credential check incomplete", "No credential values present in browser context");
@@ -225,6 +273,7 @@ async function refreshEtoro() {
   } catch (error) {
     setTile("provider-status", "warn", "Provider offline", "Using synthetic fixtures");
     await refreshTradingStatus();
+    await refreshBotStatus();
     renderAudit("Provider read failed", error.message);
   } finally {
     if (button) {

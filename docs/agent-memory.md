@@ -1,7 +1,7 @@
 # Etoro Dashboard Agent Memory
 
 Status: active
-Last updated: 2026-05-10
+Last updated: 2026-05-12
 
 ## Current Truth
 
@@ -14,11 +14,13 @@ Last updated: 2026-05-10
 - First local live-provider slice uses a dependency-free Node server with server-only eToro credentials, read-only routes, and built-in `node:test` coverage.
 - Planned UI direction is a switchable tab workspace: Landing / Widgets, Operational Cockpit, Risk Radar, Research Desk, and a demo-first Trading tab.
 - The dashboard has a dedicated demo trading tab and non-executing preview behavior, but execution routes remain absent until a separate feature-flagged write flow is designed and reviewed.
+- The dashboard has a Bot Monitor tab backed by `/api/etoro/bot/status`; it is synthetic, read-only, disabled by default, redacts account identifiers, and exposes no execution or account-mutation capability.
 - Treat the app backend boundary as mandatory: all provider calls, credential handling, DTO normalization, caching/freshness metadata, rate-limit handling, and audit persistence belong server-side.
 - A trading bot, if approved later, should be a separate worker/service with kill switch, hard limits, durable audit, monitoring, and compliance review, not code running in browser UI or request/response routes.
 - Dashboard implementation plan lives in `docs/dashboard-implementation-plan.md`.
 - Official eToro API documentation must be verified before implementing live API behavior.
 - Default feature posture is read-only. Trading and account mutation features must stay disabled until explicitly designed, audited, and feature-gated.
+- User confirmed the dashboard should not trade for now. A future trading bot may be considered, but the first acceptable direction is monitored/simulated bot telemetry in the dashboard before any execution capability.
 - Every incident requires an incident review in `docs/incidents/`.
 - Any bug or defect that reaches `develop` is a QA/test incident and requires incident review plus durable learning unless explicitly waived with rationale.
 - Non-incident bugs still require durable learning when the root cause is likely to recur, confusing, security-sensitive, test-gap-related, or affects shared behavior.
@@ -48,5 +50,5 @@ Last updated: 2026-05-10
 ## Open Decisions
 
 - Choose app stack. Recommended default: TypeScript + Next.js or another server-capable web stack, with all eToro API calls server-side.
-- Confirm whether this dashboard is read-only only, or whether order/trading actions are in scope later.
+- Define the future monitored-bot architecture if bot work resumes: simulation/read-only telemetry first, then gated demo execution, and only later reviewed live execution if explicitly requested.
 - Confirm authentication model for dashboard users if it will be accessible beyond the local machine.

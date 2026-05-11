@@ -334,6 +334,15 @@ h2 {
   gap: 18px;
 }
 
+.bot-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  grid-template-areas:
+    "status safeguards"
+    "audit audit";
+  gap: 18px;
+}
+
 .trading-ticket-panel {
   grid-area: ticket;
 }
@@ -348,6 +357,49 @@ h2 {
 
 .trading-audit-panel {
   grid-area: audit;
+}
+
+.bot-status-panel {
+  grid-area: status;
+}
+
+.bot-safeguards-panel {
+  grid-area: safeguards;
+}
+
+.bot-audit-panel {
+  grid-area: audit;
+}
+
+.bot-hero {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+}
+
+.bot-hero > div {
+  min-height: 128px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111820;
+}
+
+.bot-hero span {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.bot-hero strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.45rem;
+  line-height: 1.1;
 }
 
 .trade-ticket {
@@ -576,7 +628,8 @@ td span {
 @media (max-width: 1180px) {
   .topbar,
   .workspace,
-  .trading-layout {
+  .trading-layout,
+  .bot-layout {
     grid-template-columns: 1fr;
   }
 
@@ -596,8 +649,16 @@ td span {
       "audit";
   }
 
+  .bot-layout {
+    grid-template-areas:
+      "status"
+      "safeguards"
+      "audit";
+  }
+
   .safety-strip,
-  .kpi-grid {
+  .kpi-grid,
+  .bot-hero {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -608,7 +669,8 @@ td span {
   }
 
   .safety-strip,
-  .kpi-grid {
+  .kpi-grid,
+  .bot-hero {
     grid-template-columns: 1fr;
   }
 
