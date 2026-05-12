@@ -36,6 +36,8 @@ Then open `http://localhost:4173`. The app also accepts `ETORO_CREDENTIALS_FILE`
 
 Set `ENABLE_DEMO_TRADE_PREVIEW=true` only when you want the local server to validate and preview demo tickets. Preview responses are redacted and still do not place orders.
 
+Set `ETORO_READ_CACHE_TTL_MS` if local read-only provider calls need a different short cache window. The default is `15000` milliseconds.
+
 ## Goals
 
 - View portfolio, watchlist, market, and social-trading data through official eToro API endpoints.

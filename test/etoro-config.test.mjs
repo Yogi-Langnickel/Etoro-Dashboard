@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   DEFAULT_ETORO_BASE_URL,
+  DEFAULT_READ_CACHE_TTL_MS,
   EtoroConfigError,
   loadEtoroConfig,
   publicCredentialStatus,
@@ -22,6 +23,7 @@ test("loads credentials from the configured JSON file", async () => {
   assert.equal(config.baseUrl, DEFAULT_ETORO_BASE_URL);
   assert.equal(config.apiKey, "file-api-key");
   assert.equal(config.userKey, "file-user-key");
+  assert.equal(config.readCacheTtlMs, DEFAULT_READ_CACHE_TTL_MS);
   assert.equal(config.credentialSource, "file");
 });
 
@@ -78,6 +80,42 @@ test("demo trade preview flag is explicit and public", async () => {
 
   assert.equal(config.demoTradePreviewEnabled, true);
   assert.equal(publicCredentialStatus(config).demoTradePreviewEnabled, true);
+});
+
+test("read cache TTL is configurable without exposing secrets", async () => {
+  const config = await loadEtoroConfig({
+    env: {
+      ETORO_API_KEY: "api-key",
+      ETORO_USER_KEY: "user-key",
+      ETORO_READ_CACHE_TTL_MS: "30000",
+    },
+    readFile: async () => {
+      const error = new Error("missing");
+      error.code = "ENOENT";
+      throw error;
+    },
+  });
+
+  assert.equal(config.readCacheTtlMs, 30_000);
+  assert.equal(publicCredentialStatus(config).readCacheTtlMs, 30_000);
+});
+
+test("read cache TTL must be a positive integer", async () => {
+  await assert.rejects(
+    loadEtoroConfig({
+      env: {
+        ETORO_API_KEY: "api-key",
+        ETORO_USER_KEY: "user-key",
+        ETORO_READ_CACHE_TTL_MS: "0",
+      },
+      readFile: async () => {
+        const error = new Error("missing");
+        error.code = "ENOENT";
+        throw error;
+      },
+    }),
+    (error) => error instanceof EtoroConfigError && error.code === "ETORO_INVALID_CACHE_TTL",
+  );
 });
 
 test("rejects non-HTTPS provider base URLs", async () => {

@@ -4,11 +4,10 @@ import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fetchReadOnlyEndpoint, readOnlyEndpointSummary } from "./etoro-client.mjs";
-import { loadEtoroConfig, publicCredentialStatus } from "./etoro-config.mjs";
+import { DEFAULT_READ_CACHE_TTL_MS, loadEtoroConfig, publicCredentialStatus } from "./etoro-config.mjs";
 
 const STATIC_ROOT = fileURLToPath(new URL("./", import.meta.url));
 const DEFAULT_PORT = 4173;
-const DEFAULT_READ_CACHE_TTL_MS = 15_000;
 
 export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/health",
@@ -182,6 +181,10 @@ function withCacheMetadata(result, cacheState, entry) {
   };
 }
 
+function resolveCacheTtlMs(ttlMs, config) {
+  return typeof ttlMs === "function" ? ttlMs(config) : ttlMs;
+}
+
 export function createReadOnlyProviderCache({ ttlMs = DEFAULT_READ_CACHE_TTL_MS } = {}) {
   const entries = new Map();
 
@@ -189,6 +192,7 @@ export function createReadOnlyProviderCache({ ttlMs = DEFAULT_READ_CACHE_TTL_MS 
     async fetch(endpointName, config, fetchEndpoint) {
       const key = readOnlyCacheKey(endpointName, config);
       const now = Date.now();
+      const resolvedTtlMs = resolveCacheTtlMs(ttlMs, config);
       const existing = entries.get(key);
 
       if (existing?.value && existing.expiresAtMs > now) {
@@ -203,16 +207,16 @@ export function createReadOnlyProviderCache({ ttlMs = DEFAULT_READ_CACHE_TTL_MS 
 
       const entry = {
         cachedAt: new Date(now).toISOString(),
-        expiresAt: new Date(now + ttlMs).toISOString(),
-        expiresAtMs: now + ttlMs,
-        ttlMs,
+        expiresAt: new Date(now + resolvedTtlMs).toISOString(),
+        expiresAtMs: now + resolvedTtlMs,
+        ttlMs: resolvedTtlMs,
       };
 
       entry.inflight = fetchEndpoint(endpointName, { credentials: config })
         .then((value) => {
           entry.value = cloneJson(value);
           entry.cachedAt = new Date().toISOString();
-          entry.expiresAtMs = Date.now() + ttlMs;
+          entry.expiresAtMs = Date.now() + resolvedTtlMs;
           entry.expiresAt = new Date(entry.expiresAtMs).toISOString();
           delete entry.inflight;
           entries.set(key, entry);
@@ -597,7 +601,9 @@ async function handleApiRoute(pathname, response, options) {
 }
 
 export function createRequestHandler(options = {}) {
-  const providerCache = options.providerCache ?? createReadOnlyProviderCache();
+  const providerCache = options.providerCache ?? createReadOnlyProviderCache({
+    ttlMs: (config) => config.readCacheTtlMs ?? DEFAULT_READ_CACHE_TTL_MS,
+  });
 
   return async (request, response) => {
     const url = new URL(request.url, "http://localhost");
