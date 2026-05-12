@@ -19,6 +19,7 @@ Last updated: 2026-05-12
 - The dashboard has Risk Radar and Research Desk tabs backed by `/api/etoro/risk/status` and `/api/etoro/research/status`; both are synthetic/read-only, hide account identifiers/raw payloads, and expose no write routes.
 - Treat the app backend boundary as mandatory: all provider calls, credential handling, DTO normalization, caching/freshness metadata, rate-limit handling, and audit persistence belong server-side.
 - A trading bot, if approved later, should be a separate worker/service with kill switch, hard limits, durable audit, monitoring, and compliance review, not code running in browser UI or request/response routes.
+- Trading-bot planning lives in `docs/trading-bot-plan.md`: start with simulation monitor, use a separate leased worker, require durable audit/reconciliation/idempotency/risk gates, and keep demo/live execution disabled until separate review.
 - Dashboard implementation plan lives in `docs/dashboard-implementation-plan.md`.
 - Official eToro API documentation must be verified before implementing live API behavior.
 - Default feature posture is read-only. Trading and account mutation features must stay disabled until explicitly designed, audited, and feature-gated.
@@ -52,5 +53,5 @@ Last updated: 2026-05-12
 ## Open Decisions
 
 - Choose app stack. Recommended default: TypeScript + Next.js or another server-capable web stack, with all eToro API calls server-side.
-- Define the future monitored-bot architecture if bot work resumes: simulation/read-only telemetry first, then gated demo execution, and only later reviewed live execution if explicitly requested.
+- Implement the first bot slice as read-only simulation monitoring only: strategy registry, simulated run ledger, redacted bot events, kill-switch status, and "why no trade" risk-veto visibility.
 - Confirm authentication model for dashboard users if it will be accessible beyond the local machine.

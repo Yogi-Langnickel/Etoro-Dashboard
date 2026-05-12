@@ -151,6 +151,7 @@ Do not add `/api/trading/*` routes in the first milestone.
 - Confirm eToro API terms, automation permissions, account scope, and jurisdiction constraints before any implementation.
 - Require user auth, CSRF protection, request limits, body limits, origin policy, durable audit, idempotency, reconciliation, kill switch, hard risk limits, monitoring, alerting, and compliance review.
 - Keep bot controls disabled until sandbox proof shows live routes cannot be reached accidentally.
+- Use `docs/trading-bot-plan.md` as the detailed planning brief before implementation. Initial bot work is simulation monitor only; demo execution remains gated behind a separate review and feature flag.
 
 ## Required Checks
 
@@ -178,7 +179,8 @@ Run these before using real credentials:
 - [ ] Add persona review after the first dashboard slice, incorporate appropriate feedback, run a second review, then complete checks before merging to `develop`.
 - [ ] Update `docs/agent-memory.md` after each implementation slice with decisions, changed files, provider assumptions, and checks run.
 - [ ] Keep trading execution routes and enabled mutation controls out of scope until a separate threat model, demo-mode proof, confirmation UX, and review gate are complete.
-- [ ] Keep trading-bot work out of scope until backend/audit/compliance gates and a worker architecture are approved.
+- [x] Draft trading-bot architecture, strategy, persona-review, and dashboard-control plan.
+- [ ] Keep trading-bot implementation out of scope until backend/audit/compliance gates and the simulation-monitor slice are reviewed.
 
 ## Primary Risks
 
