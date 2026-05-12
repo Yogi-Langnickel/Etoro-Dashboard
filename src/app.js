@@ -40,6 +40,18 @@ function signedMoney(value) {
   return `${value >= 0 ? "+" : "-"}${formatter.format(Math.abs(value))}`;
 }
 
+function formatCacheDuration(milliseconds) {
+  if (typeof milliseconds !== "number" || !Number.isFinite(milliseconds) || milliseconds <= 0) {
+    return "read cache unavailable";
+  }
+
+  if (milliseconds >= 1000 && milliseconds % 1000 === 0) {
+    return `${milliseconds / 1000}s read cache`;
+  }
+
+  return `${milliseconds} ms read cache`;
+}
+
 async function getJson(path) {
   const response = await fetch(path, {
     headers: { accept: "application/json" },
@@ -80,6 +92,7 @@ async function postJson(path, body) {
 function renderStatus(payload) {
   const status = payload.credentialStatus;
   const configured = Boolean(status?.configured);
+  const cacheTtlMs = payload.cachePolicy?.readOnlyTtlMs ?? status?.readCacheTtlMs;
 
   setTile(
     "provider-status",
@@ -87,7 +100,12 @@ function renderStatus(payload) {
     configured ? "Provider configured" : "Provider offline",
     configured ? `${status.baseUrl}` : "Using synthetic fixtures",
   );
-  text("source-detail", configured ? status.credentialSource : "No server credentials");
+  text(
+    "source-detail",
+    configured
+      ? `${status.credentialSource}; ${formatCacheDuration(cacheTtlMs)}`
+      : `No server credentials; ${formatCacheDuration(cacheTtlMs)}`,
+  );
   text("chart-provider", configured ? `Provider: ${status.baseUrl}` : "Provider timestamp: unavailable");
 }
 

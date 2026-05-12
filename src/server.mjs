@@ -149,6 +149,14 @@ function credentialsMissingResponse(config) {
   };
 }
 
+function readOnlyCachePolicy(config) {
+  return {
+    readOnlyTtlMs: config.readCacheTtlMs ?? DEFAULT_READ_CACHE_TTL_MS,
+    requestCoalescing: true,
+    storage: "server-memory",
+  };
+}
+
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -530,6 +538,7 @@ async function handleApiRoute(pathname, response, options) {
         ok: true,
         mode: "read-only",
         credentialStatus: publicCredentialStatus(config),
+        cachePolicy: readOnlyCachePolicy(config),
         provider: {
           baseUrl: config.baseUrl,
           endpoints: readOnlyEndpointSummary(),

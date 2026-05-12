@@ -243,9 +243,33 @@ test("status route never returns configured secret values", async () => {
   const response = await callHandler(configuredHandler(), { url: "/api/etoro/status" });
 
   assert.equal(response.status, 200);
+  assert.equal(response.json.cachePolicy.readOnlyTtlMs, 15_000);
+  assert.equal(response.json.cachePolicy.requestCoalescing, true);
+  assert.equal(response.json.cachePolicy.storage, "server-memory");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
   assert.match(response.text, /public-api\.etoro\.com/);
+});
+
+test("status route reports configured read cache policy without secrets", async () => {
+  const response = await callHandler(createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      apiKey: "server-api-secret",
+      userKey: "server-user-secret",
+      configured: true,
+      credentialFileLoaded: true,
+      credentialSource: "file",
+      missing: [],
+      readCacheTtlMs: 30_000,
+    }),
+  }), { url: "/api/etoro/status" });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.cachePolicy.readOnlyTtlMs, 30_000);
+  assert.equal(response.json.credentialStatus.readCacheTtlMs, 30_000);
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
 });
 
 test("read-only provider responses are cached without exposing secrets", async () => {
