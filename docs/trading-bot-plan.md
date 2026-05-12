@@ -252,7 +252,7 @@ Initial hard defaults:
 - [x] Add `GET /api/etoro/bot/runs` for recent simulated decisions.
 - [x] Add `GET /api/etoro/bot/audit` for redacted bot events.
 - [x] Add `GET /api/etoro/bot/events` for safe, paginated recent decision/audit summaries.
-- Extend the existing Bot Monitor tab with strategy cards, risk-limit summary, simulation ledger, and kill-switch status.
+- [x] Extend the existing Bot Monitor tab with strategy cards, simulation ledger, event feed, redacted audit feed, and kill-switch status.
 - Keep all data synthetic or from read-only provider routes.
 
 Acceptance:

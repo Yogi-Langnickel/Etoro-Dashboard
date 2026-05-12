@@ -232,6 +232,129 @@ function renderBotStatus(payload) {
   );
 }
 
+function renderBotStrategies(payload) {
+  const target = document.getElementById("bot-strategies");
+
+  if (!target) {
+    return;
+  }
+
+  target.textContent = "";
+
+  for (const strategy of payload.strategies ?? []) {
+    const card = document.createElement("article");
+    const header = document.createElement("header");
+    const titleWrap = document.createElement("span");
+    const title = document.createElement("strong");
+    const version = document.createElement("small");
+    const status = document.createElement("span");
+    const detail = document.createElement("p");
+    const meta = document.createElement("div");
+
+    card.className = "strategy-card";
+    status.className = "pill lock";
+    meta.className = "strategy-meta";
+    title.textContent = strategy.name;
+    version.textContent = strategy.version;
+    status.textContent = labelize(strategy.status);
+    detail.textContent = strategy.lastValidation?.detail ?? "Synthetic strategy only.";
+
+    for (const [label, value] of Object.entries(strategy.riskBudget ?? {})) {
+      const chip = document.createElement("span");
+      chip.className = "pill";
+      chip.textContent = `${labelize(label)}: ${value}`;
+      meta.append(chip);
+    }
+
+    titleWrap.append(title, version);
+    header.append(titleWrap, status);
+    card.append(header, detail, meta);
+    target.append(card);
+  }
+}
+
+function renderBotRuns(payload) {
+  const target = document.getElementById("bot-runs");
+
+  if (!target) {
+    return;
+  }
+
+  target.textContent = "";
+
+  for (const run of payload.runs ?? []) {
+    const row = document.createElement("li");
+    const top = document.createElement("span");
+    const title = document.createElement("strong");
+    const state = document.createElement("span");
+    const detail = document.createElement("small");
+
+    top.className = "decision-row";
+    state.className = run.riskResult === "blocked" ? "pill warn" : "pill ok";
+    title.textContent = `${run.strategyId} / ${labelize(run.decision)}`;
+    state.textContent = labelize(run.riskResult);
+    detail.textContent = `${labelize(run.reasonCode)} at ${new Date(run.evaluatedAt).toLocaleTimeString()}; orders: ${
+      run.hypotheticalOrderCount ?? 0
+    }`;
+    top.append(title, state);
+    row.append(top, detail);
+    target.append(row);
+  }
+}
+
+function renderBotEvents(payload) {
+  const target = document.getElementById("bot-events");
+
+  if (!target) {
+    return;
+  }
+
+  target.textContent = "";
+
+  for (const event of payload.events ?? []) {
+    const row = document.createElement("li");
+    const top = document.createElement("span");
+    const title = document.createElement("strong");
+    const severity = document.createElement("span");
+    const detail = document.createElement("small");
+
+    top.className = "decision-row";
+    severity.className = event.severity === "warn" ? "pill warn" : "pill ok";
+    title.textContent = event.title;
+    severity.textContent = labelize(event.type);
+    detail.textContent = event.detail;
+    top.append(title, severity);
+    row.append(top, detail);
+    target.append(row);
+  }
+}
+
+function renderBotAuditFeed(payload) {
+  const list = document.getElementById("bot-audit-list");
+
+  if (!list) {
+    return;
+  }
+
+  list.textContent = "";
+
+  for (const event of payload.auditEvents ?? []) {
+    const item = document.createElement("li");
+    const time = document.createElement("span");
+    const body = document.createElement("span");
+    const title = document.createElement("strong");
+    const detail = document.createElement("small");
+
+    time.className = "event-time";
+    time.textContent = new Date(event.createdAt).toLocaleTimeString();
+    title.textContent = labelize(event.action);
+    detail.textContent = `${labelize(event.outcome)} / ${event.entityRef}`;
+    body.append(title, detail);
+    item.append(time, body);
+    list.append(item);
+  }
+}
+
 function renderRiskStatus(payload) {
   const risk = payload.portfolioRisk ?? {};
   const safeguards = payload.safeguards ?? {};
@@ -357,8 +480,18 @@ async function refreshRiskStatus() {
 
 async function refreshBotStatus() {
   try {
-    const status = await getJson("/api/etoro/bot/status");
+    const [status, strategies, runs, audit, events] = await Promise.all([
+      getJson("/api/etoro/bot/status"),
+      getJson("/api/etoro/bot/strategies"),
+      getJson("/api/etoro/bot/runs"),
+      getJson("/api/etoro/bot/audit"),
+      getJson("/api/etoro/bot/events"),
+    ]);
     renderBotStatus(status);
+    renderBotStrategies(strategies);
+    renderBotRuns(runs);
+    renderBotAuditFeed(audit);
+    renderBotEvents(events);
   } catch (error) {
     text("bot-enabled-state", "Unavailable");
     text("bot-freshness-state", "Unavailable");

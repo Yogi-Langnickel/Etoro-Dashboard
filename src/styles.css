@@ -339,7 +339,8 @@ h2 {
   grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   grid-template-areas:
     "status safeguards"
-    "audit audit";
+    "strategies runs"
+    "events audit";
   gap: 18px;
 }
 
@@ -387,6 +388,18 @@ h2 {
 
 .bot-audit-panel {
   grid-area: audit;
+}
+
+.bot-strategies-panel {
+  grid-area: strategies;
+}
+
+.bot-runs-panel {
+  grid-area: runs;
+}
+
+.bot-events-panel {
+  grid-area: events;
 }
 
 .risk-status-panel {
@@ -462,6 +475,50 @@ h2 {
   margin-bottom: 8px;
   font-size: 1.45rem;
   line-height: 1.1;
+}
+
+.strategy-grid,
+.decision-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.strategy-card,
+.decision-list li {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(48, 56, 70, 0.74);
+}
+
+.strategy-card header,
+.decision-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.strategy-card strong,
+.strategy-card small,
+.decision-list strong,
+.decision-list small {
+  display: block;
+}
+
+.strategy-card p,
+.decision-list small {
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.strategy-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .trade-ticket {

@@ -15,7 +15,7 @@ Last updated: 2026-05-13
 - Read-only live-provider routes use a configurable short server-side cache with request coalescing, freshness metadata, and a redacted `/api/etoro/status` cache-policy summary; inactive tab status panels lazy-load on first activation so initial refreshes do not duplicate provider or planning calls.
 - Planned UI direction is a switchable tab workspace: Landing / Widgets, Operational Cockpit, Risk Radar, Research Desk, and a demo-first Trading tab.
 - The dashboard has a dedicated demo trading tab and non-executing preview behavior, but execution routes remain absent until a separate feature-flagged write flow is designed and reviewed.
-- The dashboard has Bot Monitor APIs backed by `/api/etoro/bot/status`, `/api/etoro/bot/strategies`, `/api/etoro/bot/runs`, `/api/etoro/bot/audit`, and `/api/etoro/bot/events`; they are synthetic, read-only, disabled by default, redact account identifiers, and expose no execution or account-mutation capability.
+- The dashboard has a Bot Monitor tab backed by `/api/etoro/bot/status`, `/api/etoro/bot/strategies`, `/api/etoro/bot/runs`, `/api/etoro/bot/audit`, and `/api/etoro/bot/events`; it renders synthetic strategy, simulation ledger, event, and audit feeds, stays read-only/disabled by default, redacts account identifiers, and exposes no execution or account-mutation capability.
 - The dashboard has Risk Radar and Research Desk tabs backed by `/api/etoro/risk/status` and `/api/etoro/research/status`; both are synthetic/read-only, hide account identifiers/raw payloads, and expose no write routes.
 - Treat the app backend boundary as mandatory: all provider calls, credential handling, DTO normalization, caching/freshness metadata, rate-limit handling, and audit persistence belong server-side.
 - A trading bot, if approved later, should be a separate worker/service with kill switch, hard limits, durable audit, monitoring, and compliance review, not code running in browser UI or request/response routes.
@@ -53,5 +53,5 @@ Last updated: 2026-05-13
 ## Open Decisions
 
 - Choose app stack. Recommended default: TypeScript + Next.js or another server-capable web stack, with all eToro API calls server-side.
-- Next bot-monitoring UI work can consume the read-only synthetic strategy registry, simulated run ledger, redacted audit feed, and event feed; execution and account mutation remain out of scope.
+- Next bot-monitoring work should keep execution and account mutation out of scope; a future worker/backtest slice still requires separate review.
 - Confirm authentication model for dashboard users if it will be accessible beyond the local machine.
