@@ -4,7 +4,7 @@ Security-first dashboard for viewing and interacting with eToro API data.
 
 ## Status
 
-First local integration slice is in progress. The dashboard can run through a local Node server that keeps eToro credentials server-side, exposes normalized demo/account summaries to the browser, includes a gated demo trading tab with no execution routes yet, and caches read-only provider responses briefly to avoid duplicate refresh calls.
+First local integration slice is in progress. The dashboard can run through a local Node server that keeps eToro credentials server-side, exposes normalized demo/account summaries to the browser, includes a gated demo trading tab with no execution routes yet, caches read-only provider responses briefly, and lazy-loads inactive tab status data to avoid duplicate refresh calls.
 
 ## Local Demo Credentials
 

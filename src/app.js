@@ -4,6 +4,8 @@ const formatter = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   style: "currency",
 });
+const overviewTabId = "overview-view";
+const loadedTabIds = new Set([overviewTabId]);
 
 function text(id, value) {
   const element = document.getElementById(id);
@@ -356,6 +358,35 @@ async function refreshTradingStatus() {
   }
 }
 
+async function refreshTabStatus(targetId, { force = false } = {}) {
+  if (!targetId || targetId === overviewTabId) {
+    return;
+  }
+
+  if (!force && loadedTabIds.has(targetId)) {
+    return;
+  }
+
+  const refreshers = {
+    "bot-view": refreshBotStatus,
+    "research-view": refreshResearchStatus,
+    "risk-view": refreshRiskStatus,
+    "trading-view": refreshTradingStatus,
+  };
+  const refresher = refreshers[targetId];
+
+  if (!refresher) {
+    return;
+  }
+
+  await refresher();
+  loadedTabIds.add(targetId);
+}
+
+function activeTabId() {
+  return document.querySelector("[data-tab-target].active")?.dataset.tabTarget ?? overviewTabId;
+}
+
 function activateTab(targetId) {
   document.querySelectorAll("[data-tab-target]").forEach((button) => {
     const active = button.dataset.tabTarget === targetId;
@@ -367,6 +398,8 @@ function activateTab(targetId) {
   document.querySelectorAll("[data-tab-panel]").forEach((panel) => {
     panel.hidden = panel.dataset.tabPanel !== targetId;
   });
+
+  void refreshTabStatus(targetId);
 }
 
 async function refreshEtoro() {
@@ -380,10 +413,7 @@ async function refreshEtoro() {
     await getJson("/api/health");
     const status = await getJson("/api/etoro/status");
     renderStatus(status);
-    await refreshTradingStatus();
-    await refreshBotStatus();
-    await refreshRiskStatus();
-    await refreshResearchStatus();
+    await refreshTabStatus(activeTabId(), { force: true });
 
     if (!status.credentialStatus.configured) {
       renderAudit("Credential check incomplete", "No credential values present in browser context");
@@ -398,10 +428,7 @@ async function refreshEtoro() {
     renderAudit("Demo PnL summary loaded", "Provider response normalized and raw payload hidden");
   } catch (error) {
     setTile("provider-status", "warn", "Provider offline", "Using synthetic fixtures");
-    await refreshTradingStatus();
-    await refreshBotStatus();
-    await refreshRiskStatus();
-    await refreshResearchStatus();
+    await refreshTabStatus(activeTabId(), { force: true });
     renderAudit("Provider read failed", error.message);
   } finally {
     if (button) {
