@@ -17,6 +17,10 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/demo/trading/status",
   "/api/etoro/demo/trading/preview",
   "/api/etoro/bot/status",
+  "/api/etoro/bot/strategies",
+  "/api/etoro/bot/runs",
+  "/api/etoro/bot/audit",
+  "/api/etoro/bot/events",
   "/api/etoro/risk/status",
   "/api/etoro/research/status",
 ]);
@@ -266,6 +270,182 @@ function botMonitoringStatus(config) {
       accountMutation: "blocked",
       rawProviderPayloads: "hidden",
       accountIdentifiers: "redacted",
+    },
+  };
+}
+
+function botStrategyRegistry(config) {
+  return {
+    ok: true,
+    mode: "bot-simulation-monitor",
+    readOnly: true,
+    demoOnly: true,
+    botEnabled: false,
+    mutationRoutesEnabled: false,
+    credentialStatus: publicCredentialStatus(config),
+    strategies: [
+      {
+        strategyId: "dca-cash-reserve",
+        name: "Cash-reserved DCA",
+        version: "0.1.0-sim",
+        status: "simulation-only",
+        allowedModes: ["simulation"],
+        allowedInstruments: ["synthetic-etf-basket"],
+        cadence: "daily-preview",
+        riskBudget: {
+          maxPositionPct: 10,
+          maxWeeklyTurnoverPct: 5,
+          leverage: "1-only",
+          shorts: "blocked",
+        },
+        lastValidation: {
+          state: "not-run",
+          detail: "Synthetic strategy record only; no provider reads or orders are connected.",
+        },
+      },
+      {
+        strategyId: "threshold-rebalance",
+        name: "Threshold rebalance",
+        version: "0.1.0-sim",
+        status: "simulation-only",
+        allowedModes: ["simulation"],
+        allowedInstruments: ["synthetic-core-allocation"],
+        cadence: "weekly-preview",
+        riskBudget: {
+          maxDriftPct: 5,
+          maxPositionPct: 20,
+          leverage: "1-only",
+          shorts: "blocked",
+        },
+        lastValidation: {
+          state: "not-run",
+          detail: "Synthetic strategy record only; no provider reads or orders are connected.",
+        },
+      },
+    ],
+    safeguards: {
+      executionRoutes: "absent",
+      accountIdentifiers: "redacted",
+      rawProviderPayloads: "hidden",
+    },
+  };
+}
+
+function botSimulationRuns(config) {
+  return {
+    ok: true,
+    mode: "bot-simulation-monitor",
+    readOnly: true,
+    demoOnly: true,
+    mutationRoutesEnabled: false,
+    credentialStatus: publicCredentialStatus(config),
+    runs: [
+      {
+        runId: "sim-run-001",
+        strategyId: "dca-cash-reserve",
+        strategyVersion: "0.1.0-sim",
+        environment: "synthetic",
+        state: "simulated",
+        evaluatedAt: "2026-05-13T00:00:00.000Z",
+        decision: "skip",
+        reasonCode: "provider-not-connected",
+        riskResult: "blocked",
+        hypotheticalOrderCount: 0,
+      },
+      {
+        runId: "sim-run-002",
+        strategyId: "threshold-rebalance",
+        strategyVersion: "0.1.0-sim",
+        environment: "synthetic",
+        state: "simulated",
+        evaluatedAt: "2026-05-13T00:05:00.000Z",
+        decision: "skip",
+        reasonCode: "portfolio-snapshot-unavailable",
+        riskResult: "blocked",
+        hypotheticalOrderCount: 0,
+      },
+    ],
+    safeguards: {
+      executionRoutes: "absent",
+      orderSubmission: "blocked",
+      accountIdentifiers: "redacted",
+      rawProviderPayloads: "hidden",
+    },
+  };
+}
+
+function botAuditEvents(config) {
+  return {
+    ok: true,
+    mode: "bot-simulation-monitor",
+    readOnly: true,
+    mutationRoutesEnabled: false,
+    credentialStatus: publicCredentialStatus(config),
+    auditEvents: [
+      {
+        eventId: "audit-001",
+        actor: "system",
+        action: "simulation_monitor_loaded",
+        entityRef: "bot-monitor",
+        outcome: "read-only",
+        createdAt: "2026-05-13T00:00:00.000Z",
+      },
+      {
+        eventId: "audit-002",
+        actor: "system",
+        action: "execution_routes_checked",
+        entityRef: "bot-monitor",
+        outcome: "absent",
+        createdAt: "2026-05-13T00:00:01.000Z",
+      },
+    ],
+    pagination: {
+      limit: 20,
+      nextCursor: null,
+      hasMore: false,
+    },
+    safeguards: {
+      accountIdentifiers: "redacted",
+      rawProviderPayloads: "hidden",
+      orderPayloads: "not-created",
+    },
+  };
+}
+
+function botEventFeed(config) {
+  return {
+    ok: true,
+    mode: "bot-simulation-monitor",
+    readOnly: true,
+    mutationRoutesEnabled: false,
+    credentialStatus: publicCredentialStatus(config),
+    events: [
+      {
+        eventId: "event-001",
+        type: "decision",
+        severity: "info",
+        title: "DCA simulation skipped",
+        detail: "Provider portfolio data is not connected, so no candidate order was produced.",
+        createdAt: "2026-05-13T00:00:00.000Z",
+      },
+      {
+        eventId: "event-002",
+        type: "risk-veto",
+        severity: "warn",
+        title: "Rebalance blocked",
+        detail: "Portfolio snapshot is unavailable; risk engine remains fail-closed.",
+        createdAt: "2026-05-13T00:05:00.000Z",
+      },
+    ],
+    pagination: {
+      limit: 20,
+      nextCursor: null,
+      hasMore: false,
+    },
+    safeguards: {
+      executionRoutes: "absent",
+      accountIdentifiers: "redacted",
+      rawProviderPayloads: "hidden",
     },
   };
 }
@@ -570,6 +750,26 @@ async function handleApiRoute(pathname, response, options) {
 
     if (pathname === "/api/etoro/bot/status") {
       sendJson(response, 200, botMonitoringStatus(config));
+      return;
+    }
+
+    if (pathname === "/api/etoro/bot/strategies") {
+      sendJson(response, 200, botStrategyRegistry(config));
+      return;
+    }
+
+    if (pathname === "/api/etoro/bot/runs") {
+      sendJson(response, 200, botSimulationRuns(config));
+      return;
+    }
+
+    if (pathname === "/api/etoro/bot/audit") {
+      sendJson(response, 200, botAuditEvents(config));
+      return;
+    }
+
+    if (pathname === "/api/etoro/bot/events") {
+      sendJson(response, 200, botEventFeed(config));
       return;
     }
 

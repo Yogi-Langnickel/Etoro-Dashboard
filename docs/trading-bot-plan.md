@@ -2,6 +2,7 @@
 
 Status: draft
 Created: 2026-05-12
+Last updated: 2026-05-13
 
 This document plans a future eToro trading bot that is controlled and monitored through the eToro Dashboard. It is not approval to implement execution routes. The current dashboard remains read-only and simulation-first.
 
@@ -247,10 +248,10 @@ Initial hard defaults:
 
 ### Phase 1: Simulation Monitor
 
-- Add `GET /api/etoro/bot/strategies` for synthetic strategy registry.
-- Add `GET /api/etoro/bot/runs` for recent simulated decisions.
-- Add `GET /api/etoro/bot/audit` for redacted bot events.
-- Add `GET /api/etoro/bot/events` for safe, paginated recent decision/audit summaries.
+- [x] Add `GET /api/etoro/bot/strategies` for synthetic strategy registry.
+- [x] Add `GET /api/etoro/bot/runs` for recent simulated decisions.
+- [x] Add `GET /api/etoro/bot/audit` for redacted bot events.
+- [x] Add `GET /api/etoro/bot/events` for safe, paginated recent decision/audit summaries.
 - Extend the existing Bot Monitor tab with strategy cards, risk-limit summary, simulation ledger, and kill-switch status.
 - Keep all data synthetic or from read-only provider routes.
 

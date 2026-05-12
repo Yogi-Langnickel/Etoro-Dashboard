@@ -59,6 +59,10 @@ test("server exposes only internal API routes and no execution routes", () => {
     "/api/etoro/demo/trading/status",
     "/api/etoro/demo/trading/preview",
     "/api/etoro/bot/status",
+    "/api/etoro/bot/strategies",
+    "/api/etoro/bot/runs",
+    "/api/etoro/bot/audit",
+    "/api/etoro/bot/events",
     "/api/etoro/risk/status",
     "/api/etoro/research/status",
   ]);
@@ -84,6 +88,62 @@ test("bot monitoring status is read-only, disabled, and redacted", async () => {
   assert.equal(response.json.safeguards.accountIdentifiers, "redacted");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
+});
+
+test("bot strategy registry is simulation-only and redacted", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/api/etoro/bot/strategies",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.mode, "bot-simulation-monitor");
+  assert.equal(response.json.readOnly, true);
+  assert.equal(response.json.botEnabled, false);
+  assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.json.strategies.length, 2);
+  assert.equal(response.json.strategies[0].allowedModes.includes("simulation"), true);
+  assert.equal(response.json.safeguards.executionRoutes, "absent");
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes('"accountId"'), false);
+});
+
+test("bot simulation runs expose why-no-trade decisions without execution data", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/api/etoro/bot/runs",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.mode, "bot-simulation-monitor");
+  assert.equal(response.json.runs.length, 2);
+  assert.equal(response.json.runs[0].decision, "skip");
+  assert.equal(response.json.runs[0].hypotheticalOrderCount, 0);
+  assert.equal(response.json.safeguards.orderSubmission, "blocked");
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes('"positionId"'), false);
+});
+
+test("bot audit and events are read-only synthetic feeds", async () => {
+  const audit = await callHandler(configuredHandler(), {
+    url: "/api/etoro/bot/audit",
+  });
+  const events = await callHandler(configuredHandler(), {
+    url: "/api/etoro/bot/events",
+  });
+
+  assert.equal(audit.status, 200);
+  assert.equal(events.status, 200);
+  assert.equal(audit.json.auditEvents[0].action, "simulation_monitor_loaded");
+  assert.equal(events.json.events[1].type, "risk-veto");
+  assert.equal(audit.json.pagination.hasMore, false);
+  assert.equal(events.json.pagination.nextCursor, null);
+  assert.equal(audit.json.mutationRoutesEnabled, false);
+  assert.equal(events.json.mutationRoutesEnabled, false);
+  assert.equal(audit.text.includes("server-api-secret"), false);
+  assert.equal(events.text.includes("server-user-secret"), false);
+  assert.equal(audit.text.includes('"accountId"'), false);
+  assert.equal(events.text.includes('"accountId"'), false);
 });
 
 test("risk radar status is read-only, synthetic, and redacted", async () => {
