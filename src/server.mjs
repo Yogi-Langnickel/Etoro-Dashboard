@@ -26,6 +26,7 @@ export const INTERNAL_API_ROUTES = Object.freeze([
 ]);
 
 const DEMO_TRADE_PREVIEW_ROUTE = "/api/etoro/demo/trading/preview";
+const MAX_PREVIEW_BODY_BYTES = 16 * 1024;
 
 const PLANNED_DEMO_TRADING_ENDPOINTS = Object.freeze({
   marketOpenByAmount: Object.freeze({
@@ -541,6 +542,52 @@ function researchDeskStatus(config) {
   };
 }
 
+function tradingPermissionMatrix(config) {
+  return [
+    {
+      id: "read-key",
+      label: "Read key",
+      state: config.configured ? "configured" : "missing",
+      detail: config.configured ? "Server-side only" : "No server credential",
+    },
+    {
+      id: "write-key",
+      label: "Write key",
+      state: "absent",
+      detail: "No order-submission key is used by this app slice",
+    },
+    {
+      id: "environment",
+      label: "Environment",
+      state: "demo-only",
+      detail: "Live trading remains unavailable",
+    },
+    {
+      id: "preview",
+      label: "Preview route",
+      state: config.demoTradePreviewEnabled ? "enabled" : "disabled",
+      detail: "Validation only; no provider mutation",
+    },
+    {
+      id: "mutation-routes",
+      label: "Mutation routes",
+      state: "absent",
+      detail: "No market-open, market-close, copy, or account routes exist",
+    },
+  ];
+}
+
+function tradingRateBudget() {
+  return {
+    source: "planning",
+    window: "rolling-1-minute",
+    readBudget: "60-per-minute-documented",
+    writeBudget: "20-per-minute-documented",
+    reservedHeadroom: "emergency-and-status-reads",
+    currentPressure: "not-connected",
+  };
+}
+
 function parsePositiveNumber(value, fieldName) {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -557,13 +604,25 @@ function parsePositiveNumber(value, fieldName) {
 
 async function readJsonBody(request) {
   if (typeof request.body === "string") {
+    if (Buffer.byteLength(request.body, "utf8") > MAX_PREVIEW_BODY_BYTES) {
+      throw new Error(`Request body must be ${MAX_PREVIEW_BODY_BYTES} bytes or smaller`);
+    }
+
     return request.body ? JSON.parse(request.body) : {};
   }
 
   const chunks = [];
+  let totalBytes = 0;
 
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+
+    if (totalBytes > MAX_PREVIEW_BODY_BYTES) {
+      throw new Error(`Request body must be ${MAX_PREVIEW_BODY_BYTES} bytes or smaller`);
+    }
+
+    chunks.push(buffer);
   }
 
   const body = Buffer.concat(chunks).toString("utf8");
@@ -585,13 +644,24 @@ function buildTradePreview(payload) {
     throw new Error("Side must be BUY or SELL");
   }
 
+  if (side !== "BUY") {
+    throw new Error("Preview only supports BUY; shorts and sell-side concepts are blocked");
+  }
+
+  if (leverage !== 1) {
+    throw new Error("Preview only supports leverage 1");
+  }
+
   if (orderType === "marketOpenByAmount") {
     if (!instrumentId || amount === null) {
       throw new Error("Market open by amount requires an instrument ID and amount");
     }
 
     return {
-      providerEndpoint: PLANNED_DEMO_TRADING_ENDPOINTS.marketOpenByAmount,
+      providerEndpoint: {
+        category: "market-open-by-amount",
+        method: PLANNED_DEMO_TRADING_ENDPOINTS.marketOpenByAmount.method,
+      },
       ticket: {
         orderType,
         side,
@@ -611,7 +681,10 @@ function buildTradePreview(payload) {
     }
 
     return {
-      providerEndpoint: PLANNED_DEMO_TRADING_ENDPOINTS.marketOpenByUnits,
+      providerEndpoint: {
+        category: "market-open-by-units",
+        method: PLANNED_DEMO_TRADING_ENDPOINTS.marketOpenByUnits.method,
+      },
       ticket: {
         orderType,
         side,
@@ -631,7 +704,10 @@ function buildTradePreview(payload) {
     }
 
     return {
-      providerEndpoint: PLANNED_DEMO_TRADING_ENDPOINTS.marketClosePosition,
+      providerEndpoint: {
+        category: "market-close-position",
+        method: PLANNED_DEMO_TRADING_ENDPOINTS.marketClosePosition.method,
+      },
       ticket: {
         orderType,
         side,
@@ -735,7 +811,8 @@ async function handleApiRoute(pathname, response, options) {
         mutationRoutesEnabled: false,
         demoTradePreviewEnabled: Boolean(config.demoTradePreviewEnabled),
         credentialStatus: publicCredentialStatus(config),
-        plannedProviderEndpoints: PLANNED_DEMO_TRADING_ENDPOINTS,
+        permissionMatrix: tradingPermissionMatrix(config),
+        rateBudget: tradingRateBudget(),
         requiredControls: [
           "demo-only route namespace",
           "explicit feature flag",

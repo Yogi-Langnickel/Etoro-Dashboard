@@ -1,7 +1,7 @@
 # Etoro Dashboard Agent Memory
 
 Status: active
-Last updated: 2026-05-13
+Last updated: 2026-05-14
 
 ## Current Truth
 
@@ -14,7 +14,7 @@ Last updated: 2026-05-13
 - First local live-provider slice uses a dependency-free Node server with server-only eToro credentials, read-only routes, and built-in `node:test` coverage.
 - Read-only live-provider routes use a configurable short server-side cache with request coalescing, freshness metadata, and a redacted `/api/etoro/status` cache-policy summary; inactive tab status panels lazy-load on first activation so initial refreshes do not duplicate provider or planning calls.
 - Planned UI direction is a switchable tab workspace: Landing / Widgets, Operational Cockpit, Risk Radar, Research Desk, and a demo-first Trading tab.
-- The dashboard has a dedicated demo trading tab and non-executing preview behavior, but execution routes remain absent until a separate feature-flagged write flow is designed and reviewed.
+- The dashboard has a dedicated demo trading tab and non-executing preview behavior, but execution routes remain absent until a separate feature-flagged write flow is designed and reviewed. The preview/status surface hides provider endpoint paths from normal UI, exposes a permission/rate posture matrix, rejects sell-side and leverage-above-1 concepts, and bounds preview request bodies.
 - The dashboard has a Bot Monitor tab backed by `/api/etoro/bot/status`, `/api/etoro/bot/strategies`, `/api/etoro/bot/runs`, `/api/etoro/bot/audit`, and `/api/etoro/bot/events`; it renders synthetic strategy, simulation ledger, event, and audit feeds, stays read-only/disabled by default, redacts account identifiers, and exposes no execution or account-mutation capability.
 - The dashboard has Risk Radar and Research Desk tabs backed by `/api/etoro/risk/status` and `/api/etoro/research/status`; both are synthetic/read-only, hide account identifiers/raw payloads, and expose no write routes.
 - Treat the app backend boundary as mandatory: all provider calls, credential handling, DTO normalization, caching/freshness metadata, rate-limit handling, and audit persistence belong server-side.
@@ -53,5 +53,5 @@ Last updated: 2026-05-13
 ## Open Decisions
 
 - Choose app stack. Recommended default: TypeScript + Next.js or another server-capable web stack, with all eToro API calls server-side.
-- Next bot-monitoring work should keep execution and account mutation out of scope; a future worker/backtest slice still requires separate review.
+- Next bot-monitoring work should keep execution and account mutation out of scope; a future worker/backtest slice still requires separate review. Next UI hardening should add broader fixture watermarks across overview/risk/research surfaces and then start the local simulation/backtest ledger.
 - Confirm authentication model for dashboard users if it will be accessible beyond the local machine.

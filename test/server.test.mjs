@@ -191,10 +191,12 @@ test("demo trading status is planning-only and does not expose secrets", async (
   assert.equal(response.status, 200);
   assert.equal(response.json.demoOnly, true);
   assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.json.permissionMatrix.some((item) => item.id === "mutation-routes"), true);
+  assert.equal(response.json.rateBudget.currentPressure, "not-connected");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
-  assert.match(response.text, /market-open-orders/);
-  assert.match(response.text, /market-close-orders/);
+  assert.equal(response.text.includes("market-open-orders"), false);
+  assert.equal(response.text.includes("market-close-orders"), false);
 });
 
 test("demo trading status returns planning metadata without credentials", async () => {
@@ -214,7 +216,8 @@ test("demo trading status returns planning metadata without credentials", async 
   assert.equal(response.json.demoOnly, true);
   assert.equal(response.json.mutationRoutesEnabled, false);
   assert.equal(response.json.credentialStatus.configured, false);
-  assert.equal(Object.keys(response.json.plannedProviderEndpoints).length, 4);
+  assert.equal(response.json.permissionMatrix.find((item) => item.id === "read-key").state, "missing");
+  assert.equal(response.json.permissionMatrix.find((item) => item.id === "write-key").state, "absent");
 });
 
 test("demo trade preview is blocked unless explicitly enabled", async () => {
@@ -270,7 +273,74 @@ test("enabled demo trade preview returns a redacted non-executing ticket", async
   assert.equal(response.json.ticket.amount, 150);
   assert.equal(response.text.includes("100000"), false);
   assert.equal(response.text.includes("server-api-secret"), false);
-  assert.match(response.json.providerEndpoint.path, /market-open-orders\/by-amount/);
+  assert.equal(response.text.includes("market-open-orders"), false);
+  assert.equal(response.json.providerEndpoint.category, "market-open-by-amount");
+});
+
+test("demo trade preview blocks sell-side and leverage concepts", async () => {
+  const handler = createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      configured: true,
+      credentialFileLoaded: false,
+      credentialSource: "environment",
+      demoTradePreviewEnabled: true,
+      missing: [],
+    }),
+  });
+  const sellResponse = await callHandler(handler, {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    body: JSON.stringify({
+      orderType: "marketOpenByAmount",
+      instrumentId: "100000",
+      side: "SELL",
+      amount: "150",
+      leverage: "1",
+    }),
+  });
+  const leverageResponse = await callHandler(handler, {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    body: JSON.stringify({
+      orderType: "marketOpenByAmount",
+      instrumentId: "100000",
+      side: "BUY",
+      amount: "150",
+      leverage: "2",
+    }),
+  });
+
+  assert.equal(sellResponse.status, 400);
+  assert.match(sellResponse.json.error.message, /shorts and sell-side concepts are blocked/);
+  assert.equal(leverageResponse.status, 400);
+  assert.match(leverageResponse.json.error.message, /leverage 1/);
+});
+
+test("demo trade preview rejects oversized request bodies", async () => {
+  const response = await callHandler(createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      configured: true,
+      credentialFileLoaded: false,
+      credentialSource: "environment",
+      demoTradePreviewEnabled: true,
+      missing: [],
+    }),
+  }), {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    body: JSON.stringify({
+      orderType: "marketOpenByAmount",
+      instrumentId: "100000",
+      side: "BUY",
+      amount: "150",
+      note: "x".repeat(17_000),
+    }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.match(response.json.error.message, /bytes or smaller/);
 });
 
 test("demo trade preview validates required ticket fields", async () => {

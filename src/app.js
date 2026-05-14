@@ -165,7 +165,8 @@ function renderAudit(message, detail, listId = "audit-list") {
 function renderTradingStatus(payload) {
   const configured = Boolean(payload.credentialStatus?.configured);
   const mutationsEnabled = Boolean(payload.mutationRoutesEnabled);
-  const endpoints = payload.plannedProviderEndpoints ?? {};
+  const matrix = payload.permissionMatrix ?? [];
+  const rateBudget = payload.rateBudget ?? {};
   const endpointTarget = document.getElementById("trading-endpoints");
 
   text("trading-credential-state", configured ? "Configured" : "Missing");
@@ -176,17 +177,33 @@ function renderTradingStatus(payload) {
   if (endpointTarget) {
     endpointTarget.textContent = "";
 
-    for (const [name, endpoint] of Object.entries(endpoints)) {
+    for (const item of matrix) {
       const card = document.createElement("article");
       const label = document.createElement("span");
-      const path = document.createElement("code");
+      const state = document.createElement("strong");
+      const detail = document.createElement("small");
 
       card.className = "endpoint-card";
-      label.textContent = `${endpoint.method} ${name}`;
-      path.textContent = endpoint.path;
-      card.append(label, path);
+      label.textContent = item.label;
+      state.textContent = labelize(item.state);
+      detail.textContent = item.detail;
+      card.append(label, state, detail);
       endpointTarget.append(card);
     }
+
+    const rateCard = document.createElement("article");
+    const rateLabel = document.createElement("span");
+    const rateState = document.createElement("strong");
+    const rateDetail = document.createElement("small");
+
+    rateCard.className = "endpoint-card";
+    rateLabel.textContent = "Rate budget";
+    rateState.textContent = labelize(rateBudget.currentPressure);
+    rateDetail.textContent = `${rateBudget.window ?? "unknown window"}; reserve: ${
+      rateBudget.reservedHeadroom ?? "not set"
+    }`;
+    rateCard.append(rateLabel, rateState, rateDetail);
+    endpointTarget.append(rateCard);
   }
 
   renderAudit(
@@ -616,7 +633,7 @@ document.getElementById("trade-preview-blocked")?.addEventListener("click", asyn
     const preview = await postJson("/api/etoro/demo/trading/preview", collectTradeTicket());
     renderAudit(
       "Trade preview generated",
-      `${preview.ticket.orderType} mapped to ${preview.providerEndpoint.method}; execution blocked`,
+      `${preview.ticket.orderType} validation passed; execution blocked`,
       "trading-audit-list",
     );
   } catch (error) {
