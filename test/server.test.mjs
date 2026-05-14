@@ -324,6 +324,9 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.marketNews.enabled, false);
   assert.equal(response.json.marketNews.safeguards.includes("no-trade-trigger-from-news"), true);
   assert.equal(response.json.intelligence.sourcePriority[0].id, "sec-companyfacts");
+  assert.equal(response.json.intelligence.freeApiOptions[0].id, "etoro-public-api");
+  assert.equal(response.json.intelligence.freeApiOptions.some((source) => source.id === "alpha-vantage"), true);
+  assert.equal(response.json.intelligence.freeApiOptions.some((source) => source.id === "twelve-data"), true);
   assert.equal(response.json.intelligence.sourcePriority.some((source) => source.id === "sec-insider-transactions"), true);
   assert.equal(response.json.intelligence.scrapingPolicy.priority, "api-first-scraping-fallback");
   assert.equal(response.json.intelligence.scrapingPolicy.finviz.insiderTradingPage, "reference-only");

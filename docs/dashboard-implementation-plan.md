@@ -13,7 +13,10 @@ Created: 2026-05-09
 
 ## Recommended Stack
 
-Use TypeScript with Next.js App Router for the first implementation. The server route boundary keeps eToro API keys, user keys, request IDs, and provider errors out of browser code while avoiding a separate backend too early.
+Historical recommendation: use TypeScript with Next.js App Router for the first
+implementation. The current implementation is a dependency-free Node/static
+read-only spike; keep using that path until the local API contracts and safety
+states are stable enough to justify a framework migration.
 
 Initial libraries:
 
@@ -218,6 +221,8 @@ Run these before using real credentials:
   Finviz scraping.
 - [ ] Implement ETF source adapters for issuer factsheets and SEC N-PORT
   datasets where practical.
+- [x] Document free API/source options for eToro Dashboard and expose the
+  Research Desk provider plan through `/api/etoro/research/status`.
 - [ ] Add persona review after the first dashboard slice, incorporate appropriate feedback, run a second review, then complete checks before merging to `develop`.
 - [ ] Update `docs/agent-memory.md` after each implementation slice with decisions, changed files, provider assumptions, and checks run.
 - [ ] Keep trading execution routes and enabled mutation controls out of scope until a separate threat model, demo-mode proof, confirmation UX, and review gate are complete.

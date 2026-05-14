@@ -85,8 +85,52 @@ const INDICATOR_POLICY = Object.freeze({
   ],
 });
 
+const FREE_API_OPTIONS = Object.freeze([
+  Object.freeze({
+    id: "etoro-public-api",
+    label: "eToro Public API",
+    fit: "first-party market, portfolio, watchlist, social, and demo/read dashboard data",
+    access: "requires verified eToro account and API/user keys",
+    implementation: "server-side-only via existing eToro client and normalized DTOs",
+    defaultUse: "primary source for eToro-owned dashboard state",
+  }),
+  Object.freeze({
+    id: "sec-companyfacts",
+    label: "SEC companyfacts/submissions",
+    fit: "US stock fundamentals, filing metadata, ticker/exchange metadata by CIK",
+    access: "free official API, no authentication",
+    implementation: "server-side cached adapter with SEC User-Agent policy",
+    defaultUse: "Research Desk financial-record indicators and issuer context",
+  }),
+  Object.freeze({
+    id: "sec-ownership-rss",
+    label: "SEC ownership filing RSS",
+    fit: "recent Forms 3, 4, and 5 insider activity awareness",
+    access: "free official RSS/search feeds",
+    implementation: "server-side RSS ingestion with source links and short summaries",
+    defaultUse: "insider activity preview before any scraping fallback",
+  }),
+  Object.freeze({
+    id: "alpha-vantage",
+    label: "Alpha Vantage",
+    fit: "optional stock, forex, crypto, commodity, economic, and indicator enrichment",
+    access: "free key available with tight quota; no browser key exposure",
+    implementation: "optional cached server adapter after official terms/rate review",
+    defaultUse: "fallback enrichment when eToro and SEC do not cover a needed market context",
+  }),
+  Object.freeze({
+    id: "twelve-data",
+    label: "Twelve Data",
+    fit: "optional quote/time-series exploration across equities, forex, and crypto",
+    access: "free Basic plan with per-minute credits; no browser key exposure",
+    implementation: "optional cached server adapter after official terms/rate review",
+    defaultUse: "secondary market-data fallback for Research Desk, not bot signals",
+  }),
+]);
+
 export function researchIntelligenceStatus() {
   return {
+    freeApiOptions: FREE_API_OPTIONS,
     sourcePriority: OFFICIAL_SOURCE_PRIORITY,
     scrapingPolicy: SCRAPING_POLICY,
     indicatorPolicy: INDICATOR_POLICY,
