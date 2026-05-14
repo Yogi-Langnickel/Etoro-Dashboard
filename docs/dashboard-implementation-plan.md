@@ -194,6 +194,9 @@ Run these before using real credentials:
   Google Sheets trade-log export planning.
 - [x] Add a redacted synthetic bot trade-log route and dashboard simulation
   ledger panel.
+- [x] Persist simulation bot controls server-side with a safe
+  `/api/etoro/bot/config` read/update API for predefined strategy, budget,
+  allowed markets, allowed instrument classes, and no-HFT cadence.
 - [x] Add a Research Desk market-news ingestion plan/preview for portfolio and
   watchlist context, with server-side allowlist and no trade trigger.
 - [x] Attach synthetic market/news context to portfolio-position previews for

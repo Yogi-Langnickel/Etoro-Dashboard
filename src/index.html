@@ -459,24 +459,46 @@
             </div>
             <span class="pill lock">Disabled</span>
           </div>
-          <label class="control-row" for="bot-strategy-select">
-            <span>Strategy</span>
-            <select id="bot-strategy-select">
-              <option>Loading strategies</option>
-            </select>
-            <small>Local preview only. Worker configuration is not persisted from the browser.</small>
-          </label>
-          <label class="control-row" for="bot-budget-select">
-            <span>Simulation budget</span>
-            <select id="bot-budget-select">
-              <option>Loading budgets</option>
-            </select>
-            <small>Budget choices are capped by server-side planning DTOs.</small>
-          </label>
+          <form class="bot-config-form" id="bot-config-form">
+            <label class="control-row" for="bot-strategy-select">
+              <span>Strategy</span>
+              <select id="bot-strategy-select">
+                <option>Loading strategies</option>
+              </select>
+              <small>Predefined simulation strategies only.</small>
+            </label>
+            <label class="control-row" for="bot-budget-select">
+              <span>Simulation budget</span>
+              <select id="bot-budget-select">
+                <option>Loading budgets</option>
+              </select>
+              <small>Budget choices are capped by server-side validation.</small>
+            </label>
+            <label class="control-row" for="bot-cadence-select">
+              <span>Cadence</span>
+              <select id="bot-cadence-select">
+                <option>Loading cadences</option>
+              </select>
+              <small>Intraday and high-frequency cadences are blocked.</small>
+            </label>
+            <fieldset class="control-fieldset">
+              <legend>Allowed markets</legend>
+              <div class="control-check-grid" id="bot-market-options"></div>
+            </fieldset>
+            <fieldset class="control-fieldset">
+              <legend>Instrument classes</legend>
+              <div class="control-check-grid" id="bot-instrument-class-options"></div>
+            </fieldset>
+            <button class="icon-button" type="submit">Save simulation config</button>
+          </form>
           <ul class="readiness-list">
             <li>
               <span>Strategy control</span>
               <strong id="bot-strategy-control-state">Predefined disabled</strong>
+            </li>
+            <li>
+              <span>Config source</span>
+              <strong id="bot-config-source-state">Default server config</strong>
             </li>
             <li>
               <span>Base budget</span>
@@ -509,6 +531,10 @@
             <li>
               <span>Universe</span>
               <strong id="bot-universe-state">US equities, AU equities, Forex, Commodities</strong>
+            </li>
+            <li>
+              <span>Instrument classes</span>
+              <strong id="bot-instrument-class-state">Equity, ETF</strong>
             </li>
             <li>
               <span>Trade log export</span>

@@ -12,8 +12,8 @@ High-impact risks:
 - Accidental live trading, order cancellation, copy-trading, or account mutation.
 - Prompt-injection or malicious content from third-party API fields influencing trading actions.
 - Market/news context being misread as trading advice or an automated order signal.
-- Browser-local strategy or budget preview controls being mistaken for persisted
-  worker configuration.
+- Server-persisted simulation bot config being mistaken for approval to place
+  orders or connect live provider execution.
 - Logging, screenshots, fixtures, or exports that disclose balances, account ids, holdings, or trade history.
 - Public repository commits containing secrets or private financial data.
 
@@ -24,8 +24,11 @@ High-impact risks:
 - Local eToro demo credentials may also be stored outside the repo at `${HOME}/.config/etoro/credentials.json` with user-only permissions.
 - Credentialed provider clients must pin allowed hosts before sending API keys or user keys.
 - Trading feature flags default to false: `ENABLE_TRADING_ACTIONS=false`, `ENABLE_LIVE_ORDERS=false`.
-- Bot controls remain simulation/local-preview only until a worker control API,
-  authentication, CSRF/origin policy, durable audit, and review gate exist.
+- Bot config persistence remains simulation-only. Strategy, budget, market,
+  instrument-class, and cadence controls may be stored server-side, but they do
+  not enable provider calls, order previews, demo execution, or live execution.
+- Any hosted bot-control API still requires authentication, CSRF/origin policy,
+  durable audit, and review gate before real controls are exposed.
 - Bot market/news context is display-only; it cannot trigger strategy decisions,
   order previews, demo execution, or live execution.
 - Validate all external API responses before use.

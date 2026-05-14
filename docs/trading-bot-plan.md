@@ -262,6 +262,9 @@ Initial hard defaults:
 - [x] Extend the existing Bot Monitor tab with strategy cards, simulation ledger, event feed, redacted audit feed, and kill-switch status.
 - [x] Add local-only dashboard strategy and budget selectors backed by predefined
   synthetic DTOs. Browser changes are not persisted to worker config.
+- [x] Promote dashboard controls to a server-persisted simulation config route
+  for predefined strategy, budget, allowed markets, allowed instrument classes,
+  and no-HFT cadence. This still does not connect to the worker or provider.
 - [x] Start `/Users/yogi/Coding/projects/Money-maker-3000` with simulation
   contracts, budget/cadence guardrails, position-news context, and tests.
 - Keep all data synthetic or from read-only provider routes.

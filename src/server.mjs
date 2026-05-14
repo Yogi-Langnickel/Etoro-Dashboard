@@ -3,6 +3,15 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  ALLOWED_BOT_BUDGETS_USD,
+  ALLOWED_BOT_INSTRUMENT_CLASSES,
+  ALLOWED_BOT_MARKETS,
+  BotConfigValidationError,
+  loadBotConfig,
+  publicBotConfigPayload,
+  saveBotConfig,
+} from "./bot-config-store.mjs";
 import { fetchReadOnlyEndpoint, readOnlyEndpointSummary } from "./etoro-client.mjs";
 import { DEFAULT_READ_CACHE_TTL_MS, loadEtoroConfig, publicCredentialStatus } from "./etoro-config.mjs";
 
@@ -22,12 +31,14 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/bot/audit",
   "/api/etoro/bot/events",
   "/api/etoro/bot/trade-log",
+  "/api/etoro/bot/config",
   "/api/etoro/risk/status",
   "/api/etoro/research/status",
 ]);
 
 const DEMO_TRADE_PREVIEW_ROUTE = "/api/etoro/demo/trading/preview";
-const MAX_PREVIEW_BODY_BYTES = 16 * 1024;
+const BOT_CONFIG_ROUTE = "/api/etoro/bot/config";
+const MAX_API_BODY_BYTES = 16 * 1024;
 
 const PLANNED_DEMO_TRADING_ENDPOINTS = Object.freeze({
   marketOpenByAmount: Object.freeze({
@@ -66,7 +77,7 @@ const STATIC_FILES = new Map([
 const BOT_BUDGET_POLICY = Object.freeze({
   mode: "simulation-hard-limits",
   baseBudgetUsd: 1000,
-  selectableBudgetsUsd: [500, 1000, 1500, 2500],
+  selectableBudgetsUsd: ALLOWED_BOT_BUDGETS_USD,
   profitReuse: "allowed-after-realized-profit-ledger",
   maxConfigurableBudgetUsd: 2500,
   hardStops: Object.freeze({
@@ -360,7 +371,7 @@ function botMonitoringStatus(config) {
       accountIdentifiers: "redacted",
     },
     controlPolicy: {
-      strategySelection: "predefined-local-preview",
+      strategySelection: "predefined-server-persisted",
       configuredStrategyId: "dca-cash-reserve",
       allowedStrategyIds: botStrategyRecords().map((strategy) => strategy.strategyId),
       customStrategyUpload: "blocked",
@@ -370,7 +381,8 @@ function botMonitoringStatus(config) {
     schedulePolicy: BOT_SCHEDULE_POLICY,
     instrumentUniverse: {
       configurable: "planned",
-      defaultAllowed: ["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"],
+      defaultAllowed: ALLOWED_BOT_MARKETS,
+      defaultInstrumentClasses: ALLOWED_BOT_INSTRUMENT_CLASSES,
       disabledUntilReviewed: ["DERIVATIVES", "CFD", "CRYPTO"],
       perStrategyAllowlist: "required-before-execution",
     },
@@ -820,8 +832,8 @@ function parsePositiveNumber(value, fieldName) {
 
 async function readJsonBody(request) {
   if (typeof request.body === "string") {
-    if (Buffer.byteLength(request.body, "utf8") > MAX_PREVIEW_BODY_BYTES) {
-      throw new Error(`Request body must be ${MAX_PREVIEW_BODY_BYTES} bytes or smaller`);
+    if (Buffer.byteLength(request.body, "utf8") > MAX_API_BODY_BYTES) {
+      throw new Error(`Request body must be ${MAX_API_BODY_BYTES} bytes or smaller`);
     }
 
     return request.body ? JSON.parse(request.body) : {};
@@ -834,8 +846,8 @@ async function readJsonBody(request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     totalBytes += buffer.length;
 
-    if (totalBytes > MAX_PREVIEW_BODY_BYTES) {
-      throw new Error(`Request body must be ${MAX_PREVIEW_BODY_BYTES} bytes or smaller`);
+    if (totalBytes > MAX_API_BODY_BYTES) {
+      throw new Error(`Request body must be ${MAX_API_BODY_BYTES} bytes or smaller`);
     }
 
     chunks.push(buffer);
@@ -977,6 +989,50 @@ async function handleTradePreview(request, response, config) {
   }
 }
 
+async function handleBotConfigRead(response, options) {
+  const loadStoredBotConfig = options.loadBotConfig ?? loadBotConfig;
+  const loaded = await loadStoredBotConfig({
+    configFile: options.botConfigFile,
+  });
+
+  sendJson(response, 200, publicBotConfigPayload(loaded.config, loaded));
+}
+
+async function handleBotConfigUpdate(request, response, options) {
+  const saveStoredBotConfig = options.saveBotConfig ?? saveBotConfig;
+
+  try {
+    const saved = await saveStoredBotConfig(await readJsonBody(request), {
+      configFile: options.botConfigFile,
+    });
+
+    sendJson(response, 200, {
+      ...publicBotConfigPayload(saved.config, saved),
+      audit: {
+        action: "bot_config_updated",
+        outcome: "persisted-server-side",
+        redacted: true,
+      },
+    });
+  } catch (error) {
+    const validationError = error instanceof BotConfigValidationError ||
+      error instanceof SyntaxError ||
+      String(error?.message ?? "").includes("Request body must be");
+
+    sendJson(response, validationError ? 400 : 500, {
+      ok: false,
+      mode: "bot-config",
+      mutationRoutesEnabled: false,
+      executionBlocked: true,
+      error: {
+        code: validationError ? (error.code ?? "BOT_CONFIG_INVALID") : "BOT_CONFIG_SAVE_FAILED",
+        message: error?.message ?? "Unable to save bot config",
+        fields: validationError ? error.errors : undefined,
+      },
+    });
+  }
+}
+
 async function handleApiRoute(pathname, response, options) {
   const loadConfig = options.loadConfig ?? loadEtoroConfig;
   const fetchEndpoint = options.fetchEndpoint ?? fetchReadOnlyEndpoint;
@@ -1043,6 +1099,16 @@ async function handleApiRoute(pathname, response, options) {
 
     if (pathname === "/api/etoro/bot/status") {
       sendJson(response, 200, botMonitoringStatus(config));
+      return;
+    }
+
+    if (pathname === BOT_CONFIG_ROUTE) {
+      if (options.request?.method === "PUT") {
+        await handleBotConfigUpdate(options.request, response, options);
+        return;
+      }
+
+      await handleBotConfigRead(response, options);
       return;
     }
 
@@ -1117,6 +1183,20 @@ export function createRequestHandler(options = {}) {
     const pathname = url.pathname;
 
     if (pathname.startsWith("/api/")) {
+      if (pathname === BOT_CONFIG_ROUTE) {
+        if (!["GET", "PUT"].includes(request.method)) {
+          sendJson(response, 405, {
+            ok: false,
+            mode: "bot-config",
+            error: { code: "METHOD_NOT_ALLOWED", message: "Bot config supports GET and PUT only" },
+          });
+          return;
+        }
+
+        await handleApiRoute(pathname, response, { ...options, providerCache, request });
+        return;
+      }
+
       if (pathname === DEMO_TRADE_PREVIEW_ROUTE) {
         if (request.method !== "POST") {
           sendJson(response, 405, {

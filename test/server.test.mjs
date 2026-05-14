@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   INTERNAL_API_ROUTES,
@@ -64,6 +67,7 @@ test("server exposes only internal API routes and no execution routes", () => {
     "/api/etoro/bot/audit",
     "/api/etoro/bot/events",
     "/api/etoro/bot/trade-log",
+    "/api/etoro/bot/config",
     "/api/etoro/risk/status",
     "/api/etoro/research/status",
   ]);
@@ -88,7 +92,7 @@ test("bot monitoring status is read-only, disabled, and redacted", async () => {
   assert.equal(response.json.safeguards.executionRoutes, "absent");
   assert.equal(response.json.safeguards.accountIdentifiers, "redacted");
   assert.equal(response.json.controlPolicy.highFrequencyTrading, "blocked");
-  assert.equal(response.json.controlPolicy.strategySelection, "predefined-local-preview");
+  assert.equal(response.json.controlPolicy.strategySelection, "predefined-server-persisted");
   assert.equal(response.json.controlPolicy.configuredStrategyId, "dca-cash-reserve");
   assert.equal(response.json.budgetPolicy.baseBudgetUsd, 1000);
   assert.deepEqual(response.json.budgetPolicy.selectableBudgetsUsd, [500, 1000, 1500, 2500]);
@@ -162,6 +166,104 @@ test("bot trade log is synthetic, budget-scoped, and redacted", async () => {
   assert.equal(response.text.includes("server-user-secret"), false);
   assert.equal(response.text.includes('"accountId"'), false);
   assert.equal(response.text.includes('"positionId"'), false);
+});
+
+test("bot config returns default server-side simulation controls without secrets", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/api/etoro/bot/config",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.mode, "bot-config");
+  assert.equal(response.json.config.strategyId, "dca-cash-reserve");
+  assert.equal(response.json.config.budgetUsd, 1000);
+  assert.deepEqual(response.json.config.allowedMarkets, ["US_EQUITIES", "AU_EQUITIES"]);
+  assert.deepEqual(response.json.config.allowedInstrumentClasses, ["EQUITY", "ETF"]);
+  assert.equal(response.json.config.minimumEvaluationIntervalMinutes, 240);
+  assert.equal(response.json.persistence.pathRedacted, true);
+  assert.equal(response.json.persistence.persisted, false);
+  assert.equal(response.json.safeguards.executionRoutes, "absent");
+  assert.equal(response.json.safeguards.highFrequencyTrading, "blocked");
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes('"accountId"'), false);
+});
+
+test("bot config update persists validated server-side config and redacts storage path", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "etoro-bot-config-"));
+  const botConfigFile = join(tempDir, "bot-config.json");
+  const handler = createRequestHandler({
+    botConfigFile,
+    loadConfig: configuredConfig,
+  });
+  const body = {
+    strategyId: "threshold-rebalance",
+    budgetUsd: 1500,
+    allowedMarkets: ["US_EQUITIES", "COMMODITIES"],
+    allowedInstrumentClasses: ["ETF", "COMMODITY"],
+    cadence: "weekly",
+  };
+  const update = await callHandler(handler, {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    body: JSON.stringify(body),
+  });
+  const readBack = await callHandler(handler, {
+    url: "/api/etoro/bot/config",
+  });
+
+  assert.equal(update.status, 200);
+  assert.equal(update.json.config.strategyId, "threshold-rebalance");
+  assert.equal(update.json.config.budgetUsd, 1500);
+  assert.equal(update.json.config.cadence, "weekly");
+  assert.equal(update.json.config.minimumEvaluationIntervalMinutes, 240);
+  assert.equal(update.json.persistence.persisted, true);
+  assert.equal(update.json.persistence.pathRedacted, true);
+  assert.equal(update.json.audit.action, "bot_config_updated");
+  assert.equal(readBack.status, 200);
+  assert.equal(readBack.json.config.strategyId, "threshold-rebalance");
+  assert.equal(readBack.text.includes(botConfigFile), false);
+  assert.equal(readBack.text.includes("server-api-secret"), false);
+});
+
+test("bot config update rejects unsupported strategy, markets, and high-frequency cadence", async () => {
+  const response = await callHandler(configuredHandler(), {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    body: JSON.stringify({
+      strategyId: "uploaded-ai-scalper",
+      budgetUsd: 10_000,
+      allowedMarkets: ["CRYPTO"],
+      allowedInstrumentClasses: ["CFD"],
+      cadence: "minute",
+      minimumEvaluationIntervalMinutes: 5,
+    }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.json.error.code, "BOT_CONFIG_INVALID");
+  assert.equal(response.json.executionBlocked, true);
+  assert.equal(response.text.includes("uploaded-ai-scalper"), false);
+  assert.equal(response.text.includes("server-api-secret"), false);
+});
+
+test("bot config rejects unsupported methods and oversized request bodies", async () => {
+  const methodResponse = await callHandler(configuredHandler(), {
+    method: "POST",
+    url: "/api/etoro/bot/config",
+    body: "{}",
+  });
+  const oversizedResponse = await callHandler(configuredHandler(), {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    body: JSON.stringify({ note: "x".repeat(17_000) }),
+  });
+
+  assert.equal(methodResponse.status, 405);
+  assert.equal(methodResponse.json.error.code, "METHOD_NOT_ALLOWED");
+  assert.equal(oversizedResponse.status, 400);
+  assert.equal(oversizedResponse.json.error.code, "BOT_CONFIG_INVALID");
+  assert.match(oversizedResponse.json.error.message, /bytes or smaller/);
 });
 
 test("bot audit and events are read-only synthetic feeds", async () => {

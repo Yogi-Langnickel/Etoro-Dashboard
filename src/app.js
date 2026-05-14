@@ -69,13 +69,21 @@ async function getJson(path) {
 }
 
 async function postJson(path, body) {
+  return sendJsonWithMethod("POST", path, body);
+}
+
+async function putJson(path, body) {
+  return sendJsonWithMethod("PUT", path, body);
+}
+
+async function sendJsonWithMethod(method, path, body) {
   const response = await fetch(path, {
     body: JSON.stringify(body),
     headers: {
       accept: "application/json",
       "content-type": "application/json",
     },
-    method: "POST",
+    method,
   });
   const payload = await response.json();
 
@@ -259,6 +267,10 @@ function renderBotStatus(payload) {
   );
 }
 
+function checkedValues(name) {
+  return [...document.querySelectorAll(`input[name="${name}"]:checked`)].map((input) => input.value);
+}
+
 function renderBotStrategies(payload) {
   const target = document.getElementById("bot-strategies");
 
@@ -300,9 +312,50 @@ function renderBotStrategies(payload) {
   }
 }
 
-function renderBotControlSelects(statusPayload, strategiesPayload) {
+function setCheckboxGroup(name, values) {
+  const selected = new Set(values ?? []);
+
+  document.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+    input.checked = selected.has(input.value);
+  });
+}
+
+function renderBotConfig(configPayload) {
+  const config = configPayload.config ?? {};
+  const source = configPayload.persistence?.persisted ? "Persisted server-side" : "Default server config";
+
+  text("bot-config-source-state", source);
+  text("bot-budget-state", money(config.budgetUsd));
+  text("bot-cadence-state", labelize(config.cadence));
+  text("bot-universe-state", (config.allowedMarkets ?? []).map(labelize).join(", "));
+  text("bot-instrument-class-state", (config.allowedInstrumentClasses ?? []).map(labelize).join(", "));
+
+  const strategySelect = document.getElementById("bot-strategy-select");
+  const budgetSelect = document.getElementById("bot-budget-select");
+  const cadenceSelect = document.getElementById("bot-cadence-select");
+
+  if (strategySelect) {
+    strategySelect.value = config.strategyId ?? "";
+  }
+
+  if (budgetSelect) {
+    budgetSelect.value = String(config.budgetUsd ?? "");
+  }
+
+  if (cadenceSelect) {
+    cadenceSelect.value = config.cadence ?? "";
+  }
+
+  setCheckboxGroup("bot-allowed-markets", config.allowedMarkets);
+  setCheckboxGroup("bot-instrument-classes", config.allowedInstrumentClasses);
+}
+
+function renderBotControlSelects(statusPayload, strategiesPayload, configPayload) {
   const select = document.getElementById("bot-strategy-select");
   const budgetSelect = document.getElementById("bot-budget-select");
+  const cadenceSelect = document.getElementById("bot-cadence-select");
+  const marketTarget = document.getElementById("bot-market-options");
+  const classTarget = document.getElementById("bot-instrument-class-options");
   const strategyById = new Map((strategiesPayload.strategies ?? []).map((strategy) => [strategy.strategyId, strategy]));
 
   if (select) {
@@ -313,7 +366,6 @@ function renderBotControlSelects(statusPayload, strategiesPayload) {
       const option = document.createElement("option");
       option.value = strategyId;
       option.textContent = strategy?.name ?? labelize(strategyId);
-      option.selected = strategyId === statusPayload.controlPolicy?.configuredStrategyId;
       select.append(option);
     }
 
@@ -327,12 +379,60 @@ function renderBotControlSelects(statusPayload, strategiesPayload) {
       const option = document.createElement("option");
       option.value = String(budget);
       option.textContent = money(budget);
-      option.selected = budget === statusPayload.budgetPolicy?.baseBudgetUsd;
       budgetSelect.append(option);
     }
 
     budgetSelect.disabled = false;
   }
+
+  if (cadenceSelect) {
+    cadenceSelect.textContent = "";
+
+    for (const cadence of configPayload.options?.cadences ?? []) {
+      const option = document.createElement("option");
+      option.value = cadence;
+      option.textContent = labelize(cadence);
+      cadenceSelect.append(option);
+    }
+
+    cadenceSelect.disabled = false;
+  }
+
+  if (marketTarget) {
+    marketTarget.textContent = "";
+
+    for (const market of configPayload.options?.markets ?? []) {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      const span = document.createElement("span");
+
+      input.type = "checkbox";
+      input.name = "bot-allowed-markets";
+      input.value = market;
+      span.textContent = labelize(market);
+      label.append(input, span);
+      marketTarget.append(label);
+    }
+  }
+
+  if (classTarget) {
+    classTarget.textContent = "";
+
+    for (const instrumentClass of configPayload.options?.instrumentClasses ?? []) {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      const span = document.createElement("span");
+
+      input.type = "checkbox";
+      input.name = "bot-instrument-classes";
+      input.value = instrumentClass;
+      span.textContent = labelize(instrumentClass);
+      label.append(input, span);
+      classTarget.append(label);
+    }
+  }
+
+  renderBotConfig(configPayload);
 }
 
 function renderBotRuns(payload) {
@@ -620,16 +720,17 @@ async function refreshRiskStatus() {
 
 async function refreshBotStatus() {
   try {
-    const [status, strategies, runs, audit, events, tradeLog] = await Promise.all([
+    const [status, strategies, config, runs, audit, events, tradeLog] = await Promise.all([
       getJson("/api/etoro/bot/status"),
       getJson("/api/etoro/bot/strategies"),
+      getJson("/api/etoro/bot/config"),
       getJson("/api/etoro/bot/runs"),
       getJson("/api/etoro/bot/audit"),
       getJson("/api/etoro/bot/events"),
       getJson("/api/etoro/bot/trade-log"),
     ]);
     renderBotStatus(status);
-    renderBotControlSelects(status, strategies);
+    renderBotControlSelects(status, strategies, config);
     renderBotStrategies(strategies);
     renderBotRuns(runs);
     renderBotAuditFeed(audit);
@@ -749,6 +850,16 @@ function collectTradeTicket() {
   };
 }
 
+function collectBotConfig() {
+  return {
+    strategyId: ticketValue("bot-strategy-select"),
+    budgetUsd: Number(ticketValue("bot-budget-select")),
+    allowedMarkets: checkedValues("bot-allowed-markets"),
+    allowedInstrumentClasses: checkedValues("bot-instrument-classes"),
+    cadence: ticketValue("bot-cadence-select"),
+  };
+}
+
 document.getElementById("refresh-etoro")?.addEventListener("click", refreshEtoro);
 document.getElementById("trade-ticket")?.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -769,16 +880,31 @@ document.getElementById("trade-preview-blocked")?.addEventListener("click", asyn
 document.getElementById("bot-strategy-select")?.addEventListener("change", (event) => {
   renderAudit(
     "Strategy preview changed",
-    `${labelize(event.target.value)} selected locally; worker config is not persisted`,
+    `${labelize(event.target.value)} selected locally; save to persist on the server`,
     "bot-audit-list",
   );
 });
 document.getElementById("bot-budget-select")?.addEventListener("change", (event) => {
   renderAudit(
     "Budget preview changed",
-    `${money(Number(event.target.value))} selected locally; hard limits remain unchanged`,
+    `${money(Number(event.target.value))} selected locally; save to persist on the server`,
     "bot-audit-list",
   );
+});
+document.getElementById("bot-config-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  try {
+    const saved = await putJson("/api/etoro/bot/config", collectBotConfig());
+    renderBotConfig(saved);
+    renderAudit(
+      "Bot config persisted",
+      "Server-side simulation config saved; execution remains absent",
+      "bot-audit-list",
+    );
+  } catch (error) {
+    renderAudit("Bot config rejected", error.message, "bot-audit-list");
+  }
 });
 document.querySelectorAll("[data-tab-target]").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.tabTarget));

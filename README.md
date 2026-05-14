@@ -38,6 +38,8 @@ Set `ENABLE_DEMO_TRADE_PREVIEW=true` only when you want the local server to vali
 
 Set `ETORO_READ_CACHE_TTL_MS` if local read-only provider calls need a different short cache window. The default is `15000` milliseconds.
 
+Simulation bot controls are stored server-side at `${HOME}/.config/etoro-dashboard/bot-config.json` by default. The saved config contains only predefined strategy, budget, market, instrument-class, and low-frequency cadence choices; it does not contain credentials or enable trading.
+
 ## Goals
 
 - View portfolio, watchlist, market, and social-trading data through official eToro API endpoints.

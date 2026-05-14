@@ -551,6 +551,12 @@ h2 {
   margin: 0 18px 14px;
 }
 
+.bot-config-form {
+  display: grid;
+  gap: 0;
+  padding-top: 18px;
+}
+
 .control-row span {
   color: var(--muted);
   font-size: 0.78rem;
@@ -571,6 +577,46 @@ h2 {
   color: var(--text);
   font: inherit;
   padding: 0 12px;
+}
+
+.control-fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0 18px 14px;
+  padding: 0;
+  border: 0;
+}
+
+.control-fieldset legend {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.control-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.control-check-grid label {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111820;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.bot-config-form > .icon-button {
+  justify-self: start;
+  margin: 0 18px 18px;
 }
 
 .trade-ticket {

@@ -42,6 +42,10 @@ Public material currently describes API access for market data, portfolios, watc
   is a redacted simulation ledger route, not a provider trade-history route.
   It must not expose account IDs, provider order IDs, position IDs, raw payloads,
   or replayable order details.
+- `/api/etoro/bot/config` stores only simulation controls: strategy id, budget,
+  allowed market groups, allowed instrument classes, and low-frequency cadence.
+  It is not an eToro provider route and must not store credentials, account
+  identifiers, instrument IDs, position IDs, order IDs, or raw provider payloads.
 - Market/news context attached to positions is display-only. It must not be
   converted into eToro order parameters or strategy signals without a separate
   provider contract review and compliance/security gate.
