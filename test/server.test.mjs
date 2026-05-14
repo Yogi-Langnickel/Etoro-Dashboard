@@ -317,19 +317,32 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.readOnly, true);
   assert.equal(response.json.mutationRoutesEnabled, false);
   assert.equal(response.json.dataSources.watchlists, "synthetic-placeholder");
-  assert.equal(response.json.dataSources.marketNews, "planned-server-side");
+  assert.equal(response.json.dataSources.marketNews, "api-first-planned");
+  assert.equal(response.json.dataSources.financialRecords, "official-api-first-planned");
+  assert.equal(response.json.dataSources.insiderTransactions, "sec-forms-3-4-5-planned");
   assert.equal(response.json.instrumentLookup.enabled, false);
   assert.equal(response.json.marketNews.enabled, false);
   assert.equal(response.json.marketNews.safeguards.includes("no-trade-trigger-from-news"), true);
+  assert.equal(response.json.intelligence.sourcePriority[0].id, "sec-companyfacts");
+  assert.equal(response.json.intelligence.sourcePriority.some((source) => source.id === "sec-insider-transactions"), true);
+  assert.equal(response.json.intelligence.scrapingPolicy.priority, "api-first-scraping-fallback");
+  assert.equal(response.json.intelligence.scrapingPolicy.finviz.insiderTradingPage, "reference-only");
+  assert.equal(response.json.intelligence.indicatorPolicy.states.includes("buy"), true);
+  assert.equal(response.json.intelligence.indicatorPolicy.blockedUses.includes("autonomous trading signal"), true);
+  assert.equal(response.json.intelligence.financialRecordsPreview[0].indicator, "hold");
+  assert.equal(response.json.intelligence.insiderActivityPreview[0].sourceState, "planned-sec-forms-3-4-5");
   assert.equal(response.json.positionContextPreview.length, 2);
   assert.equal(response.json.positionContextPreview[0].contextOnly, true);
   assert.match(response.json.positionContextPreview[0].news[0].summary, /cannot create a signal or order/);
   assert.equal(response.json.safeguards.watchlistMutation, "blocked");
   assert.equal(response.json.safeguards.feedPosting, "blocked");
   assert.equal(response.json.safeguards.newsTradingSignals, "blocked");
+  assert.equal(response.json.safeguards.indicatorTradingSignals, "blocked");
+  assert.equal(response.json.safeguards.financialAdvice, "blocked");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
   assert.equal(response.text.includes('"accountId"'), false);
+  assert.equal(response.text.includes("finviz.com"), false);
 });
 
 test("demo trading status is planning-only and does not expose secrets", async () => {

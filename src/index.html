@@ -729,6 +729,16 @@
               <small>News can add context but cannot trigger trades.</small>
             </div>
             <div>
+              <span>Financial records</span>
+              <strong id="research-records-state">Official API first</strong>
+              <small>SEC and issuer data before scraping.</small>
+            </div>
+            <div>
+              <span>Insider activity</span>
+              <strong id="research-insider-state">SEC planned</strong>
+              <small>Forms 3/4/5 before Finviz fallback.</small>
+            </div>
+            <div>
               <span>Social feed</span>
               <strong id="research-feed-state">Disabled</strong>
               <small>Posting and feed reads are out of scope.</small>
@@ -767,6 +777,39 @@
             </li>
           </ul>
         </aside>
+
+        <section class="panel research-sources-panel" aria-labelledby="research-sources-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Source priority</p>
+              <h2 id="research-sources-title">Official APIs first</h2>
+            </div>
+            <span class="pill ok">Free first</span>
+          </div>
+          <ul class="research-list" id="research-sources"></ul>
+        </section>
+
+        <section class="panel research-financial-panel" aria-labelledby="research-financial-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Financial records</p>
+              <h2 id="research-financial-title">Data-only indicators</h2>
+            </div>
+            <span class="pill lock">Not advice</span>
+          </div>
+          <ul class="research-list" id="research-financial-records"></ul>
+        </section>
+
+        <section class="panel research-insider-panel" aria-labelledby="research-insider-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Insiders</p>
+              <h2 id="research-insider-title">SEC ownership filings</h2>
+            </div>
+            <span class="pill lock">No Finviz API</span>
+          </div>
+          <ul class="research-list" id="research-insider-activity"></ul>
+        </section>
 
         <section class="panel research-watchlist-panel" aria-labelledby="research-watchlist-title">
           <div class="panel-header">

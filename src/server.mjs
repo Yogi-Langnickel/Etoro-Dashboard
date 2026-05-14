@@ -14,6 +14,7 @@ import {
 } from "./bot-config-store.mjs";
 import { fetchReadOnlyEndpoint, readOnlyEndpointSummary } from "./etoro-client.mjs";
 import { DEFAULT_READ_CACHE_TTL_MS, loadEtoroConfig, publicCredentialStatus } from "./etoro-config.mjs";
+import { researchIntelligenceStatus } from "./research-intelligence.mjs";
 
 const STATIC_ROOT = fileURLToPath(new URL("./", import.meta.url));
 const DEFAULT_PORT = 4173;
@@ -685,6 +686,8 @@ function riskRadarStatus(config) {
 }
 
 function researchDeskStatus(config) {
+  const intelligence = researchIntelligenceStatus();
+
   return {
     ok: true,
     mode: "research-desk-planning",
@@ -694,7 +697,9 @@ function researchDeskStatus(config) {
     dataSources: {
       watchlists: "synthetic-placeholder",
       instruments: "synthetic-placeholder",
-      marketNews: "planned-server-side",
+      marketNews: "api-first-planned",
+      financialRecords: "official-api-first-planned",
+      insiderTransactions: "sec-forms-3-4-5-planned",
       socialFeed: "disabled",
       recommendations: "disabled",
     },
@@ -710,9 +715,9 @@ function researchDeskStatus(config) {
     },
     marketNews: {
       enabled: false,
-      mode: "scraper-planning",
+      mode: "api-first-scraping-fallback-planning",
       target: "attach-redacted-news-summaries-to-watchlist-and-position-rows",
-      candidateSources: ["provider-news-if-licensed", "rss-feeds", "official-company-newsrooms"],
+      candidateSources: ["free-apis", "rss-feeds", "official-company-newsrooms", "allowlisted-scraping"],
       safeguards: [
         "server-side-fetch-only",
         "source-allowlist-required",
@@ -760,10 +765,13 @@ function researchDeskStatus(config) {
         ],
       },
     ],
+    intelligence,
     safeguards: {
       watchlistMutation: "blocked",
       feedPosting: "blocked",
       newsTradingSignals: "blocked",
+      indicatorTradingSignals: "blocked",
+      financialAdvice: "blocked",
       accountIdentifiers: "redacted",
       rawProviderPayloads: "hidden",
     },

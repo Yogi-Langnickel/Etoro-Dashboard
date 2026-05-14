@@ -1,7 +1,7 @@
 # eToro API Notes
 
 Status: active
-Last updated: 2026-05-14
+Last updated: 2026-05-15
 
 ## Current Source Of Truth
 
@@ -49,6 +49,14 @@ Public material currently describes API access for market data, portfolios, watc
 - Market/news context attached to positions is display-only. It must not be
   converted into eToro order parameters or strategy signals without a separate
   provider contract review and compliance/security gate.
+- Research-intelligence routes should prefer free official records before
+  scraping: SEC companyfacts for US stock fundamentals, SEC insider transaction
+  datasets/RSS for Forms 3/4/5, SEC N-PORT datasets and issuer factsheets for
+  ETFs, and RSS/free APIs for commodities, forex, crypto, and stock news.
+- Buy/hold/sell indicators are allowed only as data-only informational labels.
+  They must be sourced to normalized financial records, carry no-advice copy,
+  and remain blocked from Money-maker-3000 execution or strategy signals until a
+  separate review gate approves a simulation-only signal contract.
 
 ## Questions To Confirm
 

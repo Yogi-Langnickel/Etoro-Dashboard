@@ -360,6 +360,8 @@ h2 {
   grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   grid-template-areas:
     "status safeguards"
+    "sources sources"
+    "financial insider"
     "watchlist news"
     "position-news position-news"
     "audit audit";
@@ -442,6 +444,18 @@ h2 {
   grid-area: watchlist;
 }
 
+.research-sources-panel {
+  grid-area: sources;
+}
+
+.research-financial-panel {
+  grid-area: financial;
+}
+
+.research-insider-panel {
+  grid-area: insider;
+}
+
 .research-news-panel {
   grid-area: news;
 }
@@ -468,7 +482,7 @@ h2 {
 }
 
 .research-hero {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .bot-hero > div,
@@ -935,8 +949,12 @@ td span {
     grid-template-areas:
       "status"
       "safeguards"
+      "sources"
+      "financial"
+      "insider"
       "watchlist"
       "news"
+      "position-news"
       "audit";
   }
 

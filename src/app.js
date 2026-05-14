@@ -604,15 +604,21 @@ function renderResearchStatus(payload) {
   const lookup = payload.instrumentLookup ?? {};
   const safeguards = payload.safeguards ?? {};
   const marketNews = payload.marketNews ?? {};
+  const intelligence = payload.intelligence ?? {};
   const preview = payload.watchlistPreview ?? [];
   const previewTarget = document.getElementById("research-watchlist");
   const newsTarget = document.getElementById("research-news");
   const positionNewsTarget = document.getElementById("research-position-news");
+  const sourceTarget = document.getElementById("research-sources");
+  const financialTarget = document.getElementById("research-financial-records");
+  const insiderTarget = document.getElementById("research-insider-activity");
   const fieldsTarget = document.getElementById("research-fields");
 
   text("research-watchlists-state", labelize(sources.watchlists));
   text("research-instruments-state", labelize(sources.instruments));
   text("research-news-state", labelize(sources.marketNews));
+  text("research-records-state", labelize(sources.financialRecords));
+  text("research-insider-state", labelize(sources.insiderTransactions));
   text("research-feed-state", labelize(sources.socialFeed));
   text("research-recommendations-state", labelize(sources.recommendations));
   text("research-lookup-state", lookup.enabled ? "Enabled" : "Disabled");
@@ -666,6 +672,69 @@ function renderResearchStatus(payload) {
     }
   }
 
+  if (sourceTarget) {
+    sourceTarget.textContent = "";
+
+    for (const item of intelligence.sourcePriority ?? []) {
+      const row = document.createElement("li");
+      const body = document.createElement("span");
+      const title = document.createElement("strong");
+      const detail = document.createElement("small");
+      const pill = document.createElement("span");
+
+      title.textContent = item.label;
+      detail.textContent = `${item.coverage}; ${item.use}`;
+      pill.className = item.access?.includes("official") ? "pill ok" : "pill warn";
+      pill.textContent = labelize(item.access);
+      body.append(title, detail);
+      row.append(body, pill);
+      sourceTarget.append(row);
+    }
+  }
+
+  if (financialTarget) {
+    financialTarget.textContent = "";
+
+    for (const item of intelligence.financialRecordsPreview ?? []) {
+      const row = document.createElement("li");
+      const body = document.createElement("span");
+      const title = document.createElement("strong");
+      const detail = document.createElement("small");
+      const pill = document.createElement("span");
+      const figures = (item.keyFigures ?? [])
+        .map((figure) => `${figure.label}: ${figure.value}`)
+        .join("; ");
+
+      title.textContent = `${item.symbol} - ${labelize(item.indicator)}`;
+      detail.textContent = `${item.assetClass}; ${figures}`;
+      pill.className = `pill ${item.indicator === "buy" ? "ok" : item.indicator === "sell" ? "danger" : "lock"}`;
+      pill.textContent = "Data-only";
+      body.append(title, detail);
+      row.append(body, pill);
+      financialTarget.append(row);
+    }
+  }
+
+  if (insiderTarget) {
+    insiderTarget.textContent = "";
+
+    for (const item of intelligence.insiderActivityPreview ?? []) {
+      const row = document.createElement("li");
+      const body = document.createElement("span");
+      const title = document.createElement("strong");
+      const detail = document.createElement("small");
+      const pill = document.createElement("span");
+
+      title.textContent = `${item.symbol} - ${labelize(item.netDirection)}`;
+      detail.textContent = `${item.latestWindow}; ${item.notableActivity}`;
+      pill.className = "pill lock";
+      pill.textContent = labelize(item.sourceState);
+      body.append(title, detail);
+      row.append(body, pill);
+      insiderTarget.append(row);
+    }
+  }
+
   if (positionNewsTarget) {
     positionNewsTarget.textContent = "";
 
@@ -691,7 +760,7 @@ function renderResearchStatus(payload) {
     "Research desk loaded",
     marketNews.enabled
       ? "Server-side market news summaries loaded for portfolio context"
-      : "Market news scraping is planned only; news cannot trigger trades",
+      : "Official/free APIs are preferred; scraping is fallback only and cannot trigger trades",
     "research-audit-list",
   );
 }

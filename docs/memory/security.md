@@ -1,7 +1,7 @@
 # Security Notes
 
 Status: active
-Last updated: 2026-05-14
+Last updated: 2026-05-15
 
 ## Threat Model
 
@@ -31,6 +31,10 @@ High-impact risks:
   durable audit, and review gate before real controls are exposed.
 - Bot market/news context is display-only; it cannot trigger strategy decisions,
   order previews, demo execution, or live execution.
+- Financial-record indicators and insider activity summaries are also
+  display-only. They must not be framed as personalized financial advice or used
+  by Money-maker-3000 without a separate simulation-signal contract, backtest,
+  explainability, and review gate.
 - Validate all external API responses before use.
 - Redact sensitive fields in logs and errors.
 - Use least-privilege API scopes where eToro supports them.

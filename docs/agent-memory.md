@@ -1,7 +1,7 @@
 # Etoro Dashboard Agent Memory
 
 Status: active
-Last updated: 2026-05-14
+Last updated: 2026-05-15
 
 ## Current Truth
 
@@ -16,8 +16,8 @@ Last updated: 2026-05-14
 - Planned UI direction is a switchable tab workspace: Landing / Widgets, Operational Cockpit, Risk Radar, Research Desk, and a demo-first Trading tab.
 - The dashboard has a dedicated demo trading tab and non-executing preview behavior, but execution routes remain absent until a separate feature-flagged write flow is designed and reviewed. The preview/status surface hides provider endpoint paths from normal UI, exposes a permission/rate posture matrix, rejects sell-side and leverage-above-1 concepts, and bounds preview request bodies.
 - The dashboard has a Bot Monitor tab backed by `/api/etoro/bot/status`, `/api/etoro/bot/strategies`, `/api/etoro/bot/runs`, `/api/etoro/bot/audit`, `/api/etoro/bot/events`, `/api/etoro/bot/trade-log`, and `/api/etoro/bot/config`; it renders synthetic strategy cards, server-persisted simulation strategy/budget/market/instrument-class/cadence controls, hard budget stops, low-frequency/no-HFT posture, simulation ledger rows, event/audit feeds, and trade-log posture. Bot config is stored as a local server file outside the repo by default and does not enable execution or account mutation.
-- The dashboard has Risk Radar and Research Desk tabs backed by `/api/etoro/risk/status` and `/api/etoro/research/status`; both are synthetic/read-only, hide account identifiers/raw payloads, and expose no write routes. Research Desk now includes a server-side market-news ingestion plan, watchlist preview, and portfolio-position context preview; news cannot trigger trades.
-- Scrapling is a candidate for server-side market-news ingestion only after API/RSS options are checked. Use source allowlists, robots/terms review, caching, and no trade triggers; do not use anti-bot bypass/proxy/stealth modes for finance news without explicit terms/compliance approval.
+- The dashboard has Risk Radar and Research Desk tabs backed by `/api/etoro/risk/status` and `/api/etoro/research/status`; both are synthetic/read-only, hide account identifiers/raw payloads, and expose no write routes. Research Desk now includes server-side market/news context, financial-record source priority, SEC insider transaction planning, portfolio-position context, and data-only buy/hold/sell indicators; research output cannot trigger trades.
+- Research intelligence should prefer free official APIs/datasets first: SEC companyfacts for US stock fundamentals, SEC Forms 3/4/5 insider transaction datasets/RSS for insiders, SEC N-PORT datasets and issuer factsheets for ETFs, and RSS/free APIs for news. Scrapling is fallback only after API/RSS options are checked. Use source allowlists, robots/terms review, caching, and no trade triggers; do not use anti-bot bypass/proxy/stealth modes for finance news without explicit terms/compliance approval.
 - Treat the app backend boundary as mandatory: all provider calls, credential handling, DTO normalization, caching/freshness metadata, rate-limit handling, and audit persistence belong server-side.
 - A trading bot, if approved later, should be a separate worker/service with kill switch, hard limits, durable audit, monitoring, and compliance review, not code running in browser UI or request/response routes.
 - Trading-bot planning lives in `docs/trading-bot-plan.md`, with the separate project plan tracked centrally as `docs/projects/money-maker-3000/README.md`: start with simulation monitor, use a separate leased worker, require durable audit/reconciliation/idempotency/risk gates, and keep demo/live execution disabled until separate review. The first local `Money-maker-3000` scaffold now exists at `/Users/yogi/Coding/projects/Money-maker-3000` with simulation contracts, budget and no-HFT guardrails, synthetic position/news context, a redacted trade-log DTO, and `node:test` coverage; it has no credential loader or provider adapter.

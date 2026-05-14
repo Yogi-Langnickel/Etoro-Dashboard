@@ -135,6 +135,10 @@ Do not add `/api/trading/*` routes in the first milestone.
 ### Phase 4.7: Market News Context
 
 - Prefer licensed/provider news APIs and RSS feeds before scraping.
+- Prefer free official records/APIs before scraping: SEC companyfacts for US
+  stock fundamentals, SEC Forms 3/4/5 insider transaction datasets/RSS for
+  insider activity, SEC N-PORT datasets plus issuer factsheets for ETF holdings
+  and fees, and RSS/free APIs for portfolio news.
 - Scrapling is a candidate Python ingestion library for permitted public pages,
   especially where adaptive selectors, robots.txt handling, development cache,
   and JSON/JSONL export reduce maintenance.
@@ -144,6 +148,12 @@ Do not add `/api/trading/*` routes in the first milestone.
   separated from trading controls.
 - News summaries may attach to portfolio/watchlist rows as context only; news
   cannot directly produce bot orders or recommendations.
+- Data-only buy/hold/sell indicators may be shown per position when derived
+  from normalized public financial records. Label them as informational, not
+  advice or bot signals.
+- Insider activity should use SEC Forms 3/4/5 sources first. Finviz insider
+  pages are reference/fallback only unless an allowed automated access path is
+  confirmed.
 
 ### Phase 5: Audit And Export Controls
 
@@ -201,6 +211,13 @@ Run these before using real credentials:
   watchlist context, with server-side allowlist and no trade trigger.
 - [x] Attach synthetic market/news context to portfolio-position previews for
   display only; news cannot create signals or orders.
+- [x] Add synthetic Research Desk source-priority, financial-record indicator,
+  and SEC insider-activity previews.
+- [ ] Implement a SEC companyfacts adapter for US stock fundamentals.
+- [ ] Implement SEC Forms 3/4/5 insider activity ingestion before considering
+  Finviz scraping.
+- [ ] Implement ETF source adapters for issuer factsheets and SEC N-PORT
+  datasets where practical.
 - [ ] Add persona review after the first dashboard slice, incorporate appropriate feedback, run a second review, then complete checks before merging to `develop`.
 - [ ] Update `docs/agent-memory.md` after each implementation slice with decisions, changed files, provider assumptions, and checks run.
 - [ ] Keep trading execution routes and enabled mutation controls out of scope until a separate threat model, demo-mode proof, confirmation UX, and review gate are complete.
