@@ -1,7 +1,7 @@
 # eToro API Notes
 
 Status: active
-Last updated: 2026-05-10
+Last updated: 2026-05-14
 
 ## Current Source Of Truth
 
@@ -38,6 +38,13 @@ Public material currently describes API access for market data, portfolios, watc
 - When provider payloads omit display-ready balance fields, derive user-facing financial KPIs only from documented formulas and cover those formulas with regression tests.
 - Demo trading UI may be introduced before execution routes, but write endpoints stay absent until the feature flag, confirmation UX, order audit, and result-polling contract are implemented.
 - `ENABLE_DEMO_TRADE_PREVIEW=true` enables local ticket validation/preview only. Preview routes must not call provider execution endpoints or echo raw instrument, position, account, key, or order identifiers.
+- Bot monitor DTOs are synthetic and internal-only. `/api/etoro/bot/trade-log`
+  is a redacted simulation ledger route, not a provider trade-history route.
+  It must not expose account IDs, provider order IDs, position IDs, raw payloads,
+  or replayable order details.
+- Market/news context attached to positions is display-only. It must not be
+  converted into eToro order parameters or strategy signals without a separate
+  provider contract review and compliance/security gate.
 
 ## Questions To Confirm
 

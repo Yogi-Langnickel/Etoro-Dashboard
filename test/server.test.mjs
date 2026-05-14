@@ -63,6 +63,7 @@ test("server exposes only internal API routes and no execution routes", () => {
     "/api/etoro/bot/runs",
     "/api/etoro/bot/audit",
     "/api/etoro/bot/events",
+    "/api/etoro/bot/trade-log",
     "/api/etoro/risk/status",
     "/api/etoro/research/status",
   ]);
@@ -87,8 +88,14 @@ test("bot monitoring status is read-only, disabled, and redacted", async () => {
   assert.equal(response.json.safeguards.executionRoutes, "absent");
   assert.equal(response.json.safeguards.accountIdentifiers, "redacted");
   assert.equal(response.json.controlPolicy.highFrequencyTrading, "blocked");
+  assert.equal(response.json.controlPolicy.strategySelection, "predefined-local-preview");
+  assert.equal(response.json.controlPolicy.configuredStrategyId, "dca-cash-reserve");
   assert.equal(response.json.budgetPolicy.baseBudgetUsd, 1000);
+  assert.deepEqual(response.json.budgetPolicy.selectableBudgetsUsd, [500, 1000, 1500, 2500]);
+  assert.equal(response.json.budgetPolicy.hardStops.dailyLossUsd, 50);
   assert.equal(response.json.budgetPolicy.profitReuse, "allowed-after-realized-profit-ledger");
+  assert.equal(response.json.schedulePolicy.highFrequencyTrading, "blocked");
+  assert.equal(response.json.schedulePolicy.minimumEvaluationIntervalMinutes >= 240, true);
   assert.equal(response.json.instrumentUniverse.defaultAllowed.includes("US_EQUITIES"), true);
   assert.equal(response.json.auditExport.googleSheets, "planned");
   assert.equal(response.text.includes("server-api-secret"), false);
@@ -106,8 +113,11 @@ test("bot strategy registry is simulation-only and redacted", async () => {
   assert.equal(response.json.botEnabled, false);
   assert.equal(response.json.mutationRoutesEnabled, false);
   assert.equal(response.json.strategies.length, 3);
+  assert.equal(response.json.strategies[0].strategyId, "dca-cash-reserve");
   assert.equal(response.json.strategies[0].allowedModes.includes("simulation"), true);
   assert.equal(response.json.strategies.some((strategy) => strategy.strategyId === "news-aware-watchlist"), true);
+  assert.equal(response.json.budgetPolicy.maxConfigurableBudgetUsd, 2500);
+  assert.equal(response.json.schedulePolicy.highFrequencyTrading, "blocked");
   assert.equal(response.json.safeguards.executionRoutes, "absent");
   assert.equal(response.json.safeguards.highFrequencyTrading, "blocked");
   assert.equal(response.text.includes("server-api-secret"), false);
@@ -125,9 +135,32 @@ test("bot simulation runs expose why-no-trade decisions without execution data",
   assert.equal(response.json.runs.length, 2);
   assert.equal(response.json.runs[0].decision, "skip");
   assert.equal(response.json.runs[0].hypotheticalOrderCount, 0);
+  assert.equal(response.json.runs[0].budgetRemainingUsd, 1000);
+  assert.equal(response.json.schedulePolicy.highFrequencyTrading, "blocked");
   assert.equal(response.json.safeguards.orderSubmission, "blocked");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes('"positionId"'), false);
+});
+
+test("bot trade log is synthetic, budget-scoped, and redacted", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/api/etoro/bot/trade-log",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.mode, "bot-simulation-trade-log");
+  assert.equal(response.json.readOnly, true);
+  assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.json.summary.source, "synthetic-ledger-preview");
+  assert.equal(response.json.summary.budgetRemainingUsd, 1000);
+  assert.equal(response.json.entries.length, 2);
+  assert.equal(response.json.entries[0].action, "simulated-skip");
+  assert.equal(response.json.entries[0].instrument.identifierState, "redacted");
+  assert.equal(response.json.safeguards.highFrequencyTrading, "blocked");
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes('"accountId"'), false);
   assert.equal(response.text.includes('"positionId"'), false);
 });
 
@@ -186,6 +219,9 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.instrumentLookup.enabled, false);
   assert.equal(response.json.marketNews.enabled, false);
   assert.equal(response.json.marketNews.safeguards.includes("no-trade-trigger-from-news"), true);
+  assert.equal(response.json.positionContextPreview.length, 2);
+  assert.equal(response.json.positionContextPreview[0].contextOnly, true);
+  assert.match(response.json.positionContextPreview[0].news[0].summary, /cannot create a signal or order/);
   assert.equal(response.json.safeguards.watchlistMutation, "blocked");
   assert.equal(response.json.safeguards.feedPosting, "blocked");
   assert.equal(response.json.safeguards.newsTradingSignals, "blocked");

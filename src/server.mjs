@@ -21,6 +21,7 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/bot/runs",
   "/api/etoro/bot/audit",
   "/api/etoro/bot/events",
+  "/api/etoro/bot/trade-log",
   "/api/etoro/risk/status",
   "/api/etoro/research/status",
 ]);
@@ -61,6 +62,92 @@ const STATIC_FILES = new Map([
   ["/styles.css", "styles.css"],
   ["/app.js", "app.js"],
 ]);
+
+const BOT_BUDGET_POLICY = Object.freeze({
+  mode: "simulation-hard-limits",
+  baseBudgetUsd: 1000,
+  selectableBudgetsUsd: [500, 1000, 1500, 2500],
+  profitReuse: "allowed-after-realized-profit-ledger",
+  maxConfigurableBudgetUsd: 2500,
+  hardStops: Object.freeze({
+    dailyLossUsd: 50,
+    weeklyLossUsd: 150,
+    maxOpenPositions: 3,
+  }),
+});
+
+const BOT_SCHEDULE_POLICY = Object.freeze({
+  mode: "low-frequency-only",
+  minimumCadence: "daily",
+  minimumEvaluationIntervalMinutes: 240,
+  highFrequencyTrading: "blocked",
+  maxSimulatedTradeDecisionsPerDay: 3,
+});
+
+function botStrategyRecords() {
+  return [
+    {
+      strategyId: "dca-cash-reserve",
+      name: "Cash-reserved DCA",
+      version: "0.1.0-sim",
+      status: "simulation-only",
+      allowedModes: ["simulation"],
+      allowedInstruments: ["synthetic-etf-basket"],
+      cadence: "daily-preview",
+      riskBudget: {
+        maxPositionPct: 10,
+        maxWeeklyTurnoverPct: 5,
+        maxBudgetUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
+        leverage: "1-only",
+        shorts: "blocked",
+      },
+      lastValidation: {
+        state: "not-run",
+        detail: "Synthetic strategy record only; no provider reads or orders are connected.",
+      },
+    },
+    {
+      strategyId: "news-aware-watchlist",
+      name: "News-aware watchlist",
+      version: "0.1.0-plan",
+      status: "planning-only",
+      allowedModes: ["simulation"],
+      allowedInstruments: ["us-equities", "au-equities", "forex", "commodities"],
+      cadence: "daily-preview",
+      riskBudget: {
+        maxBudgetUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
+        profitReuse: "ledger-only",
+        newsCanTriggerOrders: "blocked",
+        leverage: "1-only",
+        shorts: "blocked",
+      },
+      lastValidation: {
+        state: "not-run",
+        detail: "Market-news signals are planned as context only and cannot trigger orders.",
+      },
+    },
+    {
+      strategyId: "threshold-rebalance",
+      name: "Threshold rebalance",
+      version: "0.1.0-sim",
+      status: "simulation-only",
+      allowedModes: ["simulation"],
+      allowedInstruments: ["synthetic-core-allocation"],
+      cadence: "weekly-preview",
+      riskBudget: {
+        maxDriftPct: 5,
+        maxPositionPct: 20,
+        maxBudgetUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
+        leverage: "1-only",
+        shorts: "blocked",
+      },
+      lastValidation: {
+        state: "not-run",
+        detail: "Synthetic strategy record only; no provider reads or orders are connected.",
+      },
+    },
+  ];
+}
 
 function sendJson(response, status, payload) {
   response.writeHead(status, {
@@ -273,23 +360,14 @@ function botMonitoringStatus(config) {
       accountIdentifiers: "redacted",
     },
     controlPolicy: {
-      strategySelection: "predefined-disabled",
-      configuredStrategyId: "cash-reserved-dca",
-      allowedStrategyIds: ["cash-reserved-dca", "threshold-rebalance", "news-aware-watchlist"],
+      strategySelection: "predefined-local-preview",
+      configuredStrategyId: "dca-cash-reserve",
+      allowedStrategyIds: botStrategyRecords().map((strategy) => strategy.strategyId),
       customStrategyUpload: "blocked",
       highFrequencyTrading: "blocked",
     },
-    budgetPolicy: {
-      mode: "hard-coded-preview",
-      baseBudgetUsd: 1000,
-      profitReuse: "allowed-after-realized-profit-ledger",
-      maxConfigurableBudgetUsd: 2500,
-      hardStops: {
-        dailyLossUsd: 50,
-        weeklyLossUsd: 150,
-        maxOpenPositions: 3,
-      },
-    },
+    budgetPolicy: BOT_BUDGET_POLICY,
+    schedulePolicy: BOT_SCHEDULE_POLICY,
     instrumentUniverse: {
       configurable: "planned",
       defaultAllowed: ["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"],
@@ -313,65 +391,9 @@ function botStrategyRegistry(config) {
     botEnabled: false,
     mutationRoutesEnabled: false,
     credentialStatus: publicCredentialStatus(config),
-    strategies: [
-      {
-        strategyId: "dca-cash-reserve",
-        name: "Cash-reserved DCA",
-        version: "0.1.0-sim",
-        status: "simulation-only",
-        allowedModes: ["simulation"],
-        allowedInstruments: ["synthetic-etf-basket"],
-        cadence: "daily-preview",
-        riskBudget: {
-          maxPositionPct: 10,
-          maxWeeklyTurnoverPct: 5,
-          leverage: "1-only",
-          shorts: "blocked",
-        },
-        lastValidation: {
-          state: "not-run",
-          detail: "Synthetic strategy record only; no provider reads or orders are connected.",
-        },
-      },
-      {
-        strategyId: "news-aware-watchlist",
-        name: "News-aware watchlist",
-        version: "0.1.0-plan",
-        status: "planning-only",
-        allowedModes: ["simulation"],
-        allowedInstruments: ["us-equities", "au-equities", "forex", "commodities"],
-        cadence: "daily-preview",
-        riskBudget: {
-          maxBudgetUsd: 1000,
-          profitReuse: "ledger-only",
-          leverage: "1-only",
-          shorts: "blocked",
-        },
-        lastValidation: {
-          state: "not-run",
-          detail: "Market-news signals are planned as context only and cannot trigger orders.",
-        },
-      },
-      {
-        strategyId: "threshold-rebalance",
-        name: "Threshold rebalance",
-        version: "0.1.0-sim",
-        status: "simulation-only",
-        allowedModes: ["simulation"],
-        allowedInstruments: ["synthetic-core-allocation"],
-        cadence: "weekly-preview",
-        riskBudget: {
-          maxDriftPct: 5,
-          maxPositionPct: 20,
-          leverage: "1-only",
-          shorts: "blocked",
-        },
-        lastValidation: {
-          state: "not-run",
-          detail: "Synthetic strategy record only; no provider reads or orders are connected.",
-        },
-      },
-    ],
+    strategies: botStrategyRecords(),
+    budgetPolicy: BOT_BUDGET_POLICY,
+    schedulePolicy: BOT_SCHEDULE_POLICY,
     safeguards: {
       executionRoutes: "absent",
       accountIdentifiers: "redacted",
@@ -402,6 +424,8 @@ function botSimulationRuns(config) {
         reasonCode: "provider-not-connected",
         riskResult: "blocked",
         hypotheticalOrderCount: 0,
+        budgetUsedUsd: 0,
+        budgetRemainingUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
       },
       {
         runId: "sim-run-002",
@@ -414,8 +438,11 @@ function botSimulationRuns(config) {
         reasonCode: "portfolio-snapshot-unavailable",
         riskResult: "blocked",
         hypotheticalOrderCount: 0,
+        budgetUsedUsd: 0,
+        budgetRemainingUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
       },
     ],
+    schedulePolicy: BOT_SCHEDULE_POLICY,
     safeguards: {
       executionRoutes: "absent",
       orderSubmission: "blocked",
@@ -448,6 +475,14 @@ function botAuditEvents(config) {
         entityRef: "bot-monitor",
         outcome: "absent",
         createdAt: "2026-05-13T00:00:01.000Z",
+      },
+      {
+        eventId: "audit-003",
+        actor: "operator",
+        action: "local_strategy_preview_loaded",
+        entityRef: "dca-cash-reserve",
+        outcome: "not-persisted",
+        createdAt: "2026-05-14T00:00:00.000Z",
       },
     ],
     pagination: {
@@ -487,6 +522,14 @@ function botEventFeed(config) {
         detail: "Portfolio snapshot is unavailable; risk engine remains fail-closed.",
         createdAt: "2026-05-13T00:05:00.000Z",
       },
+      {
+        eventId: "event-003",
+        type: "budget-check",
+        severity: "info",
+        title: "Budget guardrail loaded",
+        detail: "Simulation budget options are capped at USD 2,500 with daily and weekly loss stops.",
+        createdAt: "2026-05-14T00:00:00.000Z",
+      },
     ],
     pagination: {
       limit: 20,
@@ -497,6 +540,75 @@ function botEventFeed(config) {
       executionRoutes: "absent",
       accountIdentifiers: "redacted",
       rawProviderPayloads: "hidden",
+    },
+  };
+}
+
+function botTradeLog(config) {
+  return {
+    ok: true,
+    mode: "bot-simulation-trade-log",
+    readOnly: true,
+    demoOnly: true,
+    mutationRoutesEnabled: false,
+    credentialStatus: publicCredentialStatus(config),
+    summary: {
+      source: "synthetic-ledger-preview",
+      durableStore: "planned-worker-owned",
+      googleSheetsExport: "planned-redacted-sink",
+      realizedProfitUsd: 0,
+      reusableProfitUsd: 0,
+      budgetUsedUsd: 0,
+      budgetRemainingUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
+    },
+    entries: [
+      {
+        tradeLogId: "trade-log-001",
+        runId: "sim-run-001",
+        strategyId: "dca-cash-reserve",
+        createdAt: "2026-05-14T00:00:00.000Z",
+        action: "simulated-skip",
+        decision: "blocked",
+        reasonCode: "provider-not-connected",
+        instrument: {
+          symbol: "SPY",
+          assetClass: "ETF",
+          identifierState: "redacted",
+        },
+        budget: {
+          allocatedUsd: 0,
+          remainingUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
+          maxPositionPct: 10,
+        },
+        riskChecks: ["provider-read-required", "stale-data-block", "execution-route-absent"],
+      },
+      {
+        tradeLogId: "trade-log-002",
+        runId: "sim-run-002",
+        strategyId: "threshold-rebalance",
+        createdAt: "2026-05-14T00:05:00.000Z",
+        action: "simulated-skip",
+        decision: "blocked",
+        reasonCode: "portfolio-snapshot-unavailable",
+        instrument: {
+          symbol: "GLD",
+          assetClass: "ETF",
+          identifierState: "redacted",
+        },
+        budget: {
+          allocatedUsd: 0,
+          remainingUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
+          maxPositionPct: 20,
+        },
+        riskChecks: ["portfolio-snapshot-required", "no-hft-cadence", "execution-route-absent"],
+      },
+    ],
+    safeguards: {
+      executionRoutes: "absent",
+      accountIdentifiers: "redacted",
+      rawProviderPayloads: "hidden",
+      orderPayloads: "not-created",
+      highFrequencyTrading: "blocked",
     },
   };
 }
@@ -606,6 +718,36 @@ function researchDeskStatus(config) {
         },
       ],
     },
+    positionContextPreview: [
+      {
+        symbol: "SPY",
+        assetClass: "ETF",
+        positionState: "synthetic",
+        contextOnly: true,
+        news: [
+          {
+            headline: "Macro calendar context placeholder",
+            source: "synthetic",
+            age: "not-live",
+            summary: "Use only as portfolio context; this cannot create a signal or order.",
+          },
+        ],
+      },
+      {
+        symbol: "GLD",
+        assetClass: "ETF",
+        positionState: "synthetic",
+        contextOnly: true,
+        news: [
+          {
+            headline: "Commodity market context placeholder",
+            source: "synthetic",
+            age: "not-live",
+            summary: "Source allowlist and terms review are required before live news ingestion.",
+          },
+        ],
+      },
+    ],
     safeguards: {
       watchlistMutation: "blocked",
       feedPosting: "blocked",
@@ -921,6 +1063,11 @@ async function handleApiRoute(pathname, response, options) {
 
     if (pathname === "/api/etoro/bot/events") {
       sendJson(response, 200, botEventFeed(config));
+      return;
+    }
+
+    if (pathname === "/api/etoro/bot/trade-log") {
+      sendJson(response, 200, botTradeLog(config));
       return;
     }
 

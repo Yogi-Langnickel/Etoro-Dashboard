@@ -341,7 +341,8 @@ h2 {
     "status safeguards"
     "controls safeguards"
     "strategies runs"
-    "events audit";
+    "events trade-log"
+    "audit audit";
   gap: 18px;
 }
 
@@ -360,6 +361,7 @@ h2 {
   grid-template-areas:
     "status safeguards"
     "watchlist news"
+    "position-news position-news"
     "audit audit";
   gap: 18px;
 }
@@ -408,6 +410,10 @@ h2 {
   grid-area: events;
 }
 
+.bot-trade-log-panel {
+  grid-area: trade-log;
+}
+
 .risk-status-panel {
   grid-area: status;
 }
@@ -438,6 +444,10 @@ h2 {
 
 .research-news-panel {
   grid-area: news;
+}
+
+.research-position-news-panel {
+  grid-area: position-news;
 }
 
 .research-audit-panel {
@@ -548,12 +558,17 @@ h2 {
   text-transform: uppercase;
 }
 
+.control-row small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .control-row select {
   min-height: 42px;
   border: 1px solid rgba(70, 82, 102, 0.9);
   border-radius: 8px;
   background: rgba(12, 18, 27, 0.92);
-  color: var(--ink);
+  color: var(--text);
   font: inherit;
   padding: 0 12px;
 }

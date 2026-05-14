@@ -238,6 +238,11 @@ function renderBotStatus(payload) {
   text("bot-profit-state", labelize(payload.budgetPolicy?.profitReuse));
   text("bot-universe-state", (payload.instrumentUniverse?.defaultAllowed ?? []).map(labelize).join(", "));
   text("bot-sheets-state", labelize(payload.auditExport?.googleSheets));
+  text("bot-daily-loss-state", money(payload.budgetPolicy?.hardStops?.dailyLossUsd));
+  text("bot-weekly-loss-state", money(payload.budgetPolicy?.hardStops?.weeklyLossUsd));
+  text("bot-open-position-state", String(payload.budgetPolicy?.hardStops?.maxOpenPositions ?? "Unavailable"));
+  text("bot-cadence-state", labelize(payload.schedulePolicy?.minimumCadence));
+  text("bot-hft-state", labelize(payload.schedulePolicy?.highFrequencyTrading));
 
   const modePill = document.getElementById("bot-mode-pill");
 
@@ -295,24 +300,39 @@ function renderBotStrategies(payload) {
   }
 }
 
-function renderBotStrategySelect(payload) {
+function renderBotControlSelects(statusPayload, strategiesPayload) {
   const select = document.getElementById("bot-strategy-select");
+  const budgetSelect = document.getElementById("bot-budget-select");
+  const strategyById = new Map((strategiesPayload.strategies ?? []).map((strategy) => [strategy.strategyId, strategy]));
 
-  if (!select) {
-    return;
+  if (select) {
+    select.textContent = "";
+
+    for (const strategyId of statusPayload.controlPolicy?.allowedStrategyIds ?? []) {
+      const strategy = strategyById.get(strategyId);
+      const option = document.createElement("option");
+      option.value = strategyId;
+      option.textContent = strategy?.name ?? labelize(strategyId);
+      option.selected = strategyId === statusPayload.controlPolicy?.configuredStrategyId;
+      select.append(option);
+    }
+
+    select.disabled = false;
   }
 
-  select.textContent = "";
+  if (budgetSelect) {
+    budgetSelect.textContent = "";
 
-  for (const strategyId of payload.controlPolicy?.allowedStrategyIds ?? []) {
-    const option = document.createElement("option");
-    option.value = strategyId;
-    option.textContent = labelize(strategyId);
-    option.selected = strategyId === payload.controlPolicy?.configuredStrategyId;
-    select.append(option);
+    for (const budget of statusPayload.budgetPolicy?.selectableBudgetsUsd ?? []) {
+      const option = document.createElement("option");
+      option.value = String(budget);
+      option.textContent = money(budget);
+      option.selected = budget === statusPayload.budgetPolicy?.baseBudgetUsd;
+      budgetSelect.append(option);
+    }
+
+    budgetSelect.disabled = false;
   }
-
-  select.disabled = true;
 }
 
 function renderBotRuns(payload) {
@@ -369,6 +389,37 @@ function renderBotEvents(payload) {
     row.append(top, detail);
     target.append(row);
   }
+}
+
+function renderBotTradeLog(payload) {
+  const target = document.getElementById("bot-trade-log");
+
+  if (!target) {
+    return;
+  }
+
+  target.textContent = "";
+
+  for (const entry of payload.entries ?? []) {
+    const row = document.createElement("li");
+    const top = document.createElement("span");
+    const title = document.createElement("strong");
+    const state = document.createElement("span");
+    const detail = document.createElement("small");
+
+    top.className = "decision-row";
+    state.className = entry.decision === "blocked" ? "pill warn" : "pill ok";
+    title.textContent = `${entry.instrument?.symbol ?? "Synthetic"} / ${labelize(entry.action)}`;
+    state.textContent = labelize(entry.reasonCode);
+    detail.textContent = `${entry.strategyId}; allocated ${money(entry.budget?.allocatedUsd)}; remaining ${
+      money(entry.budget?.remainingUsd)
+    }`;
+    top.append(title, state);
+    row.append(top, detail);
+    target.append(row);
+  }
+
+  text("bot-trade-log-state", labelize(payload.summary?.source));
 }
 
 function renderBotAuditFeed(payload) {
@@ -456,6 +507,7 @@ function renderResearchStatus(payload) {
   const preview = payload.watchlistPreview ?? [];
   const previewTarget = document.getElementById("research-watchlist");
   const newsTarget = document.getElementById("research-news");
+  const positionNewsTarget = document.getElementById("research-position-news");
   const fieldsTarget = document.getElementById("research-fields");
 
   text("research-watchlists-state", labelize(sources.watchlists));
@@ -514,6 +566,27 @@ function renderResearchStatus(payload) {
     }
   }
 
+  if (positionNewsTarget) {
+    positionNewsTarget.textContent = "";
+
+    for (const item of payload.positionContextPreview ?? []) {
+      const row = document.createElement("li");
+      const body = document.createElement("span");
+      const title = document.createElement("strong");
+      const detail = document.createElement("small");
+      const pill = document.createElement("span");
+      const firstNews = item.news?.[0];
+
+      title.textContent = `${item.symbol} - ${firstNews?.headline ?? "No context"}`;
+      detail.textContent = `${item.assetClass}; ${firstNews?.summary ?? "Context unavailable"}`;
+      pill.className = "pill lock";
+      pill.textContent = item.contextOnly ? "Context only" : labelize(item.positionState);
+      body.append(title, detail);
+      row.append(body, pill);
+      positionNewsTarget.append(row);
+    }
+  }
+
   renderAudit(
     "Research desk loaded",
     marketNews.enabled
@@ -547,19 +620,21 @@ async function refreshRiskStatus() {
 
 async function refreshBotStatus() {
   try {
-    const [status, strategies, runs, audit, events] = await Promise.all([
+    const [status, strategies, runs, audit, events, tradeLog] = await Promise.all([
       getJson("/api/etoro/bot/status"),
       getJson("/api/etoro/bot/strategies"),
       getJson("/api/etoro/bot/runs"),
       getJson("/api/etoro/bot/audit"),
       getJson("/api/etoro/bot/events"),
+      getJson("/api/etoro/bot/trade-log"),
     ]);
     renderBotStatus(status);
-    renderBotStrategySelect(status);
+    renderBotControlSelects(status, strategies);
     renderBotStrategies(strategies);
     renderBotRuns(runs);
     renderBotAuditFeed(audit);
     renderBotEvents(events);
+    renderBotTradeLog(tradeLog);
   } catch (error) {
     text("bot-enabled-state", "Unavailable");
     text("bot-freshness-state", "Unavailable");
@@ -690,6 +765,20 @@ document.getElementById("trade-preview-blocked")?.addEventListener("click", asyn
   } catch (error) {
     renderAudit("Trade preview blocked", error.message, "trading-audit-list");
   }
+});
+document.getElementById("bot-strategy-select")?.addEventListener("change", (event) => {
+  renderAudit(
+    "Strategy preview changed",
+    `${labelize(event.target.value)} selected locally; worker config is not persisted`,
+    "bot-audit-list",
+  );
+});
+document.getElementById("bot-budget-select")?.addEventListener("change", (event) => {
+  renderAudit(
+    "Budget preview changed",
+    `${money(Number(event.target.value))} selected locally; hard limits remain unchanged`,
+    "bot-audit-list",
+  );
 });
 document.querySelectorAll("[data-tab-target]").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.tabTarget));

@@ -1,8 +1,8 @@
 # eToro Trading Bot Planning
 
-Status: draft
+Status: scaffold started
 Created: 2026-05-12
-Last updated: 2026-05-13
+Last updated: 2026-05-14
 
 This document plans a future eToro trading bot, now working-named
 Money-maker-3000, that is controlled and monitored through the eToro Dashboard.
@@ -13,6 +13,9 @@ read-only and simulation-first.
 
 - Build the bot as a separate worker/service, not browser code and not a request/response route.
 - Start with simulation and monitoring only. No orders are placed in Phase 1.
+- The first `Money-maker-3000` worker scaffold is local, dependency-free, and
+  simulation-only. It emits redacted DTOs and does not load credentials or call
+  eToro.
 - Use demo-only execution before any real-money path is designed.
 - Keep live trading unavailable until there is explicit user approval, eToro terms review, compliance review, strategy proof, audited controls, and a second persona review.
 - Keep all credentials server-side. Browser responses must never include keys, account identifiers, raw provider payloads, or order payloads that can be replayed.
@@ -255,7 +258,12 @@ Initial hard defaults:
 - [x] Add `GET /api/etoro/bot/runs` for recent simulated decisions.
 - [x] Add `GET /api/etoro/bot/audit` for redacted bot events.
 - [x] Add `GET /api/etoro/bot/events` for safe, paginated recent decision/audit summaries.
+- [x] Add `GET /api/etoro/bot/trade-log` for redacted synthetic simulation ledger rows.
 - [x] Extend the existing Bot Monitor tab with strategy cards, simulation ledger, event feed, redacted audit feed, and kill-switch status.
+- [x] Add local-only dashboard strategy and budget selectors backed by predefined
+  synthetic DTOs. Browser changes are not persisted to worker config.
+- [x] Start `/Users/yogi/Coding/projects/Money-maker-3000` with simulation
+  contracts, budget/cadence guardrails, position-news context, and tests.
 - Keep all data synthetic or from read-only provider routes.
 
 Acceptance:

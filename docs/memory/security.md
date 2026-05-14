@@ -1,7 +1,7 @@
 # Security Notes
 
 Status: active
-Last updated: 2026-05-10
+Last updated: 2026-05-14
 
 ## Threat Model
 
@@ -11,6 +11,9 @@ High-impact risks:
 - Browser-side leakage of privileged API credentials.
 - Accidental live trading, order cancellation, copy-trading, or account mutation.
 - Prompt-injection or malicious content from third-party API fields influencing trading actions.
+- Market/news context being misread as trading advice or an automated order signal.
+- Browser-local strategy or budget preview controls being mistaken for persisted
+  worker configuration.
 - Logging, screenshots, fixtures, or exports that disclose balances, account ids, holdings, or trade history.
 - Public repository commits containing secrets or private financial data.
 
@@ -21,6 +24,10 @@ High-impact risks:
 - Local eToro demo credentials may also be stored outside the repo at `${HOME}/.config/etoro/credentials.json` with user-only permissions.
 - Credentialed provider clients must pin allowed hosts before sending API keys or user keys.
 - Trading feature flags default to false: `ENABLE_TRADING_ACTIONS=false`, `ENABLE_LIVE_ORDERS=false`.
+- Bot controls remain simulation/local-preview only until a worker control API,
+  authentication, CSRF/origin policy, durable audit, and review gate exist.
+- Bot market/news context is display-only; it cannot trigger strategy decisions,
+  order previews, demo execution, or live execution.
 - Validate all external API responses before use.
 - Redact sensitive fields in logs and errors.
 - Use least-privilege API scopes where eToro supports them.

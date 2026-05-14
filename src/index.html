@@ -461,9 +461,17 @@
           </div>
           <label class="control-row" for="bot-strategy-select">
             <span>Strategy</span>
-            <select id="bot-strategy-select" disabled>
+            <select id="bot-strategy-select">
               <option>Loading strategies</option>
             </select>
+            <small>Local preview only. Worker configuration is not persisted from the browser.</small>
+          </label>
+          <label class="control-row" for="bot-budget-select">
+            <span>Simulation budget</span>
+            <select id="bot-budget-select">
+              <option>Loading budgets</option>
+            </select>
+            <small>Budget choices are capped by server-side planning DTOs.</small>
           </label>
           <ul class="readiness-list">
             <li>
@@ -475,8 +483,28 @@
               <strong id="bot-budget-state">$1,000.00</strong>
             </li>
             <li>
+              <span>Daily loss stop</span>
+              <strong id="bot-daily-loss-state">$50.00</strong>
+            </li>
+            <li>
+              <span>Weekly loss stop</span>
+              <strong id="bot-weekly-loss-state">$150.00</strong>
+            </li>
+            <li>
+              <span>Max open positions</span>
+              <strong id="bot-open-position-state">3</strong>
+            </li>
+            <li>
               <span>Profit reuse</span>
               <strong id="bot-profit-state">Ledger only</strong>
+            </li>
+            <li>
+              <span>Cadence</span>
+              <strong id="bot-cadence-state">Daily</strong>
+            </li>
+            <li>
+              <span>High-frequency trading</span>
+              <strong id="bot-hft-state">Blocked</strong>
             </li>
             <li>
               <span>Universe</span>
@@ -520,6 +548,17 @@
             <span class="pill ok">Synthetic</span>
           </div>
           <ul class="decision-list" id="bot-events"></ul>
+        </section>
+
+        <section class="panel bot-trade-log-panel" aria-labelledby="bot-trade-log-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Trade log</p>
+              <h2 id="bot-trade-log-title">Simulation ledger</h2>
+            </div>
+            <span class="pill lock" id="bot-trade-log-state">Synthetic</span>
+          </div>
+          <ul class="decision-list" id="bot-trade-log"></ul>
         </section>
 
         <section class="panel bot-audit-panel" aria-labelledby="bot-audit-title">
@@ -727,6 +766,17 @@
             <span class="pill lock">No live scraping</span>
           </div>
           <ul class="research-list" id="research-news"></ul>
+        </section>
+
+        <section class="panel research-position-news-panel" aria-labelledby="research-position-news-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Position context</p>
+              <h2 id="research-position-news-title">Market news by position</h2>
+            </div>
+            <span class="pill lock">Context only</span>
+          </div>
+          <ul class="research-list" id="research-position-news"></ul>
         </section>
 
         <section class="panel research-audit-panel" aria-labelledby="research-audit-title">
