@@ -233,6 +233,11 @@ function renderBotStatus(payload) {
   text("bot-execution-state", labelize(safeguards.executionRoutes));
   text("bot-account-id-state", labelize(safeguards.accountIdentifiers));
   text("bot-payload-state", labelize(safeguards.rawProviderPayloads));
+  text("bot-strategy-control-state", labelize(payload.controlPolicy?.strategySelection));
+  text("bot-budget-state", money(payload.budgetPolicy?.baseBudgetUsd));
+  text("bot-profit-state", labelize(payload.budgetPolicy?.profitReuse));
+  text("bot-universe-state", (payload.instrumentUniverse?.defaultAllowed ?? []).map(labelize).join(", "));
+  text("bot-sheets-state", labelize(payload.auditExport?.googleSheets));
 
   const modePill = document.getElementById("bot-mode-pill");
 
@@ -288,6 +293,26 @@ function renderBotStrategies(payload) {
     card.append(header, detail, meta);
     target.append(card);
   }
+}
+
+function renderBotStrategySelect(payload) {
+  const select = document.getElementById("bot-strategy-select");
+
+  if (!select) {
+    return;
+  }
+
+  select.textContent = "";
+
+  for (const strategyId of payload.controlPolicy?.allowedStrategyIds ?? []) {
+    const option = document.createElement("option");
+    option.value = strategyId;
+    option.textContent = labelize(strategyId);
+    option.selected = strategyId === payload.controlPolicy?.configuredStrategyId;
+    select.append(option);
+  }
+
+  select.disabled = true;
 }
 
 function renderBotRuns(payload) {
@@ -427,12 +452,15 @@ function renderResearchStatus(payload) {
   const sources = payload.dataSources ?? {};
   const lookup = payload.instrumentLookup ?? {};
   const safeguards = payload.safeguards ?? {};
+  const marketNews = payload.marketNews ?? {};
   const preview = payload.watchlistPreview ?? [];
   const previewTarget = document.getElementById("research-watchlist");
+  const newsTarget = document.getElementById("research-news");
   const fieldsTarget = document.getElementById("research-fields");
 
   text("research-watchlists-state", labelize(sources.watchlists));
   text("research-instruments-state", labelize(sources.instruments));
+  text("research-news-state", labelize(sources.marketNews));
   text("research-feed-state", labelize(sources.socialFeed));
   text("research-recommendations-state", labelize(sources.recommendations));
   text("research-lookup-state", lookup.enabled ? "Enabled" : "Disabled");
@@ -466,9 +494,31 @@ function renderResearchStatus(payload) {
     fieldsTarget.textContent = (lookup.requiredFields ?? []).join(", ");
   }
 
+  if (newsTarget) {
+    newsTarget.textContent = "";
+
+    for (const item of marketNews.rowPreview ?? []) {
+      const row = document.createElement("li");
+      const body = document.createElement("span");
+      const title = document.createElement("strong");
+      const detail = document.createElement("small");
+      const pill = document.createElement("span");
+
+      title.textContent = `${item.symbol} - ${item.headline}`;
+      detail.textContent = `Source: ${item.source}; attached to ${item.attachedTo}`;
+      pill.className = "pill lock";
+      pill.textContent = labelize(item.state);
+      body.append(title, detail);
+      row.append(body, pill);
+      newsTarget.append(row);
+    }
+  }
+
   renderAudit(
     "Research desk loaded",
-    "Read-only planning DTO loaded; watchlist writes, feed posts, raw payloads, and account identifiers remain blocked",
+    marketNews.enabled
+      ? "Server-side market news summaries loaded for portfolio context"
+      : "Market news scraping is planned only; news cannot trigger trades",
     "research-audit-list",
   );
 }
@@ -505,6 +555,7 @@ async function refreshBotStatus() {
       getJson("/api/etoro/bot/events"),
     ]);
     renderBotStatus(status);
+    renderBotStrategySelect(status);
     renderBotStrategies(strategies);
     renderBotRuns(runs);
     renderBotAuditFeed(audit);

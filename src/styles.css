@@ -339,6 +339,7 @@ h2 {
   grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   grid-template-areas:
     "status safeguards"
+    "controls safeguards"
     "strategies runs"
     "events audit";
   gap: 18px;
@@ -358,7 +359,8 @@ h2 {
   grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   grid-template-areas:
     "status safeguards"
-    "watchlist audit";
+    "watchlist news"
+    "audit audit";
   gap: 18px;
 }
 
@@ -384,6 +386,10 @@ h2 {
 
 .bot-safeguards-panel {
   grid-area: safeguards;
+}
+
+.bot-control-panel {
+  grid-area: controls;
 }
 
 .bot-audit-panel {
@@ -430,6 +436,10 @@ h2 {
   grid-area: watchlist;
 }
 
+.research-news-panel {
+  grid-area: news;
+}
+
 .research-audit-panel {
   grid-area: audit;
 }
@@ -444,6 +454,10 @@ h2 {
 }
 
 .risk-hero {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.research-hero {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
@@ -519,6 +533,29 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.control-row {
+  display: grid;
+  gap: 8px;
+  margin: 0 18px 14px;
+}
+
+.control-row span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.control-row select {
+  min-height: 42px;
+  border: 1px solid rgba(70, 82, 102, 0.9);
+  border-radius: 8px;
+  background: rgba(12, 18, 27, 0.92);
+  color: var(--ink);
+  font: inherit;
+  padding: 0 12px;
 }
 
 .trade-ticket {
@@ -818,6 +855,10 @@ td span {
     grid-template-areas:
       "status"
       "safeguards"
+      "controls"
+      "strategies"
+      "runs"
+      "events"
       "audit";
   }
 
@@ -834,6 +875,7 @@ td span {
       "status"
       "safeguards"
       "watchlist"
+      "news"
       "audit";
   }
 

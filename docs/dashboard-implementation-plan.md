@@ -176,6 +176,11 @@ Run these before using real credentials:
 - [ ] Build switchable tabs for Landing / Widgets, Operational Cockpit, Risk Radar, Research Desk, and Trading once backend DTOs are stable.
 - [x] Add read-only synthetic Risk Radar and Research Desk tabs backed by `/api/etoro/risk/status` and `/api/etoro/research/status`, with redacted safeguards and no write routes.
 - [x] Add backend caching, freshness metadata, and request coalescing before tabs independently consume live provider data.
+- [x] Add disabled Bot Monitor controls for predefined strategy selection,
+  hard-coded budget posture, instrument universe scope, no-HFT stance, and
+  Google Sheets trade-log export planning.
+- [x] Add a Research Desk market-news ingestion plan/preview for portfolio and
+  watchlist context, with server-side allowlist and no trade trigger.
 - [ ] Add persona review after the first dashboard slice, incorporate appropriate feedback, run a second review, then complete checks before merging to `develop`.
 - [ ] Update `docs/agent-memory.md` after each implementation slice with decisions, changed files, provider assumptions, and checks run.
 - [ ] Keep trading execution routes and enabled mutation controls out of scope until a separate threat model, demo-mode proof, confirmation UX, and review gate are complete.

@@ -4,7 +4,10 @@ Status: draft
 Created: 2026-05-12
 Last updated: 2026-05-13
 
-This document plans a future eToro trading bot that is controlled and monitored through the eToro Dashboard. It is not approval to implement execution routes. The current dashboard remains read-only and simulation-first.
+This document plans a future eToro trading bot, now working-named
+Money-maker-3000, that is controlled and monitored through the eToro Dashboard.
+It is not approval to implement execution routes. The current dashboard remains
+read-only and simulation-first.
 
 ## Current Decision
 

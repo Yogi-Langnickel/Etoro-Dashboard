@@ -86,6 +86,11 @@ test("bot monitoring status is read-only, disabled, and redacted", async () => {
   assert.equal(response.json.telemetry.pendingExecutionCount, 0);
   assert.equal(response.json.safeguards.executionRoutes, "absent");
   assert.equal(response.json.safeguards.accountIdentifiers, "redacted");
+  assert.equal(response.json.controlPolicy.highFrequencyTrading, "blocked");
+  assert.equal(response.json.budgetPolicy.baseBudgetUsd, 1000);
+  assert.equal(response.json.budgetPolicy.profitReuse, "allowed-after-realized-profit-ledger");
+  assert.equal(response.json.instrumentUniverse.defaultAllowed.includes("US_EQUITIES"), true);
+  assert.equal(response.json.auditExport.googleSheets, "planned");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
 });
@@ -100,9 +105,11 @@ test("bot strategy registry is simulation-only and redacted", async () => {
   assert.equal(response.json.readOnly, true);
   assert.equal(response.json.botEnabled, false);
   assert.equal(response.json.mutationRoutesEnabled, false);
-  assert.equal(response.json.strategies.length, 2);
+  assert.equal(response.json.strategies.length, 3);
   assert.equal(response.json.strategies[0].allowedModes.includes("simulation"), true);
+  assert.equal(response.json.strategies.some((strategy) => strategy.strategyId === "news-aware-watchlist"), true);
   assert.equal(response.json.safeguards.executionRoutes, "absent");
+  assert.equal(response.json.safeguards.highFrequencyTrading, "blocked");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
   assert.equal(response.text.includes('"accountId"'), false);
@@ -175,9 +182,13 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.readOnly, true);
   assert.equal(response.json.mutationRoutesEnabled, false);
   assert.equal(response.json.dataSources.watchlists, "synthetic-placeholder");
+  assert.equal(response.json.dataSources.marketNews, "planned-server-side");
   assert.equal(response.json.instrumentLookup.enabled, false);
+  assert.equal(response.json.marketNews.enabled, false);
+  assert.equal(response.json.marketNews.safeguards.includes("no-trade-trigger-from-news"), true);
   assert.equal(response.json.safeguards.watchlistMutation, "blocked");
   assert.equal(response.json.safeguards.feedPosting, "blocked");
+  assert.equal(response.json.safeguards.newsTradingSignals, "blocked");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
   assert.equal(response.text.includes('"accountId"'), false);

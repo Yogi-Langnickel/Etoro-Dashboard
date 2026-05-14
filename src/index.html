@@ -451,6 +451,44 @@
           </ul>
         </aside>
 
+        <section class="panel bot-control-panel" aria-labelledby="bot-control-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Configuration</p>
+              <h2 id="bot-control-title">Money-maker-3000 controls</h2>
+            </div>
+            <span class="pill lock">Disabled</span>
+          </div>
+          <label class="control-row" for="bot-strategy-select">
+            <span>Strategy</span>
+            <select id="bot-strategy-select" disabled>
+              <option>Loading strategies</option>
+            </select>
+          </label>
+          <ul class="readiness-list">
+            <li>
+              <span>Strategy control</span>
+              <strong id="bot-strategy-control-state">Predefined disabled</strong>
+            </li>
+            <li>
+              <span>Base budget</span>
+              <strong id="bot-budget-state">$1,000.00</strong>
+            </li>
+            <li>
+              <span>Profit reuse</span>
+              <strong id="bot-profit-state">Ledger only</strong>
+            </li>
+            <li>
+              <span>Universe</span>
+              <strong id="bot-universe-state">US equities, AU equities, Forex, Commodities</strong>
+            </li>
+            <li>
+              <span>Trade log export</span>
+              <strong id="bot-sheets-state">Planned</strong>
+            </li>
+          </ul>
+        </section>
+
         <section class="panel bot-strategies-panel" aria-labelledby="bot-strategies-title">
           <div class="panel-header">
             <div>
@@ -621,6 +659,11 @@
               <small>Provider lookup stays server-side when connected.</small>
             </div>
             <div>
+              <span>Market news</span>
+              <strong id="research-news-state">Planned server side</strong>
+              <small>News can add context but cannot trigger trades.</small>
+            </div>
+            <div>
               <span>Social feed</span>
               <strong id="research-feed-state">Disabled</strong>
               <small>Posting and feed reads are out of scope.</small>
@@ -673,6 +716,17 @@
             <span>Lookup fields</span>
             <code id="research-fields">instrumentId, internalSymbolFull, displayname, marketId</code>
           </div>
+        </section>
+
+        <section class="panel research-news-panel" aria-labelledby="research-news-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Portfolio context</p>
+              <h2 id="research-news-title">Market news preview</h2>
+            </div>
+            <span class="pill lock">No live scraping</span>
+          </div>
+          <ul class="research-list" id="research-news"></ul>
         </section>
 
         <section class="panel research-audit-panel" aria-labelledby="research-audit-title">

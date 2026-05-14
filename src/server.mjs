@@ -272,6 +272,35 @@ function botMonitoringStatus(config) {
       rawProviderPayloads: "hidden",
       accountIdentifiers: "redacted",
     },
+    controlPolicy: {
+      strategySelection: "predefined-disabled",
+      configuredStrategyId: "cash-reserved-dca",
+      allowedStrategyIds: ["cash-reserved-dca", "threshold-rebalance", "news-aware-watchlist"],
+      customStrategyUpload: "blocked",
+      highFrequencyTrading: "blocked",
+    },
+    budgetPolicy: {
+      mode: "hard-coded-preview",
+      baseBudgetUsd: 1000,
+      profitReuse: "allowed-after-realized-profit-ledger",
+      maxConfigurableBudgetUsd: 2500,
+      hardStops: {
+        dailyLossUsd: 50,
+        weeklyLossUsd: 150,
+        maxOpenPositions: 3,
+      },
+    },
+    instrumentUniverse: {
+      configurable: "planned",
+      defaultAllowed: ["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"],
+      disabledUntilReviewed: ["DERIVATIVES", "CFD", "CRYPTO"],
+      perStrategyAllowlist: "required-before-execution",
+    },
+    auditExport: {
+      tradeLog: "required-before-execution",
+      googleSheets: "planned",
+      rawProviderPayloads: "excluded",
+    },
   };
 }
 
@@ -305,6 +334,25 @@ function botStrategyRegistry(config) {
         },
       },
       {
+        strategyId: "news-aware-watchlist",
+        name: "News-aware watchlist",
+        version: "0.1.0-plan",
+        status: "planning-only",
+        allowedModes: ["simulation"],
+        allowedInstruments: ["us-equities", "au-equities", "forex", "commodities"],
+        cadence: "daily-preview",
+        riskBudget: {
+          maxBudgetUsd: 1000,
+          profitReuse: "ledger-only",
+          leverage: "1-only",
+          shorts: "blocked",
+        },
+        lastValidation: {
+          state: "not-run",
+          detail: "Market-news signals are planned as context only and cannot trigger orders.",
+        },
+      },
+      {
         strategyId: "threshold-rebalance",
         name: "Threshold rebalance",
         version: "0.1.0-sim",
@@ -328,6 +376,8 @@ function botStrategyRegistry(config) {
       executionRoutes: "absent",
       accountIdentifiers: "redacted",
       rawProviderPayloads: "hidden",
+      customStrategies: "blocked",
+      highFrequencyTrading: "blocked",
     },
   };
 }
@@ -520,6 +570,7 @@ function researchDeskStatus(config) {
     dataSources: {
       watchlists: "synthetic-placeholder",
       instruments: "synthetic-placeholder",
+      marketNews: "planned-server-side",
       socialFeed: "disabled",
       recommendations: "disabled",
     },
@@ -533,9 +584,32 @@ function researchDeskStatus(config) {
       requiredFields: ["instrumentId", "internalSymbolFull", "displayname", "marketId"],
       exactSymbolLookup: "planned-server-only",
     },
+    marketNews: {
+      enabled: false,
+      mode: "scraper-planning",
+      target: "attach-redacted-news-summaries-to-watchlist-and-position-rows",
+      candidateSources: ["provider-news-if-licensed", "rss-feeds", "official-company-newsrooms"],
+      safeguards: [
+        "server-side-fetch-only",
+        "source-allowlist-required",
+        "robots-and-terms-review-required",
+        "no-trade-trigger-from-news",
+        "headline-summary-redaction",
+      ],
+      rowPreview: [
+        {
+          symbol: "AAPL",
+          state: "placeholder",
+          headline: "No live news source connected",
+          source: "synthetic",
+          attachedTo: "watchlist",
+        },
+      ],
+    },
     safeguards: {
       watchlistMutation: "blocked",
       feedPosting: "blocked",
+      newsTradingSignals: "blocked",
       accountIdentifiers: "redacted",
       rawProviderPayloads: "hidden",
     },
