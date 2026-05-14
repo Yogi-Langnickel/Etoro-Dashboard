@@ -132,6 +132,19 @@ Do not add `/api/trading/*` routes in the first milestone.
 - Keep all tabs backed by cached server responses rather than direct client/provider calls.
 - Add widget interaction rules: popovers for compact detail, deep navigation for larger datasets.
 
+### Phase 4.7: Market News Context
+
+- Prefer licensed/provider news APIs and RSS feeds before scraping.
+- Scrapling is a candidate Python ingestion library for permitted public pages,
+  especially where adaptive selectors, robots.txt handling, development cache,
+  and JSON/JSONL export reduce maintenance.
+- Do not use anti-bot bypass, CAPTCHA bypass, proxy rotation, or stealth modes
+  for financial news unless the source terms explicitly allow automated access.
+- Keep ingestion server-side, source-allowlisted, rate-limited, cached, and
+  separated from trading controls.
+- News summaries may attach to portfolio/watchlist rows as context only; news
+  cannot directly produce bot orders or recommendations.
+
 ### Phase 5: Audit And Export Controls
 
 - Add a read-request audit trail.
