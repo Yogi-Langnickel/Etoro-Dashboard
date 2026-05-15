@@ -9,7 +9,7 @@ import {
   createRequestHandler,
 } from "../src/server.mjs";
 
-async function callHandler(handler, { method = "GET", url = "/api/health", body = "" } = {}) {
+async function callHandler(handler, { method = "GET", url = "/api/health", body = "", headers = {} } = {}) {
   const response = {
     body: "",
     headers: {},
@@ -23,13 +23,32 @@ async function callHandler(handler, { method = "GET", url = "/api/health", body 
     },
   };
 
-  await handler({ method, url, body }, response);
+  await handler({ method, url, body, headers }, response);
 
   return {
     status: response.status,
     headers: response.headers,
     text: response.body,
     json: response.body ? JSON.parse(response.body) : null,
+  };
+}
+
+async function readBotConfigMutationProtection(handler) {
+  const response = await callHandler(handler, {
+    url: "/api/etoro/bot/config",
+  });
+
+  assert.equal(response.status, 200);
+  return response.json.mutationProtection;
+}
+
+function localBotConfigMutationHeaders(mutationProtection, overrides = {}) {
+  return {
+    host: "localhost:4173",
+    origin: "http://localhost:4173",
+    "content-type": "application/json",
+    [mutationProtection.csrfHeader]: mutationProtection.csrfToken,
+    ...overrides,
   };
 }
 
@@ -180,6 +199,16 @@ test("bot config returns default server-side simulation controls without secrets
   assert.deepEqual(response.json.config.allowedMarkets, ["US_EQUITIES", "AU_EQUITIES"]);
   assert.deepEqual(response.json.config.allowedInstrumentClasses, ["EQUITY", "ETF"]);
   assert.equal(response.json.config.minimumEvaluationIntervalMinutes, 240);
+  assert.equal(response.json.mutationProtection.csrfHeader, "x-etoro-dashboard-csrf");
+  assert.equal(typeof response.json.mutationProtection.csrfToken, "string");
+  assert.equal(response.json.mutationProtection.localOriginOnly, true);
+  assert.equal(response.json.mutationProtection.contentType, "application/json");
+  assert.equal(response.json.options.strategyRules["dca-cash-reserve"].status, "simulation-only");
+  assert.deepEqual(response.json.options.strategyRules["dca-cash-reserve"].allowedInstrumentClasses, [
+    "EQUITY",
+    "ETF",
+  ]);
+  assert.deepEqual(response.json.options.marketInstrumentClassRules.FOREX, ["FOREX"]);
   assert.equal(response.json.persistence.pathRedacted, true);
   assert.equal(response.json.persistence.persisted, false);
   assert.equal(response.json.safeguards.executionRoutes, "absent");
@@ -196,6 +225,7 @@ test("bot config update persists validated server-side config and redacts storag
     botConfigFile,
     loadConfig: configuredConfig,
   });
+  const mutationProtection = await readBotConfigMutationProtection(handler);
   const body = {
     strategyId: "threshold-rebalance",
     budgetUsd: 1500,
@@ -206,6 +236,7 @@ test("bot config update persists validated server-side config and redacts storag
   const update = await callHandler(handler, {
     method: "PUT",
     url: "/api/etoro/bot/config",
+    headers: localBotConfigMutationHeaders(mutationProtection),
     body: JSON.stringify(body),
   });
   const readBack = await callHandler(handler, {
@@ -226,10 +257,61 @@ test("bot config update persists validated server-side config and redacts storag
   assert.equal(readBack.text.includes("server-api-secret"), false);
 });
 
-test("bot config update rejects unsupported strategy, markets, and high-frequency cadence", async () => {
-  const response = await callHandler(configuredHandler(), {
+test("bot config update rejects missing token, cross-origin, and bad content type", async () => {
+  const handler = configuredHandler();
+  const mutationProtection = await readBotConfigMutationProtection(handler);
+  const body = JSON.stringify({
+    strategyId: "dca-cash-reserve",
+    budgetUsd: 1000,
+    allowedMarkets: ["US_EQUITIES"],
+    allowedInstrumentClasses: ["ETF"],
+    cadence: "daily",
+  });
+  const missingToken = await callHandler(handler, {
     method: "PUT",
     url: "/api/etoro/bot/config",
+    headers: {
+      host: "localhost:4173",
+      origin: "http://localhost:4173",
+      "content-type": "application/json",
+    },
+    body,
+  });
+  const crossOrigin = await callHandler(handler, {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    headers: localBotConfigMutationHeaders(mutationProtection, {
+      origin: "https://example.com",
+    }),
+    body,
+  });
+  const badContentType = await callHandler(handler, {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    headers: localBotConfigMutationHeaders(mutationProtection, {
+      "content-type": "text/plain",
+    }),
+    body,
+  });
+
+  assert.equal(missingToken.status, 403);
+  assert.equal(missingToken.json.error.code, "BOT_CONFIG_MUTATION_FORBIDDEN");
+  assert.match(missingToken.json.error.message, /token/);
+  assert.equal(crossOrigin.status, 403);
+  assert.match(crossOrigin.json.error.message, /local dashboard origin/);
+  assert.equal(badContentType.status, 415);
+  assert.match(badContentType.json.error.message, /application\/json/);
+  assert.equal(missingToken.text.includes("server-api-secret"), false);
+  assert.equal(crossOrigin.text.includes("server-user-secret"), false);
+});
+
+test("bot config update rejects unsupported strategy, markets, and high-frequency cadence", async () => {
+  const handler = configuredHandler();
+  const mutationProtection = await readBotConfigMutationProtection(handler);
+  const response = await callHandler(handler, {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    headers: localBotConfigMutationHeaders(mutationProtection),
     body: JSON.stringify({
       strategyId: "uploaded-ai-scalper",
       budgetUsd: 10_000,
@@ -247,15 +329,66 @@ test("bot config update rejects unsupported strategy, markets, and high-frequenc
   assert.equal(response.text.includes("server-api-secret"), false);
 });
 
+test("bot config mirrors strategy registry rules for market, instrument, and cadence compatibility", async () => {
+  const handler = configuredHandler();
+  const mutationProtection = await readBotConfigMutationProtection(handler);
+  const dcaForex = await callHandler(handler, {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    headers: localBotConfigMutationHeaders(mutationProtection),
+    body: JSON.stringify({
+      strategyId: "dca-cash-reserve",
+      budgetUsd: 1000,
+      allowedMarkets: ["FOREX"],
+      allowedInstrumentClasses: ["FOREX"],
+      cadence: "daily",
+    }),
+  });
+  const thresholdDaily = await callHandler(handler, {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    headers: localBotConfigMutationHeaders(mutationProtection),
+    body: JSON.stringify({
+      strategyId: "threshold-rebalance",
+      budgetUsd: 1000,
+      allowedMarkets: ["US_EQUITIES"],
+      allowedInstrumentClasses: ["ETF"],
+      cadence: "daily",
+    }),
+  });
+  const mismatchedMarketClass = await callHandler(handler, {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    headers: localBotConfigMutationHeaders(mutationProtection),
+    body: JSON.stringify({
+      strategyId: "news-aware-watchlist",
+      budgetUsd: 1000,
+      allowedMarkets: ["US_EQUITIES"],
+      allowedInstrumentClasses: ["FOREX"],
+      cadence: "daily",
+    }),
+  });
+
+  assert.equal(dcaForex.status, 400);
+  assert.match(dcaForex.json.error.message, /allowedMarkets/);
+  assert.equal(thresholdDaily.status, 400);
+  assert.match(thresholdDaily.json.error.message, /cadence/);
+  assert.equal(mismatchedMarketClass.status, 400);
+  assert.match(mismatchedMarketClass.json.error.message, /selected markets/);
+});
+
 test("bot config rejects unsupported methods and oversized request bodies", async () => {
-  const methodResponse = await callHandler(configuredHandler(), {
+  const handler = configuredHandler();
+  const mutationProtection = await readBotConfigMutationProtection(handler);
+  const methodResponse = await callHandler(handler, {
     method: "POST",
     url: "/api/etoro/bot/config",
     body: "{}",
   });
-  const oversizedResponse = await callHandler(configuredHandler(), {
+  const oversizedResponse = await callHandler(handler, {
     method: "PUT",
     url: "/api/etoro/bot/config",
+    headers: localBotConfigMutationHeaders(mutationProtection),
     body: JSON.stringify({ note: "x".repeat(17_000) }),
   });
 
@@ -359,9 +492,10 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.intelligence.sourcePriority.some((source) => source.id === "sec-insider-transactions"), true);
   assert.equal(response.json.intelligence.scrapingPolicy.priority, "api-first-scraping-fallback");
   assert.equal(response.json.intelligence.scrapingPolicy.finviz.insiderTradingPage, "reference-only");
-  assert.equal(response.json.intelligence.indicatorPolicy.states.includes("buy"), true);
-  assert.equal(response.json.intelligence.indicatorPolicy.blockedUses.includes("autonomous trading signal"), true);
-  assert.equal(response.json.intelligence.financialRecordsPreview[0].indicator, "hold");
+  assert.equal(response.json.intelligence.coverageStatePolicy.states.includes("sufficient-data"), true);
+  assert.equal(response.json.intelligence.coverageStatePolicy.states.includes("mixed-records"), true);
+  assert.equal(response.json.intelligence.coverageStatePolicy.blockedUses.includes("autonomous trading trigger"), true);
+  assert.equal(response.json.intelligence.financialRecordsPreview[0].coverageState, "mixed-records");
   assert.equal(response.json.intelligence.insiderActivityPreview[0].sourceState, "planned-sec-forms-3-4-5");
   assert.equal(response.json.positionContextPreview.length, 2);
   assert.equal(response.json.positionContextPreview[0].contextOnly, true);

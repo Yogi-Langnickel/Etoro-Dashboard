@@ -1,6 +1,6 @@
 # Free API Options
 
-Status: active plan  
+Status: active plan
 Created: 2026-05-15
 
 This dashboard should prefer first-party eToro reads and free official public
@@ -19,7 +19,7 @@ approves broader behavior.
 2. SEC companyfacts/submissions
    - Free official API for US company facts, filing history, ticker/exchange
      metadata, and nightly bulk archives.
-   - Best first implementation for Research Desk financial-record indicators.
+   - Best first implementation for Research Desk financial-record coverage states.
 
 3. SEC ownership filing RSS/search feeds
    - Free official path for recent Forms 3, 4, and 5 insider activity.
@@ -44,7 +44,7 @@ approves broader behavior.
 
 1. Keep eToro reads as the only live first-party provider connected by default.
 2. Implement SEC companyfacts as the first non-eToro adapter for Research Desk
-   financial-record indicators.
+   financial-record coverage states.
 3. Add SEC ownership RSS ingestion for insider activity before any scraping
    fallback.
 4. Keep Alpha Vantage and Twelve Data as optional adapters behind server config,

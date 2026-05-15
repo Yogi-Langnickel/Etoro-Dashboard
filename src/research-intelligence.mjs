@@ -72,15 +72,15 @@ const SCRAPING_POLICY = Object.freeze({
   },
 });
 
-const INDICATOR_POLICY = Object.freeze({
-  label: "Financial-data indicator",
-  states: ["buy", "hold", "sell", "insufficient-data"],
+const COVERAGE_STATE_POLICY = Object.freeze({
+  label: "Financial-record coverage state",
+  states: ["sufficient-data", "mixed-records", "needs-review", "insufficient-data"],
   source: "normalized public financial records and synthetic placeholders until adapters exist",
   notAdvice:
-    "Indicator is an informational summary of financial data only. It is not personal financial advice, a recommendation, or an order signal.",
+    "Coverage state summarizes record completeness and consistency only. It is not personal financial advice, a recommendation, or an order trigger.",
   blockedUses: [
     "Money-maker-3000 execution input",
-    "autonomous trading signal",
+    "autonomous trading trigger",
     "personalized suitability assessment",
   ],
 });
@@ -100,7 +100,7 @@ const FREE_API_OPTIONS = Object.freeze([
     fit: "US stock fundamentals, filing metadata, ticker/exchange metadata by CIK",
     access: "free official API, no authentication",
     implementation: "server-side cached adapter with SEC User-Agent policy",
-    defaultUse: "Research Desk financial-record indicators and issuer context",
+    defaultUse: "Research Desk financial-record coverage states and issuer context",
   }),
   Object.freeze({
     id: "sec-ownership-rss",
@@ -215,14 +215,14 @@ export function researchIntelligenceStatus() {
     providerReadiness: PROVIDER_READINESS,
     sourcePriority: OFFICIAL_SOURCE_PRIORITY,
     scrapingPolicy: SCRAPING_POLICY,
-    indicatorPolicy: INDICATOR_POLICY,
+    coverageStatePolicy: COVERAGE_STATE_POLICY,
     financialRecordsPreview: [
       {
         symbol: "AAPL",
         assetClass: "Equity",
         sourceState: "planned-sec-companyfacts",
-        indicator: "hold",
-        indicatorBasis: [
+        coverageState: "mixed-records",
+        coverageBasis: [
           "strong profitability placeholder",
           "large cash-flow base placeholder",
           "valuation needs live SEC-derived denominator",
@@ -238,8 +238,8 @@ export function researchIntelligenceStatus() {
         symbol: "SPY",
         assetClass: "ETF",
         sourceState: "planned-sec-nport-and-issuer",
-        indicator: "hold",
-        indicatorBasis: [
+        coverageState: "needs-review",
+        coverageBasis: [
           "broad-market ETF placeholder",
           "expense and concentration metrics pending",
           "holdings source not connected",
@@ -255,8 +255,8 @@ export function researchIntelligenceStatus() {
         symbol: "BTC",
         assetClass: "Crypto",
         sourceState: "news-and-market-context-only",
-        indicator: "insufficient-data",
-        indicatorBasis: [
+        coverageState: "insufficient-data",
+        coverageBasis: [
           "no public financial statements",
           "use news, liquidity, volatility, and macro context instead",
         ],

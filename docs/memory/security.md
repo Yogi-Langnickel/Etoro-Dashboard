@@ -25,15 +25,18 @@ High-impact risks:
 - Credentialed provider clients must pin allowed hosts before sending API keys or user keys.
 - Trading feature flags default to false: `ENABLE_TRADING_ACTIONS=false`, `ENABLE_LIVE_ORDERS=false`.
 - Bot config persistence remains simulation-only. Strategy, budget, market,
-  instrument-class, and cadence controls may be stored server-side, but they do
-  not enable provider calls, order previews, demo execution, or live execution.
+  instrument-class, and cadence controls may be stored server-side, but PUT
+  updates require local JSON requests, local Host/Origin headers, and the
+  mutation-protection token surfaced by the GET config payload. Saved config
+  must mirror Money-maker simulation registry compatibility rules and does not
+  enable provider calls, order previews, demo execution, or live execution.
 - Any hosted bot-control API still requires authentication, CSRF/origin policy,
   durable audit, and review gate before real controls are exposed.
 - Bot market/news context is display-only; it cannot trigger strategy decisions,
   order previews, demo execution, or live execution.
-- Financial-record indicators and insider activity summaries are also
+- Financial-record coverage states and insider activity summaries are also
   display-only. They must not be framed as personalized financial advice or used
-  by Money-maker-3000 without a separate simulation-signal contract, backtest,
+  by Money-maker-3000 without a separate simulation contract, backtest,
   explainability, and review gate.
 - Provider fallback/readiness metadata may describe safe server-side credential
   handling and required header names, but it must not contain credential values,

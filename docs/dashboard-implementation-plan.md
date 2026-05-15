@@ -151,9 +151,10 @@ Do not add `/api/trading/*` routes in the first milestone.
   separated from trading controls.
 - News summaries may attach to portfolio/watchlist rows as context only; news
   cannot directly produce bot orders or recommendations.
-- Data-only buy/hold/sell indicators may be shown per position when derived
-  from normalized public financial records. Label them as informational, not
-  advice or bot signals.
+- Neutral coverage states such as sufficient-data, mixed-records, needs-review,
+  and insufficient-data may be shown per position when derived from normalized
+  public financial records. Label them as record coverage, not advice or bot
+  triggers.
 - Insider activity should use SEC Forms 3/4/5 sources first. Finviz insider
   pages are reference/fallback only unless an allowed automated access path is
   confirmed.
@@ -193,7 +194,7 @@ Run these before using real credentials:
 
 ## TODO Backlog
 
-- [ ] Replace placeholder package scripts with real lint, typecheck, unit test, audit, and check commands before implementation begins.
+- [x] Replace placeholder package scripts with real lint, typecheck, unit test, audit, and check commands.
 - [ ] Confirm official eToro API access mode, scopes, demo availability, endpoint contracts, and permitted use before broad live-provider implementation.
 - [ ] Validate the local read-only API spike against a demo/read eToro key.
 - [ ] Add server-only environment validation and import guards so credentials cannot enter browser bundles.
@@ -209,13 +210,14 @@ Run these before using real credentials:
   ledger panel.
 - [x] Persist simulation bot controls server-side with a safe
   `/api/etoro/bot/config` read/update API for predefined strategy, budget,
-  allowed markets, allowed instrument classes, and no-HFT cadence.
+  allowed markets, allowed instrument classes, no-HFT cadence, local JSON/CSRF
+  mutation protection, and Money-maker strategy compatibility rules.
 - [x] Add a Research Desk market-news ingestion plan/preview for portfolio and
   watchlist context, with server-side allowlist and no trade trigger.
 - [x] Attach synthetic market/news context to portfolio-position previews for
   display only; news cannot create signals or orders.
-- [x] Add synthetic Research Desk source-priority, financial-record indicator,
-  and SEC insider-activity previews.
+- [x] Add synthetic Research Desk source-priority, financial-record coverage
+  state, and SEC insider-activity previews.
 - [x] Add explicit fixture/source watermarks across overview, Risk Radar, and
   Research Desk surfaces.
 - [ ] Implement a SEC companyfacts adapter for US stock fundamentals.

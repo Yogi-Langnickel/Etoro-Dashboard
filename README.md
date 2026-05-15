@@ -38,7 +38,7 @@ Set `ENABLE_DEMO_TRADE_PREVIEW=true` only when you want the local server to vali
 
 Set `ETORO_READ_CACHE_TTL_MS` if local read-only provider calls need a different short cache window. The default is `15000` milliseconds.
 
-Simulation bot controls are stored server-side at `${HOME}/.config/etoro-dashboard/bot-config.json` by default. The saved config contains only predefined strategy, budget, market, instrument-class, and low-frequency cadence choices; it does not contain credentials or enable trading.
+Simulation bot controls are stored server-side at `${HOME}/.config/etoro-dashboard/bot-config.json` by default. The saved config contains only predefined strategy, budget, market, instrument-class, and low-frequency cadence choices; it does not contain credentials or enable trading. Config updates are local-dashboard only: the server requires JSON, local Host/Origin headers, and the mutation-protection token returned by `GET /api/etoro/bot/config`. Strategy, market, instrument-class, and cadence combinations mirror the Money-maker simulation registry rules.
 
 ## Goals
 

@@ -46,6 +46,10 @@ Public material currently describes API access for market data, portfolios, watc
   allowed market groups, allowed instrument classes, and low-frequency cadence.
   It is not an eToro provider route and must not store credentials, account
   identifiers, instrument IDs, position IDs, order IDs, or raw provider payloads.
+  PUT updates require application/json, a local dashboard Host/Origin, and the
+  CSRF-style mutation header/token returned by GET. Validation mirrors the
+  Money-maker simulation registry rules, so strategy-incompatible
+  market/instrument/cadence combinations such as DCA plus FOREX are rejected.
 - Market/news context attached to positions is display-only. It must not be
   converted into eToro order parameters or strategy signals without a separate
   provider contract review and compliance/security gate.
@@ -58,10 +62,11 @@ Public material currently describes API access for market data, portfolios, watc
   scraping: SEC companyfacts for US stock fundamentals, SEC insider transaction
   datasets/RSS for Forms 3/4/5, SEC N-PORT datasets and issuer factsheets for
   ETFs, and RSS/free APIs for commodities, forex, crypto, and stock news.
-- Buy/hold/sell indicators are allowed only as data-only informational labels.
-  They must be sourced to normalized financial records, carry no-advice copy,
-  and remain blocked from Money-maker-3000 execution or strategy signals until a
-  separate review gate approves a simulation-only signal contract.
+- Research Desk financial-record output uses neutral coverage states such as
+  sufficient-data, mixed-records, needs-review, and insufficient-data. It must
+  be sourced to normalized financial records, carry no-advice copy, and remain
+  blocked from Money-maker-3000 execution or strategy triggers until a separate
+  review gate approves a simulation-only contract.
 
 ## Questions To Confirm
 

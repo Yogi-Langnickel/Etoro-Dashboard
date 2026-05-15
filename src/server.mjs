@@ -1,5 +1,5 @@
 import { createServer as createHttpServer } from "node:http";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,6 +39,8 @@ export const INTERNAL_API_ROUTES = Object.freeze([
 
 const DEMO_TRADE_PREVIEW_ROUTE = "/api/etoro/demo/trading/preview";
 const BOT_CONFIG_ROUTE = "/api/etoro/bot/config";
+const BOT_CONFIG_CSRF_HEADER = "x-etoro-dashboard-csrf";
+const botConfigCsrfToken = randomBytes(32).toString("base64url");
 const MAX_API_BODY_BYTES = 16 * 1024;
 
 const PLANNED_DEMO_TRADING_ENDPOINTS = Object.freeze({
@@ -167,6 +169,89 @@ function sendJson(response, status, payload) {
     "cache-control": "no-store",
   });
   response.end(JSON.stringify(payload, null, 2));
+}
+
+function getRequestHeader(request, name) {
+  const headers = request?.headers ?? {};
+  const expected = name.toLowerCase();
+
+  if (typeof headers.get === "function") {
+    return headers.get(name);
+  }
+
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() !== expected) {
+      continue;
+    }
+
+    return Array.isArray(value) ? value[0] : value;
+  }
+
+  return undefined;
+}
+
+function normalizeHostname(hostname) {
+  const value = String(hostname ?? "").trim().toLowerCase();
+
+  if (value.startsWith("[") && value.includes("]")) {
+    return value.slice(1, value.indexOf("]"));
+  }
+
+  return value.split(":")[0];
+}
+
+function isLocalHostname(hostname) {
+  return ["127.0.0.1", "localhost", "::1"].includes(normalizeHostname(hostname));
+}
+
+function parseOriginHeader(origin) {
+  try {
+    return new URL(origin);
+  } catch {
+    return null;
+  }
+}
+
+function validateBotConfigMutationRequest(request) {
+  const contentType = String(getRequestHeader(request, "content-type") ?? "").toLowerCase();
+  const origin = getRequestHeader(request, "origin");
+  const host = getRequestHeader(request, "host");
+  const csrfToken = getRequestHeader(request, BOT_CONFIG_CSRF_HEADER);
+
+  if (!contentType.startsWith("application/json")) {
+    return {
+      ok: false,
+      status: 415,
+      message: "Bot config updates require application/json.",
+    };
+  }
+
+  if (!host || !isLocalHostname(host)) {
+    return {
+      ok: false,
+      status: 403,
+      message: "Bot config updates require a local dashboard host.",
+    };
+  }
+
+  const originUrl = origin ? parseOriginHeader(origin) : null;
+  if (!originUrl || !isLocalHostname(originUrl.hostname)) {
+    return {
+      ok: false,
+      status: 403,
+      message: "Bot config updates are restricted to the local dashboard origin.",
+    };
+  }
+
+  if (csrfToken !== botConfigCsrfToken) {
+    return {
+      ok: false,
+      status: 403,
+      message: "Bot config update token is missing or invalid.",
+    };
+  }
+
+  return { ok: true };
 }
 
 function safeErrorPayload(error) {
@@ -1018,11 +1103,34 @@ async function handleBotConfigRead(response, options) {
     configFile: options.botConfigFile,
   });
 
-  sendJson(response, 200, publicBotConfigPayload(loaded.config, loaded));
+  sendJson(response, 200, {
+    ...publicBotConfigPayload(loaded.config, loaded),
+    mutationProtection: {
+      csrfHeader: BOT_CONFIG_CSRF_HEADER,
+      csrfToken: botConfigCsrfToken,
+      localOriginOnly: true,
+      contentType: "application/json",
+    },
+  });
 }
 
 async function handleBotConfigUpdate(request, response, options) {
   const saveStoredBotConfig = options.saveBotConfig ?? saveBotConfig;
+  const mutationRequest = validateBotConfigMutationRequest(request);
+
+  if (!mutationRequest.ok) {
+    sendJson(response, mutationRequest.status, {
+      ok: false,
+      mode: "bot-config",
+      mutationRoutesEnabled: false,
+      executionBlocked: true,
+      error: {
+        code: "BOT_CONFIG_MUTATION_FORBIDDEN",
+        message: mutationRequest.message,
+      },
+    });
+    return;
+  }
 
   try {
     const saved = await saveStoredBotConfig(await readJsonBody(request), {

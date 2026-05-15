@@ -6,6 +6,8 @@ const formatter = new Intl.NumberFormat("en-US", {
 });
 const overviewTabId = "overview-view";
 const loadedTabIds = new Set([overviewTabId]);
+let botConfigMutationProtection = null;
+let botConfigOptionsPayload = null;
 
 function text(id, value) {
   const element = document.getElementById(id);
@@ -73,15 +75,22 @@ async function postJson(path, body) {
 }
 
 async function putJson(path, body) {
-  return sendJsonWithMethod("PUT", path, body);
+  const headers = {};
+
+  if (path === "/api/etoro/bot/config" && botConfigMutationProtection?.csrfHeader) {
+    headers[botConfigMutationProtection.csrfHeader] = botConfigMutationProtection.csrfToken;
+  }
+
+  return sendJsonWithMethod("PUT", path, body, headers);
 }
 
-async function sendJsonWithMethod(method, path, body) {
+async function sendJsonWithMethod(method, path, body, extraHeaders = {}) {
   const response = await fetch(path, {
     body: JSON.stringify(body),
     headers: {
       accept: "application/json",
       "content-type": "application/json",
+      ...extraHeaders,
     },
     method,
   });
@@ -336,6 +345,7 @@ function setCheckboxGroup(name, values) {
 function renderBotConfig(configPayload) {
   const config = configPayload.config ?? {};
   const source = configPayload.persistence?.persisted ? "Persisted server-side" : "Default server config";
+  botConfigMutationProtection = configPayload.mutationProtection ?? botConfigMutationProtection;
 
   text("bot-config-source-state", source);
   text("bot-budget-state", money(config.budgetUsd));
@@ -361,6 +371,42 @@ function renderBotConfig(configPayload) {
 
   setCheckboxGroup("bot-allowed-markets", config.allowedMarkets);
   setCheckboxGroup("bot-instrument-classes", config.allowedInstrumentClasses);
+  applyBotStrategyRuleControls(configPayload);
+}
+
+function applyBotStrategyRuleControls(configPayload = botConfigOptionsPayload) {
+  const strategyId = ticketValue("bot-strategy-select");
+  const rule = configPayload?.options?.strategyRules?.[strategyId];
+
+  if (!rule) {
+    return;
+  }
+
+  document.querySelectorAll('input[name="bot-allowed-markets"]').forEach((input) => {
+    input.disabled = !(rule.allowedMarkets ?? []).includes(input.value);
+
+    if (input.disabled) {
+      input.checked = false;
+    }
+  });
+
+  document.querySelectorAll('input[name="bot-instrument-classes"]').forEach((input) => {
+    input.disabled = !(rule.allowedInstrumentClasses ?? []).includes(input.value);
+
+    if (input.disabled) {
+      input.checked = false;
+    }
+  });
+
+  const cadenceSelect = document.getElementById("bot-cadence-select");
+
+  if (cadenceSelect) {
+    for (const option of cadenceSelect.options) {
+      option.disabled = option.value !== rule.cadence;
+    }
+
+    cadenceSelect.value = rule.cadence;
+  }
 }
 
 function renderBotControlSelects(statusPayload, strategiesPayload, configPayload) {
@@ -370,6 +416,7 @@ function renderBotControlSelects(statusPayload, strategiesPayload, configPayload
   const marketTarget = document.getElementById("bot-market-options");
   const classTarget = document.getElementById("bot-instrument-class-options");
   const strategyById = new Map((strategiesPayload.strategies ?? []).map((strategy) => [strategy.strategyId, strategy]));
+  botConfigOptionsPayload = configPayload;
 
   if (select) {
     select.textContent = "";
@@ -741,10 +788,10 @@ function renderResearchStatus(payload) {
         .map((figure) => `${figure.label}: ${figure.value}`)
         .join("; ");
 
-      title.textContent = `${item.symbol} - ${labelize(item.indicator)}`;
+      title.textContent = `${item.symbol} - ${labelize(item.coverageState)}`;
       detail.textContent = `${item.assetClass}; ${figures}`;
-      pill.className = `pill ${item.indicator === "buy" ? "ok" : item.indicator === "sell" ? "danger" : "lock"}`;
-      pill.textContent = "Data-only";
+      pill.className = `pill ${item.coverageState === "sufficient-data" ? "ok" : item.coverageState === "needs-review" ? "warn" : "lock"}`;
+      pill.textContent = "Coverage";
       body.append(title, detail);
       row.append(body, pill);
       financialTarget.append(row);
@@ -983,6 +1030,7 @@ document.getElementById("trade-preview-blocked")?.addEventListener("click", asyn
   }
 });
 document.getElementById("bot-strategy-select")?.addEventListener("change", (event) => {
+  applyBotStrategyRuleControls();
   renderAudit(
     "Strategy preview changed",
     `${labelize(event.target.value)} selected locally; save to persist on the server`,

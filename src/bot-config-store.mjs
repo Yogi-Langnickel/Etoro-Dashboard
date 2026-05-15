@@ -15,6 +15,44 @@ export const ALLOWED_BOT_MARKETS = Object.freeze(["US_EQUITIES", "AU_EQUITIES", 
 export const ALLOWED_BOT_INSTRUMENT_CLASSES = Object.freeze(["EQUITY", "ETF", "FOREX", "COMMODITY"]);
 export const ALLOWED_BOT_CADENCES = Object.freeze(["daily", "weekly"]);
 export const MIN_BOT_EVALUATION_INTERVAL_MINUTES = 240;
+export const BOT_MARKET_INSTRUMENT_CLASS_RULES = Object.freeze({
+  US_EQUITIES: Object.freeze(["EQUITY", "ETF"]),
+  AU_EQUITIES: Object.freeze(["EQUITY", "ETF"]),
+  FOREX: Object.freeze(["FOREX"]),
+  COMMODITIES: Object.freeze(["COMMODITY", "ETF"]),
+});
+export const BOT_STRATEGY_CONFIG_RULES = Object.freeze({
+  "dca-cash-reserve": Object.freeze({
+    name: "Cash-reserved DCA",
+    version: "0.1.0-sim",
+    status: "simulation-only",
+    mirroredRegistry: "Money-maker-3000 STRATEGY_REGISTRY",
+    allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES"]),
+    allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF"]),
+    cadence: "daily",
+    expectedHoldingPeriod: "weeks-to-months",
+  }),
+  "threshold-rebalance": Object.freeze({
+    name: "Threshold rebalance",
+    version: "0.1.0-sim",
+    status: "simulation-only",
+    mirroredRegistry: "Money-maker-3000 STRATEGY_REGISTRY",
+    allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES", "COMMODITIES"]),
+    allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF", "COMMODITY"]),
+    cadence: "weekly",
+    expectedHoldingPeriod: "weeks-to-months",
+  }),
+  "news-aware-watchlist": Object.freeze({
+    name: "News-aware watchlist",
+    version: "0.1.0-plan",
+    status: "context-only",
+    mirroredRegistry: "Money-maker-3000 STRATEGY_REGISTRY",
+    allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"]),
+    allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF", "FOREX", "COMMODITY"]),
+    cadence: "daily",
+    expectedHoldingPeriod: "not-trading-from-news",
+  }),
+});
 
 export const DEFAULT_BOT_CONFIG = Object.freeze({
   strategyId: "dca-cash-reserve",
@@ -60,6 +98,27 @@ function assertAllowedArray(values, allowedValues, fieldName) {
   }
 }
 
+function assertStrategyRuleArray(values, allowedValues, fieldName, strategyId) {
+  const blocked = values.filter((value) => !allowedValues.includes(value));
+
+  if (blocked.length > 0) {
+    throw new BotConfigValidationError(`${fieldName} includes values not allowed for ${strategyId}`, [fieldName]);
+  }
+}
+
+function assertMarketInstrumentCompatibility(allowedMarkets, allowedInstrumentClasses) {
+  const marketAllowedClasses = new Set(
+    allowedMarkets.flatMap((market) => BOT_MARKET_INSTRUMENT_CLASS_RULES[market] ?? []),
+  );
+  const blocked = allowedInstrumentClasses.filter((instrumentClass) => !marketAllowedClasses.has(instrumentClass));
+
+  if (blocked.length > 0) {
+    throw new BotConfigValidationError("allowedInstrumentClasses include values not supported by selected markets", [
+      "allowedInstrumentClasses",
+    ]);
+  }
+}
+
 export function normalizeBotConfig(input = {}) {
   const candidate = {
     ...DEFAULT_BOT_CONFIG,
@@ -76,6 +135,7 @@ export function normalizeBotConfig(input = {}) {
   const minimumEvaluationIntervalMinutes = Number(candidate.minimumEvaluationIntervalMinutes);
 
   assertAllowed(strategyId, ALLOWED_BOT_STRATEGY_IDS, "strategyId");
+  const strategyRule = BOT_STRATEGY_CONFIG_RULES[strategyId];
 
   if (!Number.isInteger(budgetUsd) || !ALLOWED_BOT_BUDGETS_USD.includes(budgetUsd)) {
     throw new BotConfigValidationError("budgetUsd is not allowed", ["budgetUsd"]);
@@ -84,6 +144,18 @@ export function normalizeBotConfig(input = {}) {
   assertAllowedArray(allowedMarkets, ALLOWED_BOT_MARKETS, "allowedMarkets");
   assertAllowedArray(allowedInstrumentClasses, ALLOWED_BOT_INSTRUMENT_CLASSES, "allowedInstrumentClasses");
   assertAllowed(cadence, ALLOWED_BOT_CADENCES, "cadence");
+  assertStrategyRuleArray(allowedMarkets, strategyRule.allowedMarkets, "allowedMarkets", strategyId);
+  assertStrategyRuleArray(
+    allowedInstrumentClasses,
+    strategyRule.allowedInstrumentClasses,
+    "allowedInstrumentClasses",
+    strategyId,
+  );
+
+  if (cadence !== strategyRule.cadence) {
+    throw new BotConfigValidationError(`cadence is not allowed for ${strategyId}`, ["cadence"]);
+  }
+  assertMarketInstrumentCompatibility(allowedMarkets, allowedInstrumentClasses);
 
   if (
     !Number.isInteger(minimumEvaluationIntervalMinutes) ||
@@ -116,9 +188,11 @@ export function publicBotConfigPayload(config, { source = "default", persisted =
     config,
     options: {
       strategies: ALLOWED_BOT_STRATEGY_IDS,
+      strategyRules: BOT_STRATEGY_CONFIG_RULES,
       budgetsUsd: ALLOWED_BOT_BUDGETS_USD,
       markets: ALLOWED_BOT_MARKETS,
       instrumentClasses: ALLOWED_BOT_INSTRUMENT_CLASSES,
+      marketInstrumentClassRules: BOT_MARKET_INSTRUMENT_CLASS_RULES,
       cadences: ALLOWED_BOT_CADENCES,
       minimumEvaluationIntervalMinutes: MIN_BOT_EVALUATION_INTERVAL_MINUTES,
     },
