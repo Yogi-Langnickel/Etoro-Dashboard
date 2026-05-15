@@ -613,6 +613,7 @@ function renderResearchStatus(payload) {
   const financialTarget = document.getElementById("research-financial-records");
   const insiderTarget = document.getElementById("research-insider-activity");
   const fieldsTarget = document.getElementById("research-fields");
+  const providerTarget = document.getElementById("research-provider-readiness");
 
   text("research-watchlists-state", labelize(sources.watchlists));
   text("research-instruments-state", labelize(sources.instruments));
@@ -689,6 +690,26 @@ function renderResearchStatus(payload) {
       body.append(title, detail);
       row.append(body, pill);
       sourceTarget.append(row);
+    }
+  }
+
+  if (providerTarget) {
+    providerTarget.textContent = "";
+
+    for (const item of intelligence.providerReadiness ?? []) {
+      const row = document.createElement("li");
+      const body = document.createElement("span");
+      const title = document.createElement("strong");
+      const detail = document.createElement("small");
+      const pill = document.createElement("span");
+
+      title.textContent = item.label;
+      detail.textContent = `${labelize(item.defaultState)}; ${item.credentialHandling}`;
+      pill.className = item.defaultState?.includes("disabled") ? "pill warn" : "pill lock";
+      pill.textContent = item.liveNetworkConnected ? "Live" : "Metadata only";
+      body.append(title, detail);
+      row.append(body, pill);
+      providerTarget.append(row);
     }
   }
 

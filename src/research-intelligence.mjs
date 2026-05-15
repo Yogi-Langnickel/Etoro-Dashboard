@@ -128,9 +128,91 @@ const FREE_API_OPTIONS = Object.freeze([
   }),
 ]);
 
+const PROVIDER_FALLBACK_POLICY = Object.freeze({
+  mode: "metadata-only",
+  defaultProvider: "etoro-public-api",
+  enabledByDefault: ["etoro-public-api", "sec-companyfacts", "sec-ownership-rss"],
+  disabledUntilConfigured: ["alpha-vantage", "twelve-data", "allowlisted-scraping"],
+  fallbackOrder: [
+    "eToro first-party reads",
+    "free official public records",
+    "free RSS/API sources with reviewed terms",
+    "optional key-based enrichment",
+    "allowlisted scraping after robots and terms review",
+  ],
+  safety: [
+    "server-side-only-provider-calls",
+    "no-browser-keys",
+    "no-secrets-in-status-payloads",
+    "cache-and-rate-limit-before-live-fetch",
+    "context-only-output",
+    "no-trade-or-bot-signal-output",
+  ],
+});
+
+const PROVIDER_READINESS = Object.freeze([
+  Object.freeze({
+    id: "etoro-public-api",
+    label: "eToro Public API",
+    defaultState: "server-credential-required",
+    credentialHandling: "server-side provider keys only",
+    requestMetadata: ["unique-request-id", "provider-auth-headers-redacted"],
+    liveNetworkConnected: false,
+    readOnlyDefault: true,
+    termsStatus: "official-docs-required-before-new-live-behavior",
+    fallbackRole: "primary first-party dashboard reads",
+  }),
+  Object.freeze({
+    id: "sec-companyfacts",
+    label: "SEC companyfacts/submissions",
+    defaultState: "planned-free-official",
+    credentialHandling: "no API key; server-side User-Agent policy required",
+    requestMetadata: ["source-url", "retrieved-at", "cache-state"],
+    liveNetworkConnected: false,
+    readOnlyDefault: true,
+    termsStatus: "official-public-api-terms-review-before-adapter",
+    fallbackRole: "first fallback for US issuer fundamentals",
+  }),
+  Object.freeze({
+    id: "sec-ownership-rss",
+    label: "SEC ownership filing RSS",
+    defaultState: "planned-free-official",
+    credentialHandling: "no API key; server-side feed fetch only",
+    requestMetadata: ["source-url", "retrieved-at", "cache-state"],
+    liveNetworkConnected: false,
+    readOnlyDefault: true,
+    termsStatus: "official-feed-terms-review-before-adapter",
+    fallbackRole: "first fallback for Forms 3, 4, and 5 insider activity",
+  }),
+  Object.freeze({
+    id: "alpha-vantage",
+    label: "Alpha Vantage",
+    defaultState: "disabled-optional-key",
+    credentialHandling: "server-side optional key; never browser-exposed",
+    requestMetadata: ["provider", "quota-window", "cache-state"],
+    liveNetworkConnected: false,
+    readOnlyDefault: true,
+    termsStatus: "blocked-until-quota-and-terms-reviewed",
+    fallbackRole: "optional enrichment after official/free sources",
+  }),
+  Object.freeze({
+    id: "twelve-data",
+    label: "Twelve Data",
+    defaultState: "disabled-optional-key",
+    credentialHandling: "server-side optional key; never browser-exposed",
+    requestMetadata: ["provider", "quota-window", "cache-state"],
+    liveNetworkConnected: false,
+    readOnlyDefault: true,
+    termsStatus: "blocked-until-quota-and-terms-reviewed",
+    fallbackRole: "secondary quote/time-series enrichment",
+  }),
+]);
+
 export function researchIntelligenceStatus() {
   return {
     freeApiOptions: FREE_API_OPTIONS,
+    providerFallbackPolicy: PROVIDER_FALLBACK_POLICY,
+    providerReadiness: PROVIDER_READINESS,
     sourcePriority: OFFICIAL_SOURCE_PRIORITY,
     scrapingPolicy: SCRAPING_POLICY,
     indicatorPolicy: INDICATOR_POLICY,

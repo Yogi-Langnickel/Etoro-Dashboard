@@ -35,6 +35,9 @@ High-impact risks:
   display-only. They must not be framed as personalized financial advice or used
   by Money-maker-3000 without a separate simulation-signal contract, backtest,
   explainability, and review gate.
+- Provider fallback/readiness metadata may describe safe server-side credential
+  handling and required header names, but it must not contain credential values,
+  account identifiers, raw provider payloads, or live provider responses.
 - Validate all external API responses before use.
 - Redact sensitive fields in logs and errors.
 - Use least-privilege API scopes where eToro supports them.

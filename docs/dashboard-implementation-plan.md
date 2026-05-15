@@ -223,6 +223,9 @@ Run these before using real credentials:
   datasets where practical.
 - [x] Document free API/source options for eToro Dashboard and expose the
   Research Desk provider plan through `/api/etoro/research/status`.
+- [x] Add Research Desk provider fallback/readiness metadata and dashboard
+  rendering for safe defaults, disabled optional key-based providers, and
+  context-only output.
 - [ ] Add persona review after the first dashboard slice, incorporate appropriate feedback, run a second review, then complete checks before merging to `develop`.
 - [ ] Update `docs/agent-memory.md` after each implementation slice with decisions, changed files, provider assumptions, and checks run.
 - [ ] Keep trading execution routes and enabled mutation controls out of scope until a separate threat model, demo-mode proof, confirmation UX, and review gate are complete.

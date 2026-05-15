@@ -49,6 +49,11 @@ Public material currently describes API access for market data, portfolios, watc
 - Market/news context attached to positions is display-only. It must not be
   converted into eToro order parameters or strategy signals without a separate
   provider contract review and compliance/security gate.
+- Research Desk provider fallback/readiness metadata is allowed in
+  `/api/etoro/research/status` when it is metadata-only. It may describe
+  required request-id and auth-header categories, but browser responses must not
+  include provider auth header names, credential values, account identifiers,
+  live endpoint responses, raw provider payloads, or execution-capable routes.
 - Research-intelligence routes should prefer free official records before
   scraping: SEC companyfacts for US stock fundamentals, SEC insider transaction
   datasets/RSS for Forms 3/4/5, SEC N-PORT datasets and issuer factsheets for

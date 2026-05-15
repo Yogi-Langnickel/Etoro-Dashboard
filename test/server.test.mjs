@@ -327,6 +327,23 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.intelligence.freeApiOptions[0].id, "etoro-public-api");
   assert.equal(response.json.intelligence.freeApiOptions.some((source) => source.id === "alpha-vantage"), true);
   assert.equal(response.json.intelligence.freeApiOptions.some((source) => source.id === "twelve-data"), true);
+  assert.equal(response.json.intelligence.providerFallbackPolicy.mode, "metadata-only");
+  assert.deepEqual(response.json.intelligence.providerFallbackPolicy.enabledByDefault, [
+    "etoro-public-api",
+    "sec-companyfacts",
+    "sec-ownership-rss",
+  ]);
+  assert.equal(response.json.intelligence.providerFallbackPolicy.disabledUntilConfigured.includes("alpha-vantage"), true);
+  assert.equal(response.json.intelligence.providerFallbackPolicy.safety.includes("no-browser-keys"), true);
+  assert.equal(response.json.intelligence.providerFallbackPolicy.safety.includes("no-trade-or-bot-signal-output"), true);
+  assert.equal(response.json.intelligence.providerReadiness[0].id, "etoro-public-api");
+  assert.equal(response.json.intelligence.providerReadiness[0].credentialHandling, "server-side provider keys only");
+  assert.equal(response.json.intelligence.providerReadiness[0].requestMetadata.includes("provider-auth-headers-redacted"), true);
+  assert.equal(response.json.intelligence.providerReadiness.every((provider) => provider.liveNetworkConnected === false), true);
+  assert.equal(
+    response.json.intelligence.providerReadiness.find((provider) => provider.id === "alpha-vantage").defaultState,
+    "disabled-optional-key",
+  );
   assert.equal(response.json.intelligence.sourcePriority.some((source) => source.id === "sec-insider-transactions"), true);
   assert.equal(response.json.intelligence.scrapingPolicy.priority, "api-first-scraping-fallback");
   assert.equal(response.json.intelligence.scrapingPolicy.finviz.insiderTradingPage, "reference-only");
@@ -344,6 +361,8 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.safeguards.financialAdvice, "blocked");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes("x-api-key"), false);
+  assert.equal(response.text.includes("x-user-key"), false);
   assert.equal(response.text.includes('"accountId"'), false);
   assert.equal(response.text.includes("finviz.com"), false);
 });

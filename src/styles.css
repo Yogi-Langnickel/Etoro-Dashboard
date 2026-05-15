@@ -361,6 +361,7 @@ h2 {
   grid-template-areas:
     "status safeguards"
     "sources sources"
+    "providers providers"
     "financial insider"
     "watchlist news"
     "position-news position-news"
@@ -446,6 +447,10 @@ h2 {
 
 .research-sources-panel {
   grid-area: sources;
+}
+
+.research-providers-panel {
+  grid-area: providers;
 }
 
 .research-financial-panel {
@@ -950,6 +955,7 @@ td span {
       "status"
       "safeguards"
       "sources"
+      "providers"
       "financial"
       "insider"
       "watchlist"

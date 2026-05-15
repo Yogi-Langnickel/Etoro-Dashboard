@@ -58,3 +58,8 @@ approves broader behavior.
 - `researchIntelligenceStatus()` now exposes `freeApiOptions` so the internal
   Research Desk status route can display the provider plan without connecting
   new live providers.
+- `/api/etoro/research/status` also exposes provider fallback/readiness
+  metadata. It documents default providers, disabled optional key-based
+  enrichers, server-side credential handling, cache/rate-limit prerequisites,
+  and the rule that provider output remains context-only and cannot create bot
+  signals or order parameters.
