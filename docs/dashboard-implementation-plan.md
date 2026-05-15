@@ -216,6 +216,8 @@ Run these before using real credentials:
   display only; news cannot create signals or orders.
 - [x] Add synthetic Research Desk source-priority, financial-record indicator,
   and SEC insider-activity previews.
+- [x] Add explicit fixture/source watermarks across overview, Risk Radar, and
+  Research Desk surfaces.
 - [ ] Implement a SEC companyfacts adapter for US stock fundamentals.
 - [ ] Implement SEC Forms 3/4/5 insider activity ingestion before considering
   Finviz scraping.

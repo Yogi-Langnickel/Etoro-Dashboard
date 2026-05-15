@@ -229,6 +229,19 @@ function labelize(value) {
     .join(" ");
 }
 
+function renderFixtureWatermark(id, watermark) {
+  const element = document.getElementById(id);
+
+  if (!element || !watermark) {
+    return;
+  }
+
+  element.textContent = watermark.safeForPublicDemo ? watermark.label : "Source review needed";
+  element.title = watermark.detail ?? "";
+  element.classList.toggle("warn", !watermark.safeForPublicDemo);
+  element.classList.toggle("lock", Boolean(watermark.safeForPublicDemo));
+}
+
 function renderBotStatus(payload) {
   const telemetry = payload.telemetry ?? {};
   const safeguards = payload.safeguards ?? {};
@@ -554,6 +567,7 @@ function renderRiskStatus(payload) {
   const checks = payload.checks ?? [];
   const checkTarget = document.getElementById("risk-checks");
 
+  renderFixtureWatermark("risk-watermark-state", payload.fixtureWatermark);
   text("risk-source-state", labelize(risk.source));
   text("risk-freshness-state", labelize(risk.freshness));
   text("risk-exposure-state", risk.grossExposurePct === null ? "Unavailable" : `${risk.grossExposurePct}%`);
@@ -615,6 +629,7 @@ function renderResearchStatus(payload) {
   const fieldsTarget = document.getElementById("research-fields");
   const providerTarget = document.getElementById("research-provider-readiness");
 
+  renderFixtureWatermark("research-watermark-state", payload.fixtureWatermark);
   text("research-watchlists-state", labelize(sources.watchlists));
   text("research-instruments-state", labelize(sources.instruments));
   text("research-news-state", labelize(sources.marketNews));

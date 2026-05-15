@@ -81,6 +81,11 @@
           <strong id="stale-data">3 tiles</strong>
           <small class="warn-text">Provider timestamp missing</small>
         </article>
+        <article class="metric">
+          <span>Source watermark</span>
+          <strong>Fixture</strong>
+          <small class="warn-text">Synthetic overview values; no live account data</small>
+        </article>
       </section>
 
       <div class="workspace tab-view" data-tab-panel="overview-view">
@@ -614,6 +619,7 @@
               <p class="eyebrow">Risk posture</p>
               <h2 id="risk-status-title">Risk radar</h2>
             </div>
+            <span class="pill lock" id="risk-watermark-state">Synthetic fixture</span>
             <span class="pill lock" id="risk-mode-pill">Synthetic only</span>
           </div>
           <div class="risk-hero">
@@ -710,6 +716,7 @@
               <p class="eyebrow">Research posture</p>
               <h2 id="research-status-title">Research desk</h2>
             </div>
+            <span class="pill lock" id="research-watermark-state">Synthetic fixture</span>
             <span class="pill lock">Read only</span>
           </div>
           <div class="research-hero">

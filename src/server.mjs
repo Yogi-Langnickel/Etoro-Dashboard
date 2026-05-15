@@ -265,6 +265,19 @@ function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function syntheticFixtureWatermark(surface) {
+  return {
+    surface,
+    kind: "synthetic-fixture",
+    label: "Synthetic fixture",
+    detail: "No live provider response, account identifier, or raw payload is present.",
+    liveProviderConnected: false,
+    containsPrivateAccountData: false,
+    containsRawProviderPayloads: false,
+    safeForPublicDemo: true,
+  };
+}
+
 function readOnlyCacheKey(endpointName, config) {
   const credentialFingerprint = createHash("sha256")
     .update(config.apiKey ?? "")
@@ -635,6 +648,7 @@ function riskRadarStatus(config) {
     mutationRoutesEnabled: false,
     livePortfolioConnected: false,
     credentialStatus: publicCredentialStatus(config),
+    fixtureWatermark: syntheticFixtureWatermark("risk-radar"),
     portfolioRisk: {
       source: "synthetic-placeholder",
       freshness: "not-connected",
@@ -694,6 +708,7 @@ function researchDeskStatus(config) {
     readOnly: true,
     mutationRoutesEnabled: false,
     credentialStatus: publicCredentialStatus(config),
+    fixtureWatermark: syntheticFixtureWatermark("research-desk"),
     dataSources: {
       watchlists: "synthetic-placeholder",
       instruments: "synthetic-placeholder",

@@ -299,6 +299,12 @@ test("risk radar status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.demoOnly, true);
   assert.equal(response.json.mutationRoutesEnabled, false);
   assert.equal(response.json.livePortfolioConnected, false);
+  assert.equal(response.json.fixtureWatermark.kind, "synthetic-fixture");
+  assert.equal(response.json.fixtureWatermark.surface, "risk-radar");
+  assert.equal(response.json.fixtureWatermark.liveProviderConnected, false);
+  assert.equal(response.json.fixtureWatermark.containsPrivateAccountData, false);
+  assert.equal(response.json.fixtureWatermark.containsRawProviderPayloads, false);
+  assert.equal(response.json.fixtureWatermark.safeForPublicDemo, true);
   assert.equal(response.json.portfolioRisk.source, "synthetic-placeholder");
   assert.equal(response.json.safeguards.executionRoutes, "absent");
   assert.equal(response.json.safeguards.accountIdentifiers, "redacted");
@@ -316,6 +322,12 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.mode, "research-desk-planning");
   assert.equal(response.json.readOnly, true);
   assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.json.fixtureWatermark.kind, "synthetic-fixture");
+  assert.equal(response.json.fixtureWatermark.surface, "research-desk");
+  assert.equal(response.json.fixtureWatermark.liveProviderConnected, false);
+  assert.equal(response.json.fixtureWatermark.containsPrivateAccountData, false);
+  assert.equal(response.json.fixtureWatermark.containsRawProviderPayloads, false);
+  assert.equal(response.json.fixtureWatermark.safeForPublicDemo, true);
   assert.equal(response.json.dataSources.watchlists, "synthetic-placeholder");
   assert.equal(response.json.dataSources.marketNews, "api-first-planned");
   assert.equal(response.json.dataSources.financialRecords, "official-api-first-planned");

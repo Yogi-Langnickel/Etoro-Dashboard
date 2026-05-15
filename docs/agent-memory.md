@@ -1,7 +1,7 @@
 # Etoro Dashboard Agent Memory
 
 Status: active
-Last updated: 2026-05-15
+Last updated: 2026-05-16
 
 ## Current Truth
 
@@ -17,6 +17,7 @@ Last updated: 2026-05-15
 - The dashboard has a dedicated demo trading tab and non-executing preview behavior, but execution routes remain absent until a separate feature-flagged write flow is designed and reviewed. The preview/status surface hides provider endpoint paths from normal UI, exposes a permission/rate posture matrix, rejects sell-side and leverage-above-1 concepts, and bounds preview request bodies.
 - The dashboard has a Bot Monitor tab backed by `/api/etoro/bot/status`, `/api/etoro/bot/strategies`, `/api/etoro/bot/runs`, `/api/etoro/bot/audit`, `/api/etoro/bot/events`, `/api/etoro/bot/trade-log`, and `/api/etoro/bot/config`; it renders synthetic strategy cards, server-persisted simulation strategy/budget/market/instrument-class/cadence controls, hard budget stops, low-frequency/no-HFT posture, simulation ledger rows, event/audit feeds, and trade-log posture. Bot config is stored as a local server file outside the repo by default and does not enable execution or account mutation.
 - The dashboard has Risk Radar and Research Desk tabs backed by `/api/etoro/risk/status` and `/api/etoro/research/status`; both are synthetic/read-only, hide account identifiers/raw payloads, and expose no write routes. Research Desk now includes server-side market/news context, financial-record source priority, SEC insider transaction planning, portfolio-position context, and data-only buy/hold/sell indicators; research output cannot trigger trades.
+- Overview, Risk Radar, and Research Desk surfaces now show explicit fixture/source watermarks. Risk and Research status DTOs expose a `fixtureWatermark` object stating that synthetic payloads contain no live provider responses, private account data, or raw provider payloads.
 - Research Desk now exposes provider fallback/readiness metadata through `/api/etoro/research/status` and renders it in the dashboard. The metadata is synthetic and read-only: no live provider fetches, no credential values, no account identifiers, no raw payloads, and no trade or bot signal output.
 - Research intelligence should prefer free official APIs/datasets first: SEC companyfacts for US stock fundamentals, SEC Forms 3/4/5 insider transaction datasets/RSS for insiders, SEC N-PORT datasets and issuer factsheets for ETFs, and RSS/free APIs for news. Scrapling is fallback only after API/RSS options are checked. Use source allowlists, robots/terms review, caching, and no trade triggers; do not use anti-bot bypass/proxy/stealth modes for finance news without explicit terms/compliance approval.
 - Treat the app backend boundary as mandatory: all provider calls, credential handling, DTO normalization, caching/freshness metadata, rate-limit handling, and audit persistence belong server-side.
@@ -59,5 +60,5 @@ Last updated: 2026-05-15
 - Choose app stack later. The old Next.js-first recommendation is historical;
   the active implementation remains the dependency-free Node/static read-only
   spike until contracts and safety states are stable.
-- Next bot-monitoring work should keep execution and account mutation out of scope; a future worker/backtest slice still requires separate review. Next UI hardening should add broader fixture watermarks across overview/risk/research surfaces and then start the local simulation/backtest ledger.
+- Next bot-monitoring work should keep execution and account mutation out of scope; a future worker/backtest slice still requires separate review. Next UI hardening should start the local simulation/backtest ledger.
 - Confirm authentication model for dashboard users if it will be accessible beyond the local machine.
