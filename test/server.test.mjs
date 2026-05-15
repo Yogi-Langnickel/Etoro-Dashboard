@@ -295,6 +295,35 @@ test("bot config update persists validated server-side config and redacts storag
   assert.equal(readBack.text.includes("server-api-secret"), false);
 });
 
+test("bot config update failures do not expose local storage paths", async () => {
+  const handler = createRequestHandler({
+    loadConfig: configuredConfig,
+    saveBotConfig: async () => {
+      throw new Error("/Users/yogi/.config/etoro-dashboard/.bot-config.json.tmp fsync failed");
+    },
+  });
+  const mutationProtection = await readBotConfigMutationProtection(handler);
+  const response = await callHandler(handler, {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    headers: localBotConfigMutationHeaders(mutationProtection),
+    body: JSON.stringify({
+      strategyId: "threshold-rebalance",
+      budgetUsd: 1500,
+      allowedMarkets: ["US_EQUITIES"],
+      allowedInstrumentClasses: ["STOCK"],
+      cadence: "daily",
+    }),
+  });
+
+  assert.equal(response.status, 500);
+  assert.equal(response.json.error.code, "BOT_CONFIG_SAVE_FAILED");
+  assert.equal(response.json.error.message, "Unable to save bot config.");
+  assert.equal(response.text.includes("/Users/yogi"), false);
+  assert.equal(response.text.includes(".bot-config.json"), false);
+  assert.equal(response.text.includes("fsync failed"), false);
+});
+
 test("bot config saves through atomic temp file rename and fsync hooks", async () => {
   const tempDir = await mkdtemp(join(tmpdir(), "etoro-bot-config-atomic-"));
   const botConfigFile = join(tempDir, "bot-config.json");
@@ -1012,6 +1041,39 @@ test("read-only provider backoff errors never expose provider secrets or header 
     assert.equal(response.text.includes("server-user-secret"), false);
     assert.equal(response.text.includes("x-api-key"), false);
     assert.equal(response.text.includes("x-user-key"), false);
+  }
+});
+
+test("read-only provider non-backoff errors never expose provider secrets or header names", async () => {
+  let fetchCount = 0;
+  const handler = createRequestHandler({
+    loadConfig: configuredConfig,
+    providerCache: createReadOnlyProviderCache({ ttlMs: 60_000, failureBackoffMs: 2_000 }),
+    fetchEndpoint: async () => {
+      fetchCount += 1;
+      throw providerError("upstream 400 X-API-Key: server-api-secret X-User-Key=server-user-secret", {
+        code: "ETORO_PROVIDER_ERROR",
+        status: 400,
+        requestId: `secret-client-failure-${fetchCount}`,
+      });
+    },
+  });
+
+  const first = await callHandler(handler, { url: "/api/etoro/identity" });
+  const second = await callHandler(handler, { url: "/api/etoro/identity" });
+
+  assert.equal(first.status, 400);
+  assert.equal(second.status, 400);
+  assert.equal(fetchCount, 2);
+  assert.equal(first.json.error.message, "eToro provider request failed.");
+  assert.equal(second.json.error.message, "eToro provider request failed.");
+  assert.equal(first.json.cache, undefined);
+  assert.equal(second.json.cache, undefined);
+  for (const response of [first, second]) {
+    assert.equal(response.text.includes("server-api-secret"), false);
+    assert.equal(response.text.includes("server-user-secret"), false);
+    assert.equal(response.text.includes("X-API-Key"), false);
+    assert.equal(response.text.includes("X-User-Key"), false);
   }
 });
 

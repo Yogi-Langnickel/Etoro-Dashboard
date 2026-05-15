@@ -25,7 +25,8 @@ High-impact risks:
 - Credentialed provider clients must pin allowed hosts before sending API keys or user keys.
 - Read-only provider clients must use short server-side backoff metadata for
   429, timeout, and 5xx failures so local refresh loops do not storm provider
-  rate limits or unstable upstreams.
+  rate limits or unstable upstreams. Browser-facing provider errors must use
+  fixed public messages for both cached and non-cached failures.
 - Trading feature flags default to false: `ENABLE_TRADING_ACTIONS=false`, `ENABLE_LIVE_ORDERS=false`.
 - Bot config persistence remains simulation-only. Strategy, budget, market,
   instrument-class, and cadence controls may be stored server-side, but PUT
@@ -34,8 +35,9 @@ High-impact risks:
   writes must use serialized atomic temp-file rename with fsync where
   practical, and must mirror the Money-maker canonical contract at
   `Money-maker-3000/src/simulation-contract.mjs`; the local snapshot fixture is
-  the drift check for this repo. Bot config does not enable provider calls,
-  order previews, demo execution, or live execution.
+  the drift check for this repo. Unexpected save failures must not expose local
+  config or temp-file paths to browser responses. Bot config does not enable
+  provider calls, order previews, demo execution, or live execution.
 - Any hosted bot-control API still requires authentication, CSRF/origin policy,
   durable audit, and review gate before real controls are exposed.
 - Bot market/news context is display-only; it cannot trigger strategy decisions,

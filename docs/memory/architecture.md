@@ -21,7 +21,8 @@ Current architecture:
   calls from duplicate tab refreshes.
 - Read-only provider 429, timeout, and 5xx failures use short server-side
   negative-cache/backoff metadata so repeated refreshes do not storm the
-  provider.
+  provider. Browser-facing provider errors are fixed public messages and must
+  not echo raw provider text, credential header names, or credential values.
 - Bot config persistence is local simulation-only state and uses serialized
   atomic temp-file rename with fsync where practical.
 - Research, risk, and bot-monitoring surfaces are synthetic/read-only unless a

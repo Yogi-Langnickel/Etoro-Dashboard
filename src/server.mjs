@@ -465,6 +465,15 @@ function providerErrorWithCacheMetadata(serializedError, cacheState, entry) {
   return error;
 }
 
+function publicProviderError(error, config) {
+  const serializedError = serializeProviderError(error, config);
+  const publicError = new Error(serializedError.message);
+  publicError.code = serializedError.code;
+  publicError.status = serializedError.status;
+  publicError.requestId = serializedError.requestId;
+  return publicError;
+}
+
 function resolveCacheTtlMs(ttlMs, config) {
   return typeof ttlMs === "function" ? ttlMs(config) : ttlMs;
 }
@@ -517,7 +526,7 @@ export function createReadOnlyProviderCache({
         .catch((error) => {
           if (!providerFailureBackoffEligible(error) || resolvedFailureBackoffMs <= 0) {
             entries.delete(key);
-            throw error;
+            throw publicProviderError(error, config);
           }
 
           const backoffStartedAt = Date.now();
@@ -1251,7 +1260,7 @@ async function handleBotConfigUpdate(request, response, options) {
       executionBlocked: true,
       error: {
         code: validationError ? (error.code ?? "BOT_CONFIG_INVALID") : "BOT_CONFIG_SAVE_FAILED",
-        message: error?.message ?? "Unable to save bot config",
+        message: validationError ? (error?.message ?? "Invalid bot config") : "Unable to save bot config.",
         fields: validationError ? error.errors : undefined,
       },
     });
