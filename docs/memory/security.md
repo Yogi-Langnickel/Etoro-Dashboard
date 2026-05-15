@@ -1,7 +1,7 @@
 # Security Notes
 
 Status: active
-Last updated: 2026-05-15
+Last updated: 2026-05-16
 
 ## Threat Model
 
@@ -23,12 +23,16 @@ High-impact risks:
 - `.env.local` or deployment secret store for credentials; `.env*` ignored except `.env.example`.
 - Local eToro demo credentials may also be stored outside the repo at `${HOME}/.config/etoro/credentials.json` with user-only permissions.
 - Credentialed provider clients must pin allowed hosts before sending API keys or user keys.
+- Read-only provider clients must use short server-side backoff metadata for
+  429, timeout, and 5xx failures so local refresh loops do not storm provider
+  rate limits or unstable upstreams.
 - Trading feature flags default to false: `ENABLE_TRADING_ACTIONS=false`, `ENABLE_LIVE_ORDERS=false`.
 - Bot config persistence remains simulation-only. Strategy, budget, market,
   instrument-class, and cadence controls may be stored server-side, but PUT
   updates require local JSON requests, local Host/Origin headers, and the
   mutation-protection token surfaced by the GET config payload. Saved config
-  must mirror the Money-maker canonical contract at
+  writes must use serialized atomic temp-file rename with fsync where
+  practical, and must mirror the Money-maker canonical contract at
   `Money-maker-3000/src/simulation-contract.mjs`; the local snapshot fixture is
   the drift check for this repo. Bot config does not enable provider calls,
   order previews, demo execution, or live execution.

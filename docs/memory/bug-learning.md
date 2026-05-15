@@ -1,7 +1,7 @@
 # Bug Learning Notes
 
 Status: active
-Last updated: 2026-05-10
+Last updated: 2026-05-16
 
 ## Purpose
 
@@ -54,6 +54,15 @@ Add a short dated entry when the lesson qualifies. Keep entries factual and reus
 Do not include secrets, private account identifiers, private portfolio data, screenshots with balances, or raw third-party payloads.
 
 ## Current Lessons
+
+### 2026-05-16: Refresh Loops Need Provider Backoff And Atomic Local State
+
+- Symptom: Pre-merge review found repeated dashboard refreshes could retry every read-only provider 429, timeout, or 5xx failure immediately, and concurrent bot config PUTs used direct file writes.
+- Root cause: The first cache only stored successful reads and the local simulation config store did not treat file replacement as a reliability-sensitive mutation.
+- Prevention: Cache short redacted backoff metadata for transient provider failures, leave non-transient 4xx responses uncached, and write local config through serialized temp-file rename with fsync where practical.
+- Transferability: family/cross-repo.
+- Suggested propagation targets: Workspace memory for external-provider dashboards and local state persistence patterns.
+- Links: `src/server.mjs`, `src/bot-config-store.mjs`, `test/server.test.mjs`.
 
 ### 2026-05-10: Credentialed Provider Clients Need Host-Pinning And Strict Contracts
 

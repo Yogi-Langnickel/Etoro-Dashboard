@@ -43,6 +43,7 @@ const BOT_CONFIG_ROUTE = "/api/etoro/bot/config";
 const BOT_CONFIG_CSRF_HEADER = "x-etoro-dashboard-csrf";
 const botConfigCsrfToken = randomBytes(32).toString("base64url");
 const MAX_API_BODY_BYTES = 16 * 1024;
+export const DEFAULT_PROVIDER_FAILURE_BACKOFF_MS = 5_000;
 
 const PLANNED_DEMO_TRADING_ENDPOINTS = Object.freeze({
   marketOpenByAmount: Object.freeze({
@@ -271,6 +272,41 @@ function safeErrorPayload(error) {
   };
 }
 
+function redactErrorMessage(message, config = {}) {
+  let redacted = String(message ?? "");
+  const replacements = [
+    config.apiKey,
+    config.userKey,
+    "x-api-key",
+    "x-user-key",
+    "authorization",
+    "api-key",
+    "user-key",
+  ].filter(Boolean);
+
+  for (const value of replacements) {
+    redacted = redacted.replaceAll(String(value), "[redacted]");
+  }
+
+  return redacted;
+}
+
+function publicProviderErrorMessage(error) {
+  if (error?.code === "ETORO_TIMEOUT") {
+    return "eToro provider request timed out.";
+  }
+
+  if (error?.status === 429) {
+    return "eToro provider rate limit is temporarily backing off.";
+  }
+
+  if (error?.status >= 500) {
+    return "eToro provider is temporarily unavailable.";
+  }
+
+  return "eToro provider request failed.";
+}
+
 function assertSafeStaticPath(pathname) {
   let decoded = "/";
 
@@ -349,6 +385,7 @@ function credentialsMissingResponse(config) {
 function readOnlyCachePolicy(config) {
   return {
     readOnlyTtlMs: config.readCacheTtlMs ?? DEFAULT_READ_CACHE_TTL_MS,
+    failureBackoffMs: DEFAULT_PROVIDER_FAILURE_BACKOFF_MS,
     requestCoalescing: true,
     storage: "server-memory",
   };
@@ -399,11 +436,43 @@ function withCacheMetadata(result, cacheState, entry) {
   };
 }
 
+function providerFailureBackoffEligible(error) {
+  return error?.code === "ETORO_TIMEOUT" || error?.status === 429 || error?.status >= 500;
+}
+
+function serializeProviderError(error, config) {
+  return {
+    code: error?.code ?? "ETORO_PROVIDER_UNAVAILABLE",
+    message: publicProviderErrorMessage(error),
+    redactedDetail: redactErrorMessage(error?.message, config),
+    status: error?.status ?? undefined,
+    requestId: error?.requestId ?? undefined,
+  };
+}
+
+function providerErrorWithCacheMetadata(serializedError, cacheState, entry) {
+  const error = new Error(serializedError.message);
+  error.code = serializedError.code;
+  error.status = serializedError.status;
+  error.requestId = serializedError.requestId;
+  error.cache = {
+    state: cacheState,
+    cachedAt: entry.cachedAt,
+    expiresAt: entry.expiresAt,
+    ttlMs: entry.ttlMs,
+    reason: serializedError.code,
+  };
+  return error;
+}
+
 function resolveCacheTtlMs(ttlMs, config) {
   return typeof ttlMs === "function" ? ttlMs(config) : ttlMs;
 }
 
-export function createReadOnlyProviderCache({ ttlMs = DEFAULT_READ_CACHE_TTL_MS } = {}) {
+export function createReadOnlyProviderCache({
+  ttlMs = DEFAULT_READ_CACHE_TTL_MS,
+  failureBackoffMs = DEFAULT_PROVIDER_FAILURE_BACKOFF_MS,
+} = {}) {
   const entries = new Map();
 
   return {
@@ -411,10 +480,15 @@ export function createReadOnlyProviderCache({ ttlMs = DEFAULT_READ_CACHE_TTL_MS 
       const key = readOnlyCacheKey(endpointName, config);
       const now = Date.now();
       const resolvedTtlMs = resolveCacheTtlMs(ttlMs, config);
+      const resolvedFailureBackoffMs = resolveCacheTtlMs(failureBackoffMs, config);
       const existing = entries.get(key);
 
       if (existing?.value && existing.expiresAtMs > now) {
         return withCacheMetadata(existing.value, "hit", existing);
+      }
+
+      if (existing?.error && existing.expiresAtMs > now) {
+        throw providerErrorWithCacheMetadata(existing.error, "backoff", existing);
       }
 
       if (existing?.inflight) {
@@ -441,8 +515,20 @@ export function createReadOnlyProviderCache({ ttlMs = DEFAULT_READ_CACHE_TTL_MS 
           return entry.value;
         })
         .catch((error) => {
-          entries.delete(key);
-          throw error;
+          if (!providerFailureBackoffEligible(error) || resolvedFailureBackoffMs <= 0) {
+            entries.delete(key);
+            throw error;
+          }
+
+          const backoffStartedAt = Date.now();
+          entry.error = serializeProviderError(error, config);
+          entry.cachedAt = new Date(backoffStartedAt).toISOString();
+          entry.expiresAtMs = backoffStartedAt + resolvedFailureBackoffMs;
+          entry.expiresAt = new Date(entry.expiresAtMs).toISOString();
+          entry.ttlMs = resolvedFailureBackoffMs;
+          delete entry.inflight;
+          entries.set(key, entry);
+          throw providerErrorWithCacheMetadata(entry.error, "error", entry);
         });
 
       entries.set(key, entry);
@@ -1308,6 +1394,7 @@ async function handleApiRoute(pathname, response, options) {
       ok: false,
       mode: "read-only",
       error: safeErrorPayload(error),
+      cache: error?.cache,
     });
   }
 }

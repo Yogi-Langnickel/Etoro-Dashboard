@@ -4,7 +4,7 @@ Security-first dashboard for viewing and interacting with eToro API data.
 
 ## Status
 
-First local integration slice is in progress. The dashboard can run through a local Node server that keeps eToro credentials server-side, exposes normalized demo/account summaries to the browser, includes a gated demo trading tab with no execution routes yet, caches read-only provider responses briefly, and lazy-loads inactive tab status data to avoid duplicate refresh calls.
+First local integration slice is in progress. The dashboard can run through a local Node server that keeps eToro credentials server-side, exposes normalized demo/account summaries to the browser, includes a gated demo trading tab with no execution routes yet, caches read-only provider responses briefly, applies short backoff metadata for 429, timeout, and 5xx provider failures, and lazy-loads inactive tab status data to avoid duplicate refresh calls.
 
 ## Local Demo Credentials
 
@@ -36,9 +36,9 @@ Then open `http://localhost:4173`. The app also accepts `ETORO_CREDENTIALS_FILE`
 
 Set `ENABLE_DEMO_TRADE_PREVIEW=true` only when you want the local server to validate and preview demo tickets. Preview responses are redacted and still do not place orders.
 
-Set `ETORO_READ_CACHE_TTL_MS` if local read-only provider calls need a different short cache window. The default is `15000` milliseconds.
+Set `ETORO_READ_CACHE_TTL_MS` if local read-only provider calls need a different short success-cache window. The default is `15000` milliseconds. Provider 429, timeout, and 5xx failures are negative-cached for a short server-memory backoff so repeated local refreshes do not storm the provider.
 
-Simulation bot controls are stored server-side at `${HOME}/.config/etoro-dashboard/bot-config.json` by default. The saved config contains only predefined strategy, budget, market-group, instrument-class, and low-frequency cadence choices; it does not contain credentials or enable trading. Config updates are local-dashboard only: the server requires JSON, local Host/Origin headers, and the mutation-protection token returned by `GET /api/etoro/bot/config`. Strategy, market-group, instrument-class, and cadence combinations mirror the Money-maker contract at `Money-maker-3000/src/simulation-contract.mjs`; the repo-local snapshot in `test/fixtures/money-maker-simulation-contract.snapshot.json` makes intentional mirror updates explicit.
+Simulation bot controls are stored server-side at `${HOME}/.config/etoro-dashboard/bot-config.json` by default. The saved config contains only predefined strategy, budget, market-group, instrument-class, and low-frequency cadence choices; it does not contain credentials or enable trading. Config updates are local-dashboard only: the server requires JSON, local Host/Origin headers, and the mutation-protection token returned by `GET /api/etoro/bot/config`. Writes use a serialized temp-file-and-rename path with fsync where the local filesystem supports it. Strategy, market-group, instrument-class, and cadence combinations mirror the Money-maker contract at `Money-maker-3000/src/simulation-contract.mjs`; the repo-local snapshot in `test/fixtures/money-maker-simulation-contract.snapshot.json` makes intentional mirror updates explicit.
 
 ## Goals
 

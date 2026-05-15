@@ -1,26 +1,42 @@
 # Architecture Notes
 
 Status: active
-Last updated: 2026-05-10
+Last updated: 2026-05-16
 
-## Initial Direction
+## Current Direction
 
-Recommended architecture:
+The active implementation is a dependency-free Node/static read-only dashboard
+spike until contracts, safety states, authentication, and hosting needs justify
+a framework migration.
 
-- TypeScript web application with server-side routes for eToro API calls.
+Current architecture:
+
+- Dependency-free Node/static application with server-side routes for eToro API calls.
 - UI consumes typed internal DTOs, not raw eToro responses.
 - eToro client is isolated behind a server-only module.
 - All API responses are validated and normalized before rendering.
 - Mutation-capable API calls are separated from read-only calls and feature-gated.
 - Local static servers expose only explicit public assets; backend modules and source files are not static content.
+- Server-side read cache/coalescing and freshness metadata protect provider
+  calls from duplicate tab refreshes.
+- Read-only provider 429, timeout, and 5xx failures use short server-side
+  negative-cache/backoff metadata so repeated refreshes do not storm the
+  provider.
+- Bot config persistence is local simulation-only state and uses serialized
+  atomic temp-file rename with fsync where practical.
+- Research, risk, and bot-monitoring surfaces are synthetic/read-only unless a
+  separate review gate approves broader behavior.
 
-## Suggested First Milestones
+## Milestones
 
-1. Select stack and scaffold app.
-1. Add server-only eToro client shell with credential loading and redacted errors.
-1. Add read-only health/check endpoint.
-1. Add watchlist and instrument lookup views.
-1. Add portfolio snapshot view.
-1. Add market data charts.
-1. Add audit logs and export controls.
-1. Only then evaluate trading actions.
+1. Keep read-only eToro route/client hardening, validation, redaction,
+   cache/coalescing, and provider-failure backoff in place.
+1. Expand fixture watermarks and status explanations across overview, risk,
+   research, and bot-monitoring surfaces.
+1. Add SEC companyfacts and ownership metadata as server-side context-only
+   adapters after source terms and rate limits are documented.
+1. Add durable local audit/backtest storage for simulation outputs before any
+   provider-backed execution preview.
+1. Only then evaluate demo trading preview; execution routes remain absent until
+   feature flag, confirmation UX, order audit, and result-polling contracts are
+   reviewed.

@@ -1,7 +1,7 @@
 # eToro API Notes
 
 Status: active
-Last updated: 2026-05-15
+Last updated: 2026-05-16
 
 ## Current Source Of Truth
 
@@ -33,6 +33,9 @@ Public material currently describes API access for market data, portfolios, watc
 - Treat OpenAPI/spec changes as contract changes and update tests.
 - Prefer read-only endpoints first.
 - Respect rate limits and request-id requirements when documented.
+- Read-only 429, timeout, and 5xx provider failures should create a short
+  server-side negative-cache/backoff entry with redacted metadata so repeated
+  local refreshes do not multiply upstream requests.
 - Treat demo and real keys as separate credentials. Use demo/read permissions for the first integration slice.
 - Keep all local integration endpoints read-only until mutation flows have a separate threat model, feature flag, audit path, and review gate.
 - When provider payloads omit display-ready balance fields, derive user-facing financial KPIs only from documented formulas and cover those formulas with regression tests.
@@ -47,7 +50,8 @@ Public material currently describes API access for market data, portfolios, watc
   It is not an eToro provider route and must not store credentials, account
   identifiers, instrument IDs, position IDs, order IDs, or raw provider payloads.
   PUT updates require application/json, a local dashboard Host/Origin, and the
-  CSRF-style mutation header/token returned by GET. Validation mirrors the
+  CSRF-style mutation header/token returned by GET. Writes use serialized
+  atomic temp-file rename with fsync where practical. Validation mirrors the
   Money-maker contract at `Money-maker-3000/src/simulation-contract.mjs`, and
   the local snapshot fixture must be updated with any intentional contract
   change. Strategy-incompatible market-group/instrument-class/cadence

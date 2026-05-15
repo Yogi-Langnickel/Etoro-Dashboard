@@ -12,8 +12,10 @@ import {
   BOT_MARKET_INSTRUMENT_CLASS_RULES,
   BOT_STRATEGY_CONFIG_RULES,
   MIN_BOT_EVALUATION_INTERVAL_MINUTES,
+  saveBotConfig,
 } from "../src/bot-config-store.mjs";
 import {
+  DEFAULT_PROVIDER_FAILURE_BACKOFF_MS,
   INTERNAL_API_ROUTES,
   createReadOnlyProviderCache,
   createRequestHandler,
@@ -78,6 +80,12 @@ function configuredHandler() {
   return createRequestHandler({
     loadConfig: configuredConfig,
   });
+}
+
+function providerError(message, options = {}) {
+  const error = new Error(message);
+  Object.assign(error, options);
+  return error;
 }
 
 test("server exposes only internal API routes and no execution routes", () => {
@@ -285,6 +293,148 @@ test("bot config update persists validated server-side config and redacts storag
   assert.equal(readBack.json.config.strategyId, "threshold-rebalance");
   assert.equal(readBack.text.includes(botConfigFile), false);
   assert.equal(readBack.text.includes("server-api-secret"), false);
+});
+
+test("bot config saves through atomic temp file rename and fsync hooks", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "etoro-bot-config-atomic-"));
+  const botConfigFile = join(tempDir, "bot-config.json");
+  const operations = [];
+  let tempFile = null;
+
+  const saved = await saveBotConfig(
+    {
+      strategyId: "dca-cash-reserve",
+      budgetUsd: 1000,
+      allowedMarkets: ["US_EQUITIES"],
+      allowedInstrumentClasses: ["ETF"],
+      cadence: "daily",
+    },
+    {
+      configFile: botConfigFile,
+      mkdirImpl: async (path, options) => {
+        operations.push(["mkdir", path, options.mode]);
+      },
+      writeFileImpl: async (path, contents, options) => {
+        tempFile = path;
+        operations.push(["write", path, options.mode, contents.includes('"strategyId"')]);
+      },
+      openImpl: async (path) => {
+        operations.push(["open", path]);
+        return {
+          sync: async () => operations.push(["sync", path]),
+          close: async () => operations.push(["close", path]),
+        };
+      },
+      renameImpl: async (from, to) => {
+        operations.push(["rename", from, to]);
+      },
+      rmImpl: async (path) => {
+        operations.push(["rm", path]);
+      },
+      now: () => new Date("2026-05-16T00:00:00.000Z"),
+    },
+  );
+
+  assert.equal(saved.persisted, true);
+  assert.equal(operations[0][0], "mkdir");
+  assert.equal(operations[1][0], "write");
+  assert.notEqual(tempFile, botConfigFile);
+  assert.equal(operations.some((operation) => operation[0] === "rename" && operation[2] === botConfigFile), true);
+  assert.equal(operations.filter((operation) => operation[0] === "sync").length, 2);
+  assert.equal(operations.some((operation) => operation[0] === "rm"), false);
+});
+
+test("bot config rejects temp-file fsync failures and removes the temp file", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "etoro-bot-config-fsync-fail-"));
+  const botConfigFile = join(tempDir, "bot-config.json");
+  const operations = [];
+  let tempFile = null;
+
+  await assert.rejects(
+    saveBotConfig(
+      {
+        strategyId: "dca-cash-reserve",
+        budgetUsd: 1000,
+        allowedMarkets: ["US_EQUITIES"],
+        allowedInstrumentClasses: ["ETF"],
+        cadence: "daily",
+      },
+      {
+        configFile: botConfigFile,
+        mkdirImpl: async () => {},
+        writeFileImpl: async (path) => {
+          tempFile = path;
+          operations.push(["write", path]);
+        },
+        openImpl: async (path) => ({
+          sync: async () => {
+            operations.push(["sync", path]);
+            throw Object.assign(new Error("fsync failed"), { code: "EIO" });
+          },
+          close: async () => operations.push(["close", path]),
+        }),
+        renameImpl: async () => operations.push(["rename"]),
+        rmImpl: async (path, options) => operations.push(["rm", path, options.force]),
+      },
+    ),
+    /fsync failed/,
+  );
+
+  assert.notEqual(tempFile, null);
+  assert.equal(operations.some((operation) => operation[0] === "rename"), false);
+  assert.equal(operations.some((operation) => operation[0] === "rm" && operation[1] === tempFile && operation[2] === true), true);
+});
+
+test("bot config saves are serialized per config file", async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), "etoro-bot-config-serialized-"));
+  const botConfigFile = join(tempDir, "bot-config.json");
+  let activeRenames = 0;
+  let maxActiveRenames = 0;
+  let renameCount = 0;
+
+  const options = {
+    configFile: botConfigFile,
+    mkdirImpl: async () => {},
+    writeFileImpl: async () => {},
+    openImpl: async () => ({
+      sync: async () => {},
+      close: async () => {},
+    }),
+    renameImpl: async () => {
+      activeRenames += 1;
+      maxActiveRenames = Math.max(maxActiveRenames, activeRenames);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      renameCount += 1;
+      activeRenames -= 1;
+    },
+    rmImpl: async () => {},
+  };
+
+  await Promise.all([
+    saveBotConfig(
+      {
+        strategyId: "dca-cash-reserve",
+        budgetUsd: 1000,
+        allowedMarkets: ["US_EQUITIES"],
+        allowedInstrumentClasses: ["ETF"],
+        cadence: "daily",
+      },
+      options,
+    ),
+    saveBotConfig(
+      {
+        strategyId: "threshold-rebalance",
+        budgetUsd: 1500,
+        allowedMarkets: ["COMMODITIES"],
+        allowedInstrumentClasses: ["COMMODITY"],
+        cadence: "weekly",
+      },
+      options,
+    ),
+  ]);
+
+  assert.equal(renameCount, 2);
+  assert.equal(maxActiveRenames, 1);
 });
 
 test("bot config update rejects missing token, cross-origin, and bad content type", async () => {
@@ -734,6 +884,7 @@ test("status route never returns configured secret values", async () => {
 
   assert.equal(response.status, 200);
   assert.equal(response.json.cachePolicy.readOnlyTtlMs, 15_000);
+  assert.equal(response.json.cachePolicy.failureBackoffMs, DEFAULT_PROVIDER_FAILURE_BACKOFF_MS);
   assert.equal(response.json.cachePolicy.requestCoalescing, true);
   assert.equal(response.json.cachePolicy.storage, "server-memory");
   assert.equal(response.text.includes("server-api-secret"), false);
@@ -801,6 +952,138 @@ test("read-only provider responses are cached without exposing secrets", async (
   assert.equal(second.json.cache.state, "hit");
   assert.equal(second.text.includes("server-api-secret"), false);
   assert.equal(second.text.includes("server-user-secret"), false);
+});
+
+test("read-only provider rate-limit failures use short backoff without exposing secrets", async () => {
+  let fetchCount = 0;
+  const handler = createRequestHandler({
+    loadConfig: configuredConfig,
+    providerCache: createReadOnlyProviderCache({ ttlMs: 60_000, failureBackoffMs: 2_000 }),
+    fetchEndpoint: async () => {
+      fetchCount += 1;
+      throw providerError("eToro request failed with HTTP 429", {
+        code: "ETORO_PROVIDER_ERROR",
+        status: 429,
+        requestId: `request-${fetchCount}`,
+      });
+    },
+  });
+
+  const first = await callHandler(handler, { url: "/api/etoro/identity" });
+  const second = await callHandler(handler, { url: "/api/etoro/identity" });
+
+  assert.equal(first.status, 429);
+  assert.equal(second.status, 429);
+  assert.equal(fetchCount, 1);
+  assert.equal(first.json.cache.state, "error");
+  assert.equal(second.json.cache.state, "backoff");
+  assert.equal(second.json.cache.ttlMs, 2_000);
+  assert.equal(second.text.includes("server-api-secret"), false);
+  assert.equal(second.text.includes("server-user-secret"), false);
+});
+
+test("read-only provider backoff errors never expose provider secrets or header names", async () => {
+  let fetchCount = 0;
+  const handler = createRequestHandler({
+    loadConfig: configuredConfig,
+    providerCache: createReadOnlyProviderCache({ ttlMs: 60_000, failureBackoffMs: 2_000 }),
+    fetchEndpoint: async () => {
+      fetchCount += 1;
+      throw providerError("upstream 503 x-api-key: server-api-secret x-user-key=server-user-secret", {
+        code: "ETORO_PROVIDER_ERROR",
+        status: 503,
+        requestId: `secret-failure-${fetchCount}`,
+      });
+    },
+  });
+
+  const first = await callHandler(handler, { url: "/api/etoro/identity" });
+  const second = await callHandler(handler, { url: "/api/etoro/identity" });
+
+  assert.equal(first.status, 503);
+  assert.equal(second.status, 503);
+  assert.equal(fetchCount, 1);
+  assert.equal(first.json.error.message, "eToro provider is temporarily unavailable.");
+  assert.equal(second.json.error.message, "eToro provider is temporarily unavailable.");
+  assert.equal(first.json.error.code, "ETORO_PROVIDER_ERROR");
+  assert.equal(second.json.cache.state, "backoff");
+  for (const response of [first, second]) {
+    assert.equal(response.text.includes("server-api-secret"), false);
+    assert.equal(response.text.includes("server-user-secret"), false);
+    assert.equal(response.text.includes("x-api-key"), false);
+    assert.equal(response.text.includes("x-user-key"), false);
+  }
+});
+
+test("read-only provider timeout and 5xx failures are backoff cached, but 4xx failures retry", async () => {
+  const config = await configuredConfig();
+  const timeoutCache = createReadOnlyProviderCache({ ttlMs: 60_000, failureBackoffMs: 1_000 });
+  let timeoutFetchCount = 0;
+
+  await assert.rejects(
+    timeoutCache.fetch("identity", config, async () => {
+      timeoutFetchCount += 1;
+      throw providerError("eToro request timed out", {
+        code: "ETORO_TIMEOUT",
+        requestId: `timeout-${timeoutFetchCount}`,
+      });
+    }),
+    (error) => error.code === "ETORO_TIMEOUT" && error.cache?.state === "error",
+  );
+  await assert.rejects(
+    timeoutCache.fetch("identity", config, async () => {
+      timeoutFetchCount += 1;
+      throw providerError("unexpected second timeout fetch", { code: "ETORO_TIMEOUT" });
+    }),
+    (error) => error.code === "ETORO_TIMEOUT" && error.cache?.state === "backoff",
+  );
+
+  const serverErrorCache = createReadOnlyProviderCache({ ttlMs: 60_000, failureBackoffMs: 1_000 });
+  let serverErrorFetchCount = 0;
+  await assert.rejects(
+    serverErrorCache.fetch("demoPnl", config, async () => {
+      serverErrorFetchCount += 1;
+      throw providerError("eToro request failed with HTTP 503", {
+        code: "ETORO_PROVIDER_ERROR",
+        status: 503,
+      });
+    }),
+    (error) => error.status === 503 && error.cache?.state === "error",
+  );
+  await assert.rejects(
+    serverErrorCache.fetch("demoPnl", config, async () => {
+      serverErrorFetchCount += 1;
+      throw providerError("unexpected second 5xx fetch", { code: "ETORO_PROVIDER_ERROR", status: 503 });
+    }),
+    (error) => error.status === 503 && error.cache?.state === "backoff",
+  );
+
+  const clientErrorCache = createReadOnlyProviderCache({ ttlMs: 60_000, failureBackoffMs: 1_000 });
+  let clientErrorFetchCount = 0;
+  await assert.rejects(
+    clientErrorCache.fetch("identity", config, async () => {
+      clientErrorFetchCount += 1;
+      throw providerError("eToro request failed with HTTP 400", {
+        code: "ETORO_PROVIDER_ERROR",
+        status: 400,
+      });
+    }),
+    (error) => error.status === 400 && !error.cache,
+  );
+  await assert.rejects(
+    clientErrorCache.fetch("identity", config, async () => {
+      clientErrorFetchCount += 1;
+      throw providerError("eToro request failed with HTTP 400", {
+        code: "ETORO_PROVIDER_ERROR",
+        status: 400,
+      });
+    }),
+    (error) => error.status === 400 && !error.cache,
+  );
+
+  assert.equal(timeoutFetchCount, 1);
+  assert.equal(serverErrorFetchCount, 1);
+  assert.equal(clientErrorFetchCount, 2);
 });
 
 test("concurrent read-only provider requests are coalesced", async () => {

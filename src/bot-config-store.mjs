@@ -1,6 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 export const DEFAULT_BOT_CONFIG_FILE = join(homedir(), ".config", "etoro-dashboard", "bot-config.json");
 export const BOT_CONFIG_MIRROR_SOURCE = "Money-maker-3000/src/simulation-contract.mjs";
@@ -66,6 +67,82 @@ export class BotConfigValidationError extends Error {
     this.code = "BOT_CONFIG_INVALID";
     this.errors = errors;
   }
+}
+
+const botConfigWriteQueues = new Map();
+
+function tempConfigFilePath(configFile) {
+  return join(dirname(configFile), `.${basename(configFile)}.${process.pid}.${randomUUID()}.tmp`);
+}
+
+async function fsyncFile(filePath, openImpl) {
+  const handle = await openImpl(filePath, "r");
+
+  try {
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+}
+
+function isUnsupportedDirectorySyncError(error) {
+  return ["EISDIR", "EINVAL", "ENOTSUP", "ENOTDIR", "EPERM"].includes(error?.code);
+}
+
+async function fsyncDirectory(directoryPath, openImpl) {
+  let handle = null;
+
+  try {
+    handle = await openImpl(directoryPath, "r");
+    await handle.sync();
+  } catch (error) {
+    if (!isUnsupportedDirectorySyncError(error)) {
+      throw error;
+    }
+  } finally {
+    await handle?.close();
+  }
+}
+
+async function writeFileAtomic(
+  configFile,
+  contents,
+  {
+    writeFileImpl = writeFile,
+    renameImpl = rename,
+    rmImpl = rm,
+    openImpl = open,
+  } = {},
+) {
+  const tempFile = tempConfigFilePath(configFile);
+
+  try {
+    await writeFileImpl(tempFile, contents, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    await fsyncFile(tempFile, openImpl);
+    await renameImpl(tempFile, configFile);
+    await fsyncDirectory(dirname(configFile), openImpl);
+  } catch (error) {
+    await rmImpl(tempFile, { force: true }).catch(() => {});
+    throw error;
+  }
+}
+
+async function serializeConfigWrite(configFile, operation) {
+  const previous = botConfigWriteQueues.get(configFile) ?? Promise.resolve();
+  const current = previous.then(operation);
+  const cleanup = current
+    .catch(() => {})
+    .then(() => {
+      if (botConfigWriteQueues.get(configFile) === cleanup) {
+        botConfigWriteQueues.delete(configFile);
+      }
+    });
+
+  botConfigWriteQueues.set(configFile, cleanup);
+  return current;
 }
 
 function normalizeStringArray(value, fieldName) {
@@ -243,6 +320,9 @@ export async function saveBotConfig(
   {
     configFile = DEFAULT_BOT_CONFIG_FILE,
     mkdirImpl = mkdir,
+    openImpl = open,
+    renameImpl = rename,
+    rmImpl = rm,
     writeFileImpl = writeFile,
     now = () => new Date(),
   } = {},
@@ -252,10 +332,14 @@ export async function saveBotConfig(
     updatedAt: now().toISOString(),
   });
 
-  await mkdirImpl(dirname(configFile), { recursive: true, mode: 0o700 });
-  await writeFileImpl(configFile, `${JSON.stringify(config, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
+  await serializeConfigWrite(configFile, async () => {
+    await mkdirImpl(dirname(configFile), { recursive: true, mode: 0o700 });
+    await writeFileAtomic(configFile, `${JSON.stringify(config, null, 2)}\n`, {
+      openImpl,
+      renameImpl,
+      rmImpl,
+      writeFileImpl,
+    });
   });
 
   return {
