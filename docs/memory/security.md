@@ -28,8 +28,10 @@ High-impact risks:
   instrument-class, and cadence controls may be stored server-side, but PUT
   updates require local JSON requests, local Host/Origin headers, and the
   mutation-protection token surfaced by the GET config payload. Saved config
-  must mirror Money-maker simulation registry compatibility rules and does not
-  enable provider calls, order previews, demo execution, or live execution.
+  must mirror the Money-maker canonical contract at
+  `Money-maker-3000/src/simulation-contract.mjs`; the local snapshot fixture is
+  the drift check for this repo. Bot config does not enable provider calls,
+  order previews, demo execution, or live execution.
 - Any hosted bot-control API still requires authentication, CSRF/origin policy,
   durable audit, and review gate before real controls are exposed.
 - Bot market/news context is display-only; it cannot trigger strategy decisions,

@@ -1,8 +1,18 @@
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import {
+  ALLOWED_BOT_CADENCES,
+  ALLOWED_BOT_INSTRUMENT_CLASSES,
+  ALLOWED_BOT_MARKETS,
+  BOT_CONFIG_CONTRACT_VERSION,
+  BOT_CONFIG_MIRROR_SOURCE,
+  BOT_MARKET_INSTRUMENT_CLASS_RULES,
+  BOT_STRATEGY_CONFIG_RULES,
+  MIN_BOT_EVALUATION_INTERVAL_MINUTES,
+} from "../src/bot-config-store.mjs";
 import {
   INTERNAL_API_ROUTES,
   createReadOnlyProviderCache,
@@ -138,6 +148,9 @@ test("bot strategy registry is simulation-only and redacted", async () => {
   assert.equal(response.json.strategies.length, 3);
   assert.equal(response.json.strategies[0].strategyId, "dca-cash-reserve");
   assert.equal(response.json.strategies[0].allowedModes.includes("simulation"), true);
+  assert.deepEqual(response.json.strategies[0].allowedMarkets, ["US_EQUITIES", "AU_EQUITIES"]);
+  assert.deepEqual(response.json.strategies[0].allowedInstrumentClasses, ["EQUITY", "ETF"]);
+  assert.equal(response.json.strategies[0].cadence, "daily");
   assert.equal(response.json.strategies.some((strategy) => strategy.strategyId === "news-aware-watchlist"), true);
   assert.equal(response.json.budgetPolicy.maxConfigurableBudgetUsd, 2500);
   assert.equal(response.json.schedulePolicy.highFrequencyTrading, "blocked");
@@ -204,6 +217,8 @@ test("bot config returns default server-side simulation controls without secrets
   assert.equal(response.json.mutationProtection.localOriginOnly, true);
   assert.equal(response.json.mutationProtection.contentType, "application/json");
   assert.equal(response.json.options.strategyRules["dca-cash-reserve"].status, "simulation-only");
+  assert.equal(response.json.mirrorSource, "Money-maker-3000/src/simulation-contract.mjs");
+  assert.equal(response.json.contractVersion, "0.1.0-sim");
   assert.deepEqual(response.json.options.strategyRules["dca-cash-reserve"].allowedInstrumentClasses, [
     "EQUITY",
     "ETF",
@@ -216,6 +231,21 @@ test("bot config returns default server-side simulation controls without secrets
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
   assert.equal(response.text.includes('"accountId"'), false);
+});
+
+test("bot config mirror matches the Money-maker simulation contract snapshot", async () => {
+  const snapshot = JSON.parse(
+    await readFile(new URL("./fixtures/money-maker-simulation-contract.snapshot.json", import.meta.url), "utf8"),
+  );
+
+  assert.equal(BOT_CONFIG_MIRROR_SOURCE, snapshot.source);
+  assert.equal(BOT_CONFIG_CONTRACT_VERSION, snapshot.version);
+  assert.deepEqual(ALLOWED_BOT_MARKETS, snapshot.markets);
+  assert.deepEqual(ALLOWED_BOT_INSTRUMENT_CLASSES, snapshot.instrumentClasses);
+  assert.deepEqual(BOT_MARKET_INSTRUMENT_CLASS_RULES, snapshot.marketInstrumentClassRules);
+  assert.deepEqual(ALLOWED_BOT_CADENCES, snapshot.cadences);
+  assert.equal(MIN_BOT_EVALUATION_INTERVAL_MINUTES, snapshot.minimumEvaluationIntervalMinutes);
+  assert.deepEqual(BOT_STRATEGY_CONFIG_RULES, snapshot.strategyRules);
 });
 
 test("bot config update persists validated server-side config and redacts storage path", async () => {

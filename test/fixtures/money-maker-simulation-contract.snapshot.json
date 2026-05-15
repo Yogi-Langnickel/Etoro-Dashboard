@@ -1,0 +1,88 @@
+{
+  "source": "Money-maker-3000/src/simulation-contract.mjs",
+  "version": "0.1.0-sim",
+  "markets": [
+    "US_EQUITIES",
+    "AU_EQUITIES",
+    "FOREX",
+    "COMMODITIES"
+  ],
+  "instrumentClasses": [
+    "EQUITY",
+    "ETF",
+    "FOREX",
+    "COMMODITY"
+  ],
+  "marketInstrumentClassRules": {
+    "US_EQUITIES": [
+      "EQUITY",
+      "ETF"
+    ],
+    "AU_EQUITIES": [
+      "EQUITY",
+      "ETF"
+    ],
+    "FOREX": [
+      "FOREX"
+    ],
+    "COMMODITIES": [
+      "COMMODITY",
+      "ETF"
+    ]
+  },
+  "cadences": [
+    "daily",
+    "weekly"
+  ],
+  "minimumEvaluationIntervalMinutes": 240,
+  "strategyRules": {
+    "dca-cash-reserve": {
+      "name": "Cash-reserved DCA",
+      "version": "0.1.0-sim",
+      "status": "simulation-only",
+      "cadence": "daily",
+      "allowedMarkets": [
+        "US_EQUITIES",
+        "AU_EQUITIES"
+      ],
+      "allowedInstrumentClasses": [
+        "EQUITY",
+        "ETF"
+      ]
+    },
+    "threshold-rebalance": {
+      "name": "Threshold rebalance",
+      "version": "0.1.0-sim",
+      "status": "simulation-only",
+      "cadence": "weekly",
+      "allowedMarkets": [
+        "US_EQUITIES",
+        "AU_EQUITIES",
+        "COMMODITIES"
+      ],
+      "allowedInstrumentClasses": [
+        "EQUITY",
+        "ETF",
+        "COMMODITY"
+      ]
+    },
+    "news-aware-watchlist": {
+      "name": "News-aware watchlist",
+      "version": "0.1.0-plan",
+      "status": "context-only",
+      "cadence": "daily",
+      "allowedMarkets": [
+        "US_EQUITIES",
+        "AU_EQUITIES",
+        "FOREX",
+        "COMMODITIES"
+      ],
+      "allowedInstrumentClasses": [
+        "EQUITY",
+        "ETF",
+        "FOREX",
+        "COMMODITY"
+      ]
+    }
+  }
+}

@@ -7,6 +7,7 @@ import {
   ALLOWED_BOT_BUDGETS_USD,
   ALLOWED_BOT_INSTRUMENT_CLASSES,
   ALLOWED_BOT_MARKETS,
+  BOT_STRATEGY_CONFIG_RULES,
   BotConfigValidationError,
   loadBotConfig,
   publicBotConfigPayload,
@@ -99,15 +100,20 @@ const BOT_SCHEDULE_POLICY = Object.freeze({
 });
 
 function botStrategyRecords() {
+  const dcaRule = BOT_STRATEGY_CONFIG_RULES["dca-cash-reserve"];
+  const newsRule = BOT_STRATEGY_CONFIG_RULES["news-aware-watchlist"];
+  const thresholdRule = BOT_STRATEGY_CONFIG_RULES["threshold-rebalance"];
+
   return [
     {
       strategyId: "dca-cash-reserve",
-      name: "Cash-reserved DCA",
-      version: "0.1.0-sim",
-      status: "simulation-only",
+      name: dcaRule.name,
+      version: dcaRule.version,
+      status: dcaRule.status,
       allowedModes: ["simulation"],
-      allowedInstruments: ["synthetic-etf-basket"],
-      cadence: "daily-preview",
+      allowedMarkets: dcaRule.allowedMarkets,
+      allowedInstrumentClasses: dcaRule.allowedInstrumentClasses,
+      cadence: dcaRule.cadence,
       riskBudget: {
         maxPositionPct: 10,
         maxWeeklyTurnoverPct: 5,
@@ -122,12 +128,13 @@ function botStrategyRecords() {
     },
     {
       strategyId: "news-aware-watchlist",
-      name: "News-aware watchlist",
-      version: "0.1.0-plan",
-      status: "planning-only",
+      name: newsRule.name,
+      version: newsRule.version,
+      status: newsRule.status,
       allowedModes: ["simulation"],
-      allowedInstruments: ["us-equities", "au-equities", "forex", "commodities"],
-      cadence: "daily-preview",
+      allowedMarkets: newsRule.allowedMarkets,
+      allowedInstrumentClasses: newsRule.allowedInstrumentClasses,
+      cadence: newsRule.cadence,
       riskBudget: {
         maxBudgetUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
         profitReuse: "ledger-only",
@@ -142,12 +149,13 @@ function botStrategyRecords() {
     },
     {
       strategyId: "threshold-rebalance",
-      name: "Threshold rebalance",
-      version: "0.1.0-sim",
-      status: "simulation-only",
+      name: thresholdRule.name,
+      version: thresholdRule.version,
+      status: thresholdRule.status,
       allowedModes: ["simulation"],
-      allowedInstruments: ["synthetic-core-allocation"],
-      cadence: "weekly-preview",
+      allowedMarkets: thresholdRule.allowedMarkets,
+      allowedInstrumentClasses: thresholdRule.allowedInstrumentClasses,
+      cadence: thresholdRule.cadence,
       riskBudget: {
         maxDriftPct: 5,
         maxPositionPct: 20,

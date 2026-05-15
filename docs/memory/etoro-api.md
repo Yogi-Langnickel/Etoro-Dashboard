@@ -48,8 +48,10 @@ Public material currently describes API access for market data, portfolios, watc
   identifiers, instrument IDs, position IDs, order IDs, or raw provider payloads.
   PUT updates require application/json, a local dashboard Host/Origin, and the
   CSRF-style mutation header/token returned by GET. Validation mirrors the
-  Money-maker simulation registry rules, so strategy-incompatible
-  market/instrument/cadence combinations such as DCA plus FOREX are rejected.
+  Money-maker contract at `Money-maker-3000/src/simulation-contract.mjs`, and
+  the local snapshot fixture must be updated with any intentional contract
+  change. Strategy-incompatible market-group/instrument-class/cadence
+  combinations such as DCA plus FOREX are rejected.
 - Market/news context attached to positions is display-only. It must not be
   converted into eToro order parameters or strategy signals without a separate
   provider contract review and compliance/security gate.

@@ -3,6 +3,8 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 export const DEFAULT_BOT_CONFIG_FILE = join(homedir(), ".config", "etoro-dashboard", "bot-config.json");
+export const BOT_CONFIG_MIRROR_SOURCE = "Money-maker-3000/src/simulation-contract.mjs";
+export const BOT_CONFIG_CONTRACT_VERSION = "0.1.0-sim";
 
 export const ALLOWED_BOT_STRATEGY_IDS = Object.freeze([
   "dca-cash-reserve",
@@ -26,31 +28,25 @@ export const BOT_STRATEGY_CONFIG_RULES = Object.freeze({
     name: "Cash-reserved DCA",
     version: "0.1.0-sim",
     status: "simulation-only",
-    mirroredRegistry: "Money-maker-3000 STRATEGY_REGISTRY",
     allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES"]),
     allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF"]),
     cadence: "daily",
-    expectedHoldingPeriod: "weeks-to-months",
   }),
   "threshold-rebalance": Object.freeze({
     name: "Threshold rebalance",
     version: "0.1.0-sim",
     status: "simulation-only",
-    mirroredRegistry: "Money-maker-3000 STRATEGY_REGISTRY",
     allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES", "COMMODITIES"]),
     allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF", "COMMODITY"]),
     cadence: "weekly",
-    expectedHoldingPeriod: "weeks-to-months",
   }),
   "news-aware-watchlist": Object.freeze({
     name: "News-aware watchlist",
     version: "0.1.0-plan",
     status: "context-only",
-    mirroredRegistry: "Money-maker-3000 STRATEGY_REGISTRY",
     allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"]),
     allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF", "FOREX", "COMMODITY"]),
     cadence: "daily",
-    expectedHoldingPeriod: "not-trading-from-news",
   }),
 });
 
@@ -186,6 +182,8 @@ export function publicBotConfigPayload(config, { source = "default", persisted =
     mutationRoutesEnabled: false,
     executionBlocked: true,
     config,
+    mirrorSource: BOT_CONFIG_MIRROR_SOURCE,
+    contractVersion: BOT_CONFIG_CONTRACT_VERSION,
     options: {
       strategies: ALLOWED_BOT_STRATEGY_IDS,
       strategyRules: BOT_STRATEGY_CONFIG_RULES,
