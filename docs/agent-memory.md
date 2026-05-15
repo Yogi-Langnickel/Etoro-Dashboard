@@ -55,6 +55,8 @@ Last updated: 2026-05-15
 
 ## Open Decisions
 
-- Choose app stack. Recommended default: TypeScript + Next.js or another server-capable web stack, with all eToro API calls server-side.
+- Choose app stack later. The old Next.js-first recommendation is historical;
+  the active implementation remains the dependency-free Node/static read-only
+  spike until contracts and safety states are stable.
 - Next bot-monitoring work should keep execution and account mutation out of scope; a future worker/backtest slice still requires separate review. Next UI hardening should add broader fixture watermarks across overview/risk/research surfaces and then start the local simulation/backtest ledger.
 - Confirm authentication model for dashboard users if it will be accessible beyond the local machine.

@@ -4,6 +4,18 @@ Status: scaffold started
 Created: 2026-05-12
 Last updated: 2026-05-14
 
+## Current Active Slice
+
+- Active bot implementation lives in `/Users/yogi/Coding/projects/Money-maker-3000`.
+- The worker is simulation-only and dependency-free.
+- Current diagnostics are synthetic: run counts, veto histograms, warnings, and
+  budget ranges.
+- No provider adapters, credential loading, demo execution, live execution, real
+  PnL, win-rate, drawdown, or execution-quality claims are approved.
+- Dashboard bot routes remain monitoring/config/status surfaces only.
+- Money-maker output cannot consume Research Desk market/news context as a
+  signal without a separate simulation-only signal-contract review.
+
 This document plans a future eToro trading bot, now working-named
 Money-maker-3000, that is controlled and monitored through the eToro Dashboard.
 It is not approval to implement execution routes. The current dashboard remains
