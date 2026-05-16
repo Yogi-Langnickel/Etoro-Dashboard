@@ -12,6 +12,12 @@ Do not file public issues with eToro API credentials, user keys, OAuth tokens, a
 - Keep all eToro credentials and privileged API calls server-side.
 - Store local demo credentials outside the repository, preferably at `${HOME}/.config/etoro/credentials.json` with `chmod 600`.
 - Default to read-only behavior.
+- Do not durably store account-linked dashboard data. Live read-only provider
+  data may be normalized server-side and protected by short in-memory
+  cache/backoff metadata, but portfolio exports, balances, holdings, position
+  ids, order ids, transaction history, raw provider payloads, and
+  reconciliation records must not be persisted in this repo without a new
+  storage review.
 - Keep trading, order placement, order cancellation, copy-trading, and account mutation disabled unless explicitly designed, feature-gated, confirmed, audited, and tested against a safe environment.
 - Validate and normalize every eToro API response before UI use or persistence.
 - Redact authorization headers, credentials, account identifiers, holdings, balances, and transaction details from logs and errors.

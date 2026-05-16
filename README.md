@@ -6,6 +6,11 @@ Security-first dashboard for viewing and interacting with eToro API data.
 
 First local integration slice is in progress. The dashboard can run through a local Node server that keeps eToro credentials server-side, exposes normalized demo/account summaries to the browser, includes a gated demo trading tab with no execution routes yet, caches read-only provider responses briefly, applies short backoff metadata for 429, timeout, and 5xx provider failures, and lazy-loads inactive tab status data to avoid duplicate refresh calls.
 
+The dashboard does not durably store account-linked provider data. Short
+in-memory cache/backoff metadata is allowed for freshness and rate-limit
+protection; account-linked history belongs in a separately reviewed
+Money-maker worker store if it is needed later.
+
 ## Local Demo Credentials
 
 Do not paste eToro keys into chat or commit them to the repo. Store your demo/read credentials at `${HOME}/.config/etoro/credentials.json`:
@@ -46,6 +51,8 @@ Simulation bot controls are stored server-side at `${HOME}/.config/etoro-dashboa
 - Keep credentials and privileged API calls server-side.
 - Treat trading actions as opt-in, audited, and feature-gated.
 - Keep demo trade execution disabled until the ticket, confirmation, audit, and order-status flow are implemented.
+- Keep historical market-data/backtest work in Money-maker ahead of portfolio
+  persistence, reconciliation records, or demo execution.
 - Keep the repository safe to publish publicly by never committing secrets or private financial data.
 
 ## Current Recommendation

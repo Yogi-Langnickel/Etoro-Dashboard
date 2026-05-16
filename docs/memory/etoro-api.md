@@ -80,4 +80,6 @@ Public material currently describes API access for market data, portfolios, watc
 
 - Is API access already enabled on the user's eToro account?
 - Which scopes are needed for the first read-only dashboard milestone?
-- Which first demo trading execution should be implemented: open by amount, open by units, close position, or order-status polling?
+- If demo execution is separately approved later, which first demo trading flow
+  should be designed: open by amount, open by units, close position, or
+  order-status polling?

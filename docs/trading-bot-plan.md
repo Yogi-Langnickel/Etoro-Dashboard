@@ -19,6 +19,27 @@ Last updated: 2026-05-16
   is blocked until a separate audited close-flow design covers position
   identity handling, confirmation, audit, idempotency, and reconciliation.
 
+## 2026-05-16 Provider Boundary Decision
+
+The next provider-adjacent work should start with historical market-data inputs
+for Money-maker backtests. Use this order:
+
+1. Historical market-data inputs.
+2. Deterministic backtest fixtures and diagnostics.
+3. Read-only portfolio-state snapshots.
+4. Reconciliation records.
+5. Demo execution design.
+
+The dashboard should not durably store account-linked data. It may use live
+read-only provider responses and short in-memory server cache/backoff metadata
+for freshness and rate-limit protection, but portfolio exports, balances,
+holdings, position ids, order ids, transaction history, raw provider payloads,
+and reconciliation records must not be persisted in this repo.
+
+Demo execution approval means approval to design and call eToro demo mutation
+endpoints. That approval is not currently granted; simulation, backtesting, and
+read-only provider work do not imply permission to send demo orders.
+
 ## 2026-05-16 Bot Review Follow-Ups
 
 Large improvements to schedule outside this small dashboard slice:
@@ -269,7 +290,7 @@ The bot must block when any of these conditions is true:
 Initial hard defaults:
 
 - Live execution: disabled.
-- Demo execution: disabled until Phase 3.
+- Demo execution: disabled unless Phase 3 is reached and separately approved.
 - Leverage: 1 only.
 - Shorts: disabled.
 - Copy trading: disabled.
@@ -317,6 +338,9 @@ Acceptance:
 - Risk engine blocks are visible and test-covered.
 
 ### Phase 3: Demo Execution Gate
+
+This phase is not approved by phase progression alone. It requires separate
+explicit user approval before implementation or provider mutation calls.
 
 - Add demo-only execution adapter behind `ENABLE_DEMO_BOT_EXECUTION=false`.
 - Add order preview and manual arming controls.
