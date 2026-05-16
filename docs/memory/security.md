@@ -53,6 +53,12 @@ High-impact risks:
 - Provider fallback/readiness metadata may describe safe server-side credential
   handling and required header names, but it must not contain credential values,
   account identifiers, raw provider payloads, or live provider responses.
+- Dashboard account-linked data must remain non-durable by default. Live
+  read-only responses may be normalized server-side and protected by short
+  in-memory cache/backoff metadata, but portfolio exports, balances, holdings,
+  position ids, order ids, transaction history, raw provider payloads, and
+  reconciliation records must not be persisted in this repo without a new
+  storage review.
 - Validate all external API responses before use.
 - Redact sensitive fields in logs and errors.
 - Use least-privilege API scopes where eToro supports them.
