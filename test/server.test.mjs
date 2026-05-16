@@ -128,6 +128,15 @@ test("bot monitoring status is read-only, disabled, and redacted", async () => {
   assert.equal(response.json.telemetry.pendingExecutionCount, 0);
   assert.equal(response.json.safeguards.executionRoutes, "absent");
   assert.equal(response.json.safeguards.accountIdentifiers, "redacted");
+  assert.deepEqual(response.json.providerInputPolicy, {
+    nextInput: "historical-market-data",
+    owner: "Money-maker-3000",
+    dashboardDurableAccountStorage: "blocked",
+    demoExecution: "blocked",
+    liveExecution: "blocked",
+    portfolioState: "deferred-after-backtest-review",
+    reconciliationRecords: "deferred-after-portfolio-boundary",
+  });
   assert.equal(response.json.controlPolicy.highFrequencyTrading, "blocked");
   assert.equal(response.json.controlPolicy.strategySelection, "predefined-server-persisted");
   assert.equal(response.json.controlPolicy.configuredStrategyId, "dca-cash-reserve");
@@ -178,6 +187,8 @@ test("bot simulation runs expose why-no-trade decisions without execution data",
   assert.equal(response.json.mode, "bot-simulation-monitor");
   assert.equal(response.json.runs.length, 2);
   assert.equal(response.json.runs[0].decision, "skip");
+  assert.equal(response.json.runs[0].reasonCode, "historical-market-data-unavailable");
+  assert.equal(response.json.runs[1].reasonCode, "deterministic-backtest-not-reviewed");
   assert.equal(response.json.runs[0].hypotheticalOrderCount, 0);
   assert.equal(response.json.runs[0].budgetRemainingUsd, 1000);
   assert.equal(response.json.schedulePolicy.highFrequencyTrading, "blocked");
@@ -185,6 +196,7 @@ test("bot simulation runs expose why-no-trade decisions without execution data",
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
   assert.equal(response.text.includes('"positionId"'), false);
+  assert.equal(response.text.includes("portfolio-snapshot"), false);
 });
 
 test("bot trade log is synthetic, budget-scoped, and redacted", async () => {
@@ -209,12 +221,17 @@ test("bot trade log is synthetic, budget-scoped, and redacted", async () => {
   assert.equal(response.json.reportContract.redaction.rawProviderPayloads, "excluded");
   assert.equal(response.json.entries.length, 2);
   assert.equal(response.json.entries[0].action, "simulated-skip");
+  assert.equal(response.json.entries[0].reasonCode, "historical-market-data-unavailable");
+  assert.equal(response.json.entries[1].reasonCode, "deterministic-backtest-not-reviewed");
+  assert.equal(response.json.entries[0].riskChecks.includes("historical-market-data-required"), true);
+  assert.equal(response.json.entries[1].riskChecks.includes("deterministic-backtest-review-required"), true);
   assert.equal(response.json.entries[0].instrument.identifierState, "redacted");
   assert.equal(response.json.safeguards.highFrequencyTrading, "blocked");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
   assert.equal(response.text.includes('"accountId"'), false);
   assert.equal(response.text.includes('"positionId"'), false);
+  assert.equal(response.text.includes("portfolio-snapshot"), false);
 });
 
 test("bot config returns default server-side simulation controls without secrets", async () => {
@@ -629,6 +646,8 @@ test("bot audit and events are read-only synthetic feeds", async () => {
   assert.equal(events.status, 200);
   assert.equal(audit.json.auditEvents[0].action, "simulation_monitor_loaded");
   assert.equal(events.json.events[1].type, "risk-veto");
+  assert.match(events.json.events[0].detail, /historical market data/);
+  assert.match(events.json.events[1].detail, /Deterministic backtest review/);
   assert.equal(audit.json.pagination.hasMore, false);
   assert.equal(events.json.pagination.nextCursor, null);
   assert.equal(audit.json.mutationRoutesEnabled, false);
@@ -637,6 +656,7 @@ test("bot audit and events are read-only synthetic feeds", async () => {
   assert.equal(events.text.includes("server-user-secret"), false);
   assert.equal(audit.text.includes('"accountId"'), false);
   assert.equal(events.text.includes('"accountId"'), false);
+  assert.equal(events.text.includes("Portfolio snapshot"), false);
 });
 
 test("risk radar status is read-only, synthetic, and redacted", async () => {

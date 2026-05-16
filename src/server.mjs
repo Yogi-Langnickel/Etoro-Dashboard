@@ -603,6 +603,15 @@ function botMonitoringStatus(config) {
       rawProviderPayloads: "hidden",
       accountIdentifiers: "redacted",
     },
+    providerInputPolicy: {
+      nextInput: "historical-market-data",
+      owner: "Money-maker-3000",
+      dashboardDurableAccountStorage: "blocked",
+      demoExecution: "blocked",
+      liveExecution: "blocked",
+      portfolioState: "deferred-after-backtest-review",
+      reconciliationRecords: "deferred-after-portfolio-boundary",
+    },
     controlPolicy: {
       strategySelection: "predefined-server-persisted",
       configuredStrategyId: "dca-cash-reserve",
@@ -666,7 +675,7 @@ function botSimulationRuns(config) {
         state: "simulated",
         evaluatedAt: "2026-05-13T00:00:00.000Z",
         decision: "skip",
-        reasonCode: "provider-not-connected",
+        reasonCode: "historical-market-data-unavailable",
         riskResult: "blocked",
         hypotheticalOrderCount: 0,
         budgetUsedUsd: 0,
@@ -680,7 +689,7 @@ function botSimulationRuns(config) {
         state: "simulated",
         evaluatedAt: "2026-05-13T00:05:00.000Z",
         decision: "skip",
-        reasonCode: "portfolio-snapshot-unavailable",
+        reasonCode: "deterministic-backtest-not-reviewed",
         riskResult: "blocked",
         hypotheticalOrderCount: 0,
         budgetUsedUsd: 0,
@@ -756,7 +765,7 @@ function botEventFeed(config) {
         type: "decision",
         severity: "info",
         title: "DCA simulation skipped",
-        detail: "Provider portfolio data is not connected, so no candidate order was produced.",
+        detail: "Money-maker historical market data inputs are not connected, so no candidate order was produced.",
         createdAt: "2026-05-13T00:00:00.000Z",
       },
       {
@@ -764,7 +773,7 @@ function botEventFeed(config) {
         type: "risk-veto",
         severity: "warn",
         title: "Rebalance blocked",
-        detail: "Portfolio snapshot is unavailable; risk engine remains fail-closed.",
+        detail: "Deterministic backtest review is incomplete; risk engine remains fail-closed.",
         createdAt: "2026-05-13T00:05:00.000Z",
       },
       {
@@ -830,7 +839,7 @@ function botTradeLog(config) {
         createdAt: "2026-05-14T00:00:00.000Z",
         action: "simulated-skip",
         decision: "blocked",
-        reasonCode: "provider-not-connected",
+        reasonCode: "historical-market-data-unavailable",
         instrument: {
           symbol: "SPY",
           assetClass: "ETF",
@@ -841,7 +850,7 @@ function botTradeLog(config) {
           remainingUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
           maxPositionPct: 10,
         },
-        riskChecks: ["provider-read-required", "stale-data-block", "execution-route-absent"],
+        riskChecks: ["historical-market-data-required", "stale-data-block", "execution-route-absent"],
       },
       {
         tradeLogId: "trade-log-002",
@@ -850,7 +859,7 @@ function botTradeLog(config) {
         createdAt: "2026-05-14T00:05:00.000Z",
         action: "simulated-skip",
         decision: "blocked",
-        reasonCode: "portfolio-snapshot-unavailable",
+        reasonCode: "deterministic-backtest-not-reviewed",
         instrument: {
           symbol: "GLD",
           assetClass: "ETF",
@@ -861,7 +870,7 @@ function botTradeLog(config) {
           remainingUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
           maxPositionPct: 20,
         },
-        riskChecks: ["portfolio-snapshot-required", "no-hft-cadence", "execution-route-absent"],
+        riskChecks: ["deterministic-backtest-review-required", "no-hft-cadence", "execution-route-absent"],
       },
     ],
     safeguards: {
