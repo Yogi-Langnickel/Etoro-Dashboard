@@ -816,6 +816,61 @@ test("enabled demo trade preview returns a redacted non-executing ticket", async
   assert.equal(response.json.providerEndpoint.category, "market-open-by-amount");
 });
 
+test("demo trade preview caps amount tickets to the simulation budget ceiling", async () => {
+  const response = await callHandler(createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      configured: true,
+      credentialFileLoaded: false,
+      credentialSource: "environment",
+      demoTradePreviewEnabled: true,
+      missing: [],
+    }),
+  }), {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    body: JSON.stringify({
+      orderType: "marketOpenByAmount",
+      instrumentId: "100000",
+      side: "BUY",
+      amount: "2500.01",
+      leverage: "1",
+    }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.json.executionBlocked, true);
+  assert.match(response.json.error.message, /2500 USD or lower/);
+  assert.equal(response.text.includes("100000"), false);
+});
+
+test("demo trade preview blocks close-position tickets until audited close flow exists", async () => {
+  const response = await callHandler(createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      configured: true,
+      credentialFileLoaded: false,
+      credentialSource: "environment",
+      demoTradePreviewEnabled: true,
+      missing: [],
+    }),
+  }), {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    body: JSON.stringify({
+      orderType: "marketClosePosition",
+      positionId: "position-123",
+      side: "BUY",
+    }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.json.executionBlocked, true);
+  assert.match(response.json.error.message, /audited close-flow review/);
+  assert.equal(response.text.includes("position-123"), false);
+  assert.equal(response.text.includes('"positionId"'), false);
+});
+
 test("demo trade preview blocks sell-side and leverage concepts", async () => {
   const handler = createRequestHandler({
     loadConfig: async () => ({

@@ -91,6 +91,7 @@ const BOT_BUDGET_POLICY = Object.freeze({
     maxOpenPositions: 3,
   }),
 });
+const MAX_DEMO_TRADE_PREVIEW_AMOUNT_USD = BOT_BUDGET_POLICY.maxConfigurableBudgetUsd;
 
 const BOT_SCHEDULE_POLICY = Object.freeze({
   mode: "low-frequency-only",
@@ -1041,6 +1042,12 @@ function parsePositiveNumber(value, fieldName) {
   return parsed;
 }
 
+function assertPreviewAmountLimit(amount) {
+  if (amount !== null && amount > MAX_DEMO_TRADE_PREVIEW_AMOUNT_USD) {
+    throw new Error(`Amount must be ${MAX_DEMO_TRADE_PREVIEW_AMOUNT_USD} USD or lower for preview`);
+  }
+}
+
 async function readJsonBody(request) {
   if (typeof request.body === "string") {
     if (Buffer.byteLength(request.body, "utf8") > MAX_API_BODY_BYTES) {
@@ -1072,7 +1079,6 @@ function buildTradePreview(payload) {
   const orderType = String(payload?.orderType ?? "");
   const side = String(payload?.side ?? "").toUpperCase();
   const instrumentId = String(payload?.instrumentId ?? "").trim();
-  const positionId = String(payload?.positionId ?? "").trim();
   const amount = parsePositiveNumber(payload?.amount, "Amount");
   const units = parsePositiveNumber(payload?.units, "Units");
   const leverage = parsePositiveNumber(payload?.leverage, "Leverage") ?? 1;
@@ -1095,6 +1101,8 @@ function buildTradePreview(payload) {
     if (!instrumentId || amount === null) {
       throw new Error("Market open by amount requires an instrument ID and amount");
     }
+
+    assertPreviewAmountLimit(amount);
 
     return {
       providerEndpoint: {
@@ -1138,22 +1146,7 @@ function buildTradePreview(payload) {
   }
 
   if (orderType === "marketClosePosition") {
-    if (!positionId) {
-      throw new Error("Market close position requires a position ID");
-    }
-
-    return {
-      providerEndpoint: {
-        category: "market-close-position",
-        method: PLANNED_DEMO_TRADING_ENDPOINTS.marketClosePosition.method,
-      },
-      ticket: {
-        orderType,
-        side,
-        sizingMode: "position",
-        hasPositionId: true,
-      },
-    };
+    throw new Error("Close-position preview requires a separate audited close-flow review");
   }
 
   throw new Error("Unsupported demo order type");

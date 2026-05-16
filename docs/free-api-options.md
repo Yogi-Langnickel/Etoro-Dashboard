@@ -53,6 +53,21 @@ approves broader behavior.
    create Money-maker-3000 signals or order parameters without a separate
    simulation-only signal-contract review.
 
+## 2026-05-16 Review Follow-Ups
+
+Large improvements to plan before connecting additional providers:
+
+- Document source terms, rate limits, User-Agent requirements, cache TTLs, and
+  normalized DTO shape for each free source before live fetch code lands.
+- Add source-specific redaction tests proving no raw provider payloads, account
+  identifiers, optional API keys, or full article text reach browser responses.
+- Add a small provider-readiness matrix to tests so optional key-based sources
+  remain disabled until server configuration, quota handling, and terms review
+  are complete.
+- Keep all financial-record coverage states neutral and no-advice; do not map
+  them into bot strategy fields or order parameters without a separate
+  simulation-only signal-contract review.
+
 ## First Slice Implemented
 
 - `researchIntelligenceStatus()` now exposes `freeApiOptions` so the internal

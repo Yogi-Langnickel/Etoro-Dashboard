@@ -2,7 +2,7 @@
 
 Status: scaffold started
 Created: 2026-05-12
-Last updated: 2026-05-14
+Last updated: 2026-05-16
 
 ## Current Active Slice
 
@@ -15,6 +15,22 @@ Last updated: 2026-05-14
 - Dashboard bot routes remain monitoring/config/status surfaces only.
 - Money-maker output cannot consume Research Desk market/news context as a
   signal without a separate simulation-only signal-contract review.
+- Dashboard demo-ticket preview remains validation-only. Close-position preview
+  is blocked until a separate audited close-flow design covers position
+  identity handling, confirmation, audit, idempotency, and reconciliation.
+
+## 2026-05-16 Bot Review Follow-Ups
+
+Large improvements to schedule outside this small dashboard slice:
+
+- Add a durable simulation ledger and backtest fixture set owned by the worker,
+  then display only redacted summaries in the dashboard.
+- Add a worker lease/heartbeat model before any scheduled strategy evaluation.
+- Define an immutable audit-event contract before demo execution is designed.
+- Keep close/cancel preview and execution out of the dashboard until the worker
+  has reconciliation and idempotent execution-intent contracts.
+- Add negative tests proving dashboard research/news context cannot become
+  Money-maker strategy input without a separate simulation-signal contract.
 
 This document plans a future eToro trading bot, now working-named
 Money-maker-3000, that is controlled and monitored through the eToro Dashboard.

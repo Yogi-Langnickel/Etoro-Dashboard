@@ -11,6 +11,37 @@ Created: 2026-05-09
 - Data Model And API Contract Reviewer: normalize eToro responses into internal DTOs before UI use. Treat provider schema drift as a contract event.
 - QA And Test Architect: cover auth failures, rate limits, malformed responses, stale data, redaction, and disabled trading behavior before live credentials are used.
 
+## 2026-05-16 Review Notes
+
+Small safe fixes selected for this slice:
+
+- Keep the demo ticket preview as validation-only, but block close-position
+  preview tickets until a separate audited close-flow design exists.
+- Cap cash amount previews at the existing simulation budget ceiling so local
+  preview copy cannot imply unbounded order sizing.
+- Cover both behaviors with focused route tests that prove submitted
+  instrument/position identifiers are not echoed.
+
+Large improvements to plan separately:
+
+- Choose the long-term app stack only after current Node/static DTO contracts,
+  read-cache behavior, and safety states are stable. A framework migration
+  should include client/server import guards, secret scanning, browser smoke
+  tests, and accessibility checks in the same branch.
+- Add durable read/audit storage before any execution preview expands beyond
+  local validation. Use append-only redacted events, retention rules, and export
+  tests before exposing reports.
+- Implement SEC companyfacts and SEC ownership adapters as server-side,
+  cached, official/free-source context providers before optional key-based
+  enrichers or scraping fallback.
+- Replace duplicated dashboard/Money-maker simulation constants with a
+  versioned shared contract or generated snapshot workflow once the separate
+  worker stabilizes.
+- Define the dashboard authentication and hosting model before exposing bot
+  config mutation or provider status beyond localhost.
+- Add Playwright smoke coverage for tab loading, fixture watermarks, disabled
+  execution controls, and redacted provider-failure states.
+
 ## Recommended Stack
 
 Historical recommendation: use TypeScript with Next.js App Router for the first
