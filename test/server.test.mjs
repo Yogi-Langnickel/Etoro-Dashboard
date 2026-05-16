@@ -997,6 +997,42 @@ test("status route reports configured read cache policy without secrets", async 
   assert.equal(response.text.includes("server-user-secret"), false);
 });
 
+test("unexpected API errors return generic public messages without local paths or secrets", async () => {
+  const response = await callHandler(createRequestHandler({
+    loadConfig: async () => {
+      throw new Error(
+        "/Users/yogi/.config/etoro/credentials.json x-api-key=server-api-secret x-user-key=server-user-secret",
+      );
+    },
+  }), { url: "/api/etoro/status" });
+
+  assert.equal(response.status, 500);
+  assert.equal(response.json.error.code, "UNEXPECTED_ERROR");
+  assert.equal(response.json.error.message, "Unexpected server error");
+  assert.equal(response.text.includes("/Users/yogi"), false);
+  assert.equal(response.text.includes("credentials.json"), false);
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes("x-api-key"), false);
+  assert.equal(response.text.includes("x-user-key"), false);
+});
+
+test("known config errors use fixed public messages", async () => {
+  const response = await callHandler(createRequestHandler({
+    loadConfig: async () => {
+      const error = new Error("server-user-secret from /Users/yogi/.config/etoro/credentials.json");
+      error.code = "ETORO_INVALID_CACHE_TTL";
+      throw error;
+    },
+  }), { url: "/api/etoro/status" });
+
+  assert.equal(response.status, 500);
+  assert.equal(response.json.error.code, "ETORO_INVALID_CACHE_TTL");
+  assert.equal(response.json.error.message, "Read cache TTL must be a positive integer.");
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes("/Users/yogi"), false);
+});
+
 test("read-only provider responses are cached without exposing secrets", async () => {
   let fetchCount = 0;
   const handler = createRequestHandler({

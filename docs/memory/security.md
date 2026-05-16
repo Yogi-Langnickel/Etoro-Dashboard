@@ -27,6 +27,10 @@ High-impact risks:
   429, timeout, and 5xx failures so local refresh loops do not storm provider
   rate limits or unstable upstreams. Browser-facing provider errors must use
   fixed public messages for both cached and non-cached failures.
+- Top-level API error responses must fail closed: expose only fixed public
+  messages for known provider/config failures and a generic message for
+  unexpected exceptions. Do not echo local file paths, credential/header names,
+  secret-like values, raw provider errors, or stack details to browser clients.
 - Trading feature flags default to false: `ENABLE_TRADING_ACTIONS=false`, `ENABLE_LIVE_ORDERS=false`.
 - Bot config persistence remains simulation-only. Strategy, budget, market,
   instrument-class, and cadence controls may be stored server-side, but PUT

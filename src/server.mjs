@@ -264,10 +264,38 @@ function validateBotConfigMutationRequest(request) {
   return { ok: true };
 }
 
+function safeErrorCode(error) {
+  const code = String(error?.code ?? "UNEXPECTED_ERROR");
+  return /^[A-Z0-9_]{1,64}$/.test(code) ? code : "UNEXPECTED_ERROR";
+}
+
+const PUBLIC_CONFIG_ERROR_MESSAGES = Object.freeze({
+  ETORO_CONFIG_ERROR: "eToro server configuration is invalid.",
+  ETORO_INVALID_BASE_URL: "Invalid eToro API base URL.",
+  ETORO_INVALID_CACHE_TTL: "Read cache TTL must be a positive integer.",
+  ETORO_INVALID_CREDENTIAL_FILE: "Credential file must contain a JSON object.",
+  ETORO_INVALID_CREDENTIAL_JSON: "Credential file contains invalid JSON.",
+  ETORO_CREDENTIAL_FILE_READ_FAILED: "Unable to read eToro credential file.",
+  ETORO_CREDENTIALS_MISSING: "eToro credentials are not configured on the server.",
+  ETORO_ENDPOINT_NOT_ALLOWED: "Requested eToro endpoint is not in the read-only allow-list.",
+});
+
+function safePublicErrorMessage(error) {
+  if (error?.code === "ETORO_TIMEOUT" || error?.code === "ETORO_PROVIDER_ERROR") {
+    return publicProviderErrorMessage(error);
+  }
+
+  if (PUBLIC_CONFIG_ERROR_MESSAGES[error?.code]) {
+    return PUBLIC_CONFIG_ERROR_MESSAGES[error.code];
+  }
+
+  return "Unexpected server error";
+}
+
 function safeErrorPayload(error) {
   return {
-    code: error?.code ?? "UNEXPECTED_ERROR",
-    message: error?.message ?? "Unexpected server error",
+    code: safeErrorCode(error),
+    message: safePublicErrorMessage(error),
     status: error?.status ?? undefined,
     requestId: error?.requestId ?? undefined,
   };
