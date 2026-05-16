@@ -7,8 +7,10 @@ import {
   ALLOWED_BOT_CADENCES,
   ALLOWED_BOT_INSTRUMENT_CLASSES,
   ALLOWED_BOT_MARKETS,
+  ALLOWED_BOT_RUN_MODES,
   BOT_CONFIG_CONTRACT_VERSION,
   BOT_CONFIG_MIRROR_SOURCE,
+  BOT_RUN_MODE_POLICY,
   BOT_MARKET_INSTRUMENT_CLASS_RULES,
   BOT_STRATEGY_CONFIG_RULES,
   MIN_BOT_EVALUATION_INTERVAL_MINUTES,
@@ -131,6 +133,8 @@ test("bot monitoring status is read-only, disabled, and redacted", async () => {
   assert.deepEqual(response.json.providerInputPolicy, {
     nextInput: "historical-market-data",
     owner: "Money-maker-3000",
+    backtestMode: "enabled-offline-fixture-only",
+    executeMode: "disabled-pending-separate-review",
     dashboardDurableAccountStorage: "blocked",
     demoExecution: "blocked",
     liveExecution: "blocked",
@@ -138,6 +142,9 @@ test("bot monitoring status is read-only, disabled, and redacted", async () => {
     reconciliationRecords: "deferred-after-portfolio-boundary",
   });
   assert.equal(response.json.controlPolicy.highFrequencyTrading, "blocked");
+  assert.equal(response.json.controlPolicy.runModeSelection, "backtest-only");
+  assert.equal(response.json.controlPolicy.runModePolicy.backtest.enabled, true);
+  assert.equal(response.json.controlPolicy.runModePolicy.execute.enabled, false);
   assert.equal(response.json.controlPolicy.strategySelection, "predefined-server-persisted");
   assert.equal(response.json.controlPolicy.configuredStrategyId, "dca-cash-reserve");
   assert.equal(response.json.budgetPolicy.baseBudgetUsd, 1000);
@@ -187,8 +194,11 @@ test("bot simulation runs expose why-no-trade decisions without execution data",
   assert.equal(response.json.mode, "bot-simulation-monitor");
   assert.equal(response.json.runs.length, 2);
   assert.equal(response.json.runs[0].decision, "skip");
+  assert.equal(response.json.runs[0].runMode, "backtest");
   assert.equal(response.json.runs[0].reasonCode, "historical-market-data-unavailable");
+  assert.equal(response.json.runs[0].historicalInput, "offline-fixture-required");
   assert.equal(response.json.runs[1].reasonCode, "deterministic-backtest-not-reviewed");
+  assert.equal(response.json.runs[1].historicalInput, "offline-fixture-parsed");
   assert.equal(response.json.runs[0].hypotheticalOrderCount, 0);
   assert.equal(response.json.runs[0].budgetRemainingUsd, 1000);
   assert.equal(response.json.schedulePolicy.highFrequencyTrading, "blocked");
@@ -241,6 +251,7 @@ test("bot config returns default server-side simulation controls without secrets
 
   assert.equal(response.status, 200);
   assert.equal(response.json.mode, "bot-config");
+  assert.equal(response.json.config.runMode, "backtest");
   assert.equal(response.json.config.strategyId, "dca-cash-reserve");
   assert.equal(response.json.config.budgetUsd, 1000);
   assert.deepEqual(response.json.config.allowedMarkets, ["US_EQUITIES", "AU_EQUITIES"]);
@@ -251,6 +262,9 @@ test("bot config returns default server-side simulation controls without secrets
   assert.equal(response.json.mutationProtection.localOriginOnly, true);
   assert.equal(response.json.mutationProtection.contentType, "application/json");
   assert.equal(response.json.options.strategyRules["dca-cash-reserve"].status, "simulation-only");
+  assert.deepEqual(response.json.options.runModes, ["backtest", "execute"]);
+  assert.equal(response.json.options.runModePolicy.backtest.enabled, true);
+  assert.equal(response.json.options.runModePolicy.execute.enabled, false);
   assert.equal(response.json.mirrorSource, "Money-maker-3000/src/simulation-contract.mjs");
   assert.equal(response.json.contractVersion, "0.1.0-sim");
   assert.deepEqual(response.json.options.strategyRules["dca-cash-reserve"].allowedInstrumentClasses, [
@@ -274,6 +288,8 @@ test("bot config mirror matches the Money-maker simulation contract snapshot", a
 
   assert.equal(BOT_CONFIG_MIRROR_SOURCE, snapshot.source);
   assert.equal(BOT_CONFIG_CONTRACT_VERSION, snapshot.version);
+  assert.deepEqual(ALLOWED_BOT_RUN_MODES, snapshot.runModes);
+  assert.deepEqual(BOT_RUN_MODE_POLICY, snapshot.runModePolicy);
   assert.deepEqual(ALLOWED_BOT_MARKETS, snapshot.markets);
   assert.deepEqual(ALLOWED_BOT_INSTRUMENT_CLASSES, snapshot.instrumentClasses);
   assert.deepEqual(BOT_MARKET_INSTRUMENT_CLASS_RULES, snapshot.marketInstrumentClassRules);
@@ -291,6 +307,7 @@ test("bot config update persists validated server-side config and redacts storag
   });
   const mutationProtection = await readBotConfigMutationProtection(handler);
   const body = {
+    runMode: "backtest",
     strategyId: "threshold-rebalance",
     budgetUsd: 1500,
     allowedMarkets: ["US_EQUITIES", "COMMODITIES"],
@@ -308,6 +325,7 @@ test("bot config update persists validated server-side config and redacts storag
   });
 
   assert.equal(update.status, 200);
+  assert.equal(update.json.config.runMode, "backtest");
   assert.equal(update.json.config.strategyId, "threshold-rebalance");
   assert.equal(update.json.config.budgetUsd, 1500);
   assert.equal(update.json.config.cadence, "weekly");
@@ -562,6 +580,31 @@ test("bot config update rejects unsupported strategy, markets, and high-frequenc
   assert.equal(response.json.executionBlocked, true);
   assert.equal(response.text.includes("uploaded-ai-scalper"), false);
   assert.equal(response.text.includes("server-api-secret"), false);
+});
+
+test("bot config exposes execute mode as disabled and rejects selecting it", async () => {
+  const handler = configuredHandler();
+  const mutationProtection = await readBotConfigMutationProtection(handler);
+  const response = await callHandler(handler, {
+    method: "PUT",
+    url: "/api/etoro/bot/config",
+    headers: localBotConfigMutationHeaders(mutationProtection),
+    body: JSON.stringify({
+      runMode: "execute",
+      strategyId: "dca-cash-reserve",
+      budgetUsd: 1000,
+      allowedMarkets: ["US_EQUITIES"],
+      allowedInstrumentClasses: ["ETF"],
+      cadence: "daily",
+    }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.json.error.code, "BOT_CONFIG_INVALID");
+  assert.match(response.json.error.message, /runMode/);
+  assert.equal(response.json.executionBlocked, true);
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
 });
 
 test("bot config mirrors strategy registry rules for market, instrument, and cadence compatibility", async () => {

@@ -353,9 +353,14 @@ function renderBotConfig(configPayload) {
   text("bot-universe-state", (config.allowedMarkets ?? []).map(labelize).join(", "));
   text("bot-instrument-class-state", (config.allowedInstrumentClasses ?? []).map(labelize).join(", "));
 
+  const runModeSelect = document.getElementById("bot-run-mode-select");
   const strategySelect = document.getElementById("bot-strategy-select");
   const budgetSelect = document.getElementById("bot-budget-select");
   const cadenceSelect = document.getElementById("bot-cadence-select");
+
+  if (runModeSelect) {
+    runModeSelect.value = config.runMode ?? "backtest";
+  }
 
   if (strategySelect) {
     strategySelect.value = config.strategyId ?? "";
@@ -410,6 +415,7 @@ function applyBotStrategyRuleControls(configPayload = botConfigOptionsPayload) {
 }
 
 function renderBotControlSelects(statusPayload, strategiesPayload, configPayload) {
+  const runModeSelect = document.getElementById("bot-run-mode-select");
   const select = document.getElementById("bot-strategy-select");
   const budgetSelect = document.getElementById("bot-budget-select");
   const cadenceSelect = document.getElementById("bot-cadence-select");
@@ -417,6 +423,22 @@ function renderBotControlSelects(statusPayload, strategiesPayload, configPayload
   const classTarget = document.getElementById("bot-instrument-class-options");
   const strategyById = new Map((strategiesPayload.strategies ?? []).map((strategy) => [strategy.strategyId, strategy]));
   botConfigOptionsPayload = configPayload;
+
+  if (runModeSelect) {
+    runModeSelect.textContent = "";
+
+    for (const runMode of configPayload.options?.runModes ?? []) {
+      const option = document.createElement("option");
+      const policy = configPayload.options?.runModePolicy?.[runMode];
+      option.value = runMode;
+      option.textContent = policy?.enabled ? labelize(runMode) : `${labelize(runMode)} (disabled)`;
+      option.disabled = !policy?.enabled;
+      option.title = policy?.reason ?? "";
+      runModeSelect.append(option);
+    }
+
+    runModeSelect.disabled = false;
+  }
 
   if (select) {
     select.textContent = "";
@@ -1023,6 +1045,7 @@ function collectTradeTicket() {
 
 function collectBotConfig() {
   return {
+    runMode: ticketValue("bot-run-mode-select"),
     strategyId: ticketValue("bot-strategy-select"),
     budgetUsd: Number(ticketValue("bot-budget-select")),
     allowedMarkets: checkedValues("bot-allowed-markets"),

@@ -13,6 +13,32 @@
     "FOREX",
     "COMMODITY"
   ],
+  "blockedInstrumentClasses": [
+    "CFD",
+    "CRYPTO",
+    "DERIVATIVE",
+    "OPTION"
+  ],
+  "runModes": [
+    "backtest",
+    "execute"
+  ],
+  "runModePolicy": {
+    "backtest": {
+      "enabled": true,
+      "providerCalls": "blocked",
+      "historicalInputs": "offline-fixture-only",
+      "accountData": "absent",
+      "executionRoutes": "absent"
+    },
+    "execute": {
+      "enabled": false,
+      "providerCalls": "blocked",
+      "demoExecution": "blocked",
+      "liveExecution": "blocked",
+      "reason": "demo execution requires a separate review and explicit approval"
+    }
+  },
   "marketInstrumentClassRules": {
     "US_EQUITIES": [
       "EQUITY",

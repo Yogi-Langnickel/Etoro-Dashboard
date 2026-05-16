@@ -14,10 +14,27 @@ export const ALLOWED_BOT_STRATEGY_IDS = Object.freeze([
 ]);
 
 export const ALLOWED_BOT_BUDGETS_USD = Object.freeze([500, 1000, 1500, 2500]);
+export const ALLOWED_BOT_RUN_MODES = Object.freeze(["backtest", "execute"]);
 export const ALLOWED_BOT_MARKETS = Object.freeze(["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"]);
 export const ALLOWED_BOT_INSTRUMENT_CLASSES = Object.freeze(["EQUITY", "ETF", "FOREX", "COMMODITY"]);
 export const ALLOWED_BOT_CADENCES = Object.freeze(["daily", "weekly"]);
 export const MIN_BOT_EVALUATION_INTERVAL_MINUTES = 240;
+export const BOT_RUN_MODE_POLICY = Object.freeze({
+  backtest: Object.freeze({
+    enabled: true,
+    providerCalls: "blocked",
+    historicalInputs: "offline-fixture-only",
+    accountData: "absent",
+    executionRoutes: "absent",
+  }),
+  execute: Object.freeze({
+    enabled: false,
+    providerCalls: "blocked",
+    demoExecution: "blocked",
+    liveExecution: "blocked",
+    reason: "demo execution requires a separate review and explicit approval",
+  }),
+});
 export const BOT_MARKET_INSTRUMENT_CLASS_RULES = Object.freeze({
   US_EQUITIES: Object.freeze(["EQUITY", "ETF"]),
   AU_EQUITIES: Object.freeze(["EQUITY", "ETF"]),
@@ -52,6 +69,7 @@ export const BOT_STRATEGY_CONFIG_RULES = Object.freeze({
 });
 
 export const DEFAULT_BOT_CONFIG = Object.freeze({
+  runMode: "backtest",
   strategyId: "dca-cash-reserve",
   budgetUsd: 1000,
   allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES"]),
@@ -197,6 +215,7 @@ export function normalizeBotConfig(input = {}) {
     ...DEFAULT_BOT_CONFIG,
     ...input,
   };
+  const runMode = String(candidate.runMode ?? "").trim();
   const strategyId = String(candidate.strategyId ?? "").trim();
   const budgetUsd = Number(candidate.budgetUsd);
   const allowedMarkets = normalizeStringArray(candidate.allowedMarkets, "allowedMarkets");
@@ -206,6 +225,13 @@ export function normalizeBotConfig(input = {}) {
   );
   const cadence = String(candidate.cadence ?? "").trim();
   const minimumEvaluationIntervalMinutes = Number(candidate.minimumEvaluationIntervalMinutes);
+
+  assertAllowed(runMode, ALLOWED_BOT_RUN_MODES, "runMode");
+  if (!BOT_RUN_MODE_POLICY[runMode]?.enabled) {
+    throw new BotConfigValidationError("runMode execute is disabled; only backtest is currently allowed", [
+      "runMode",
+    ]);
+  }
 
   assertAllowed(strategyId, ALLOWED_BOT_STRATEGY_IDS, "strategyId");
   const strategyRule = BOT_STRATEGY_CONFIG_RULES[strategyId];
@@ -240,6 +266,7 @@ export function normalizeBotConfig(input = {}) {
   }
 
   return {
+    runMode,
     strategyId,
     budgetUsd,
     allowedMarkets,
@@ -264,6 +291,8 @@ export function publicBotConfigPayload(config, { source = "default", persisted =
     options: {
       strategies: ALLOWED_BOT_STRATEGY_IDS,
       strategyRules: BOT_STRATEGY_CONFIG_RULES,
+      runModes: ALLOWED_BOT_RUN_MODES,
+      runModePolicy: BOT_RUN_MODE_POLICY,
       budgetsUsd: ALLOWED_BOT_BUDGETS_USD,
       markets: ALLOWED_BOT_MARKETS,
       instrumentClasses: ALLOWED_BOT_INSTRUMENT_CLASSES,
