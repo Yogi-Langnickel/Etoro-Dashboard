@@ -7,6 +7,8 @@ import {
   ALLOWED_BOT_BUDGETS_USD,
   ALLOWED_BOT_INSTRUMENT_CLASSES,
   ALLOWED_BOT_MARKETS,
+  BOT_CONFIG_CONTRACT_VERSION,
+  BOT_CONFIG_MIRROR_SOURCE,
   BOT_STRATEGY_CONFIG_RULES,
   BotConfigValidationError,
   loadBotConfig,
@@ -803,6 +805,22 @@ function botTradeLog(config) {
       reusableProfitUsd: 0,
       budgetUsedUsd: 0,
       budgetRemainingUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
+    },
+    reportContract: {
+      source: BOT_CONFIG_MIRROR_SOURCE,
+      version: BOT_CONFIG_CONTRACT_VERSION,
+      ledgerType: "simulation-report-preview",
+      owner: "worker-owned-report-contract",
+      exportState: "planned-redacted-sink",
+      executionCapability: "absent",
+      allowedSinks: ["dashboard-status", "planned-redacted-google-sheets"],
+      redaction: {
+        accountIdentifiers: "excluded",
+        providerOrderIds: "excluded",
+        positionIds: "excluded",
+        rawProviderPayloads: "excluded",
+        replayableOrderDetails: "excluded",
+      },
     },
     entries: [
       {

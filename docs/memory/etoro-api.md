@@ -44,7 +44,9 @@ Public material currently describes API access for market data, portfolios, watc
 - Bot monitor DTOs are synthetic and internal-only. `/api/etoro/bot/trade-log`
   is a redacted simulation ledger route, not a provider trade-history route.
   It must not expose account IDs, provider order IDs, position IDs, raw payloads,
-  or replayable order details.
+  or replayable order details. Its report-contract metadata may describe the
+  Money-maker simulation contract version, planned redacted sinks, and excluded
+  sensitive fields, but it must not add persistence or execution capability.
 - `/api/etoro/bot/config` stores only simulation controls: strategy id, budget,
   allowed market groups, allowed instrument classes, and low-frequency cadence.
   It is not an eToro provider route and must not store credentials, account

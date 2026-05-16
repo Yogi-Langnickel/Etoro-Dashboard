@@ -198,6 +198,15 @@ test("bot trade log is synthetic, budget-scoped, and redacted", async () => {
   assert.equal(response.json.mutationRoutesEnabled, false);
   assert.equal(response.json.summary.source, "synthetic-ledger-preview");
   assert.equal(response.json.summary.budgetRemainingUsd, 1000);
+  assert.equal(response.json.reportContract.source, "Money-maker-3000/src/simulation-contract.mjs");
+  assert.equal(response.json.reportContract.version, "0.1.0-sim");
+  assert.equal(response.json.reportContract.ledgerType, "simulation-report-preview");
+  assert.equal(response.json.reportContract.executionCapability, "absent");
+  assert.deepEqual(response.json.reportContract.allowedSinks, ["dashboard-status", "planned-redacted-google-sheets"]);
+  assert.equal(response.json.reportContract.redaction.accountIdentifiers, "excluded");
+  assert.equal(response.json.reportContract.redaction.providerOrderIds, "excluded");
+  assert.equal(response.json.reportContract.redaction.positionIds, "excluded");
+  assert.equal(response.json.reportContract.redaction.rawProviderPayloads, "excluded");
   assert.equal(response.json.entries.length, 2);
   assert.equal(response.json.entries[0].action, "simulated-skip");
   assert.equal(response.json.entries[0].instrument.identifierState, "redacted");

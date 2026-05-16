@@ -560,6 +560,25 @@ function renderBotTradeLog(payload) {
 
   target.textContent = "";
 
+  if (payload.reportContract) {
+    const row = document.createElement("li");
+    const top = document.createElement("span");
+    const title = document.createElement("strong");
+    const state = document.createElement("span");
+    const detail = document.createElement("small");
+
+    top.className = "decision-row";
+    state.className = "pill lock";
+    title.textContent = "Report contract";
+    state.textContent = labelize(payload.reportContract.version);
+    detail.textContent = `${labelize(payload.reportContract.ledgerType)}; ${
+      labelize(payload.reportContract.executionCapability)
+    } execution; ${labelize(payload.reportContract.exportState)}`;
+    top.append(title, state);
+    row.append(top, detail);
+    target.append(row);
+  }
+
   for (const entry of payload.entries ?? []) {
     const row = document.createElement("li");
     const top = document.createElement("span");
