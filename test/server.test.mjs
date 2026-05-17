@@ -765,6 +765,9 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.intelligence.adapterContracts[0].id, "sec-companyfacts");
   assert.equal(response.json.intelligence.adapterContracts[0].liveFetchEnabled, false);
   assert.equal(response.json.intelligence.adapterContracts[0].rawPayloadPersistence, "blocked");
+  assert.equal(response.json.intelligence.adapterContracts[1].id, "sec-ownership-filings");
+  assert.equal(response.json.intelligence.adapterContracts[1].liveFetchEnabled, false);
+  assert.equal(response.json.intelligence.adapterContracts[1].rawPayloadPersistence, "blocked");
   assert.equal(response.json.intelligence.providerReadiness[0].id, "etoro-public-api");
   assert.equal(response.json.intelligence.providerReadiness[0].credentialHandling, "server-side provider keys only");
   assert.equal(response.json.intelligence.providerReadiness[0].requestMetadata.includes("provider-auth-headers-redacted"), true);
@@ -783,7 +786,9 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.intelligence.financialRecordsPreview[0].coverageState, "sufficient-data");
   assert.equal(response.json.intelligence.financialRecordsPreview[0].provider.rawPayloadIncluded, false);
   assert.equal(response.json.intelligence.financialRecordsPreview[0].safeguards.noExecutionUse, true);
-  assert.equal(response.json.intelligence.insiderActivityPreview[0].sourceState, "planned-sec-forms-3-4-5");
+  assert.equal(response.json.intelligence.insiderActivityPreview[0].sourceState, "fixture-sec-ownership-normalized");
+  assert.equal(response.json.intelligence.insiderActivityPreview[0].provider.rawPayloadIncluded, false);
+  assert.equal(response.json.intelligence.insiderActivityPreview[0].safeguards.noExecutionUse, true);
   assert.equal(response.json.positionContextPreview.length, 2);
   assert.equal(response.json.positionContextPreview[0].contextOnly, true);
   assert.match(response.json.positionContextPreview[0].news[0].summary, /cannot create a signal or order/);

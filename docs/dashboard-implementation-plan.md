@@ -251,9 +251,12 @@ Run these before using real credentials:
   state, and SEC insider-activity previews.
 - [x] Add explicit fixture/source watermarks across overview, Risk Radar, and
   Research Desk surfaces.
-- [ ] Implement a SEC companyfacts adapter for US stock fundamentals.
-- [ ] Implement SEC Forms 3/4/5 insider activity ingestion before considering
-  Finviz scraping.
+- [x] Implement a fixture-backed SEC companyfacts adapter for US stock
+  fundamentals; live fetching remains blocked until SEC User-Agent,
+  cache/rate-limit, and terms controls are configured.
+- [x] Implement fixture-backed SEC Forms 3/4/5 insider activity normalization
+  before considering Finviz scraping; live fetching remains blocked until SEC
+  User-Agent, cache/rate-limit, and terms controls are configured.
 - [ ] Implement ETF source adapters for issuer factsheets and SEC N-PORT
   datasets where practical.
 - [x] Document free API/source options for eToro Dashboard and expose the

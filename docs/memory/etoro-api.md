@@ -80,6 +80,11 @@ Public material currently describes API access for market data, portfolios, watc
   server-side cache/rate-limit policy and SEC User-Agent contact value are
   configured. Browser responses must expose normalized fields only, never raw
   `facts`/`units` payloads.
+- SEC Forms 3/4/5 ownership context now has a fixture-backed normalization
+  adapter for Research Desk insider-activity context. Live SEC ownership feed
+  or dataset fetching remains blocked until the same User-Agent, cache, and
+  rate-limit controls are configured. Browser responses must expose normalized
+  filing summaries only, never raw XML or raw provider payloads.
 
 ## Questions To Confirm
 

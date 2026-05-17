@@ -2,6 +2,10 @@ import {
   SEC_COMPANYFACTS_ADAPTER_CONTRACT,
   normalizeSecCompanyFacts,
 } from "./sec-companyfacts-adapter.mjs";
+import {
+  SEC_OWNERSHIP_ADAPTER_CONTRACT,
+  normalizeSecOwnershipFilings,
+} from "./sec-ownership-adapter.mjs";
 
 const OFFICIAL_SOURCE_PRIORITY = Object.freeze([
   {
@@ -275,12 +279,41 @@ const SEC_COMPANYFACTS_NORMALIZED_PREVIEW = Object.freeze(
   }),
 );
 
+const SEC_OWNERSHIP_NORMALIZED_PREVIEW = Object.freeze(
+  normalizeSecOwnershipFilings({
+    symbol: "AAPL",
+    issuerName: "Apple Inc.",
+    sourceUrl: "fixture://sec/ownership/AAPL/forms-3-4-5.json",
+    filings: [
+      {
+        formType: "4",
+        filedAt: "2026-01-08T00:00:00.000Z",
+        reportingOwner: "Example Director",
+        relationship: "Director",
+        transactionCode: "P",
+        shares: 1200,
+      },
+      {
+        formType: "4",
+        filedAt: "2026-01-03T00:00:00.000Z",
+        reportingOwner: "Example Officer",
+        relationship: "Officer",
+        transactionCode: "S",
+        shares: 500,
+      },
+    ],
+  }),
+);
+
 export function researchIntelligenceStatus() {
   return {
     freeApiOptions: FREE_API_OPTIONS,
     providerFallbackPolicy: PROVIDER_FALLBACK_POLICY,
     providerReadiness: PROVIDER_READINESS,
-    adapterContracts: [SEC_COMPANYFACTS_ADAPTER_CONTRACT],
+    adapterContracts: [
+      SEC_COMPANYFACTS_ADAPTER_CONTRACT,
+      SEC_OWNERSHIP_ADAPTER_CONTRACT,
+    ],
     sourcePriority: OFFICIAL_SOURCE_PRIORITY,
     scrapingPolicy: SCRAPING_POLICY,
     coverageStatePolicy: COVERAGE_STATE_POLICY,
@@ -319,13 +352,7 @@ export function researchIntelligenceStatus() {
       },
     ],
     insiderActivityPreview: [
-      {
-        symbol: "AAPL",
-        sourceState: "planned-sec-forms-3-4-5",
-        latestWindow: "30d placeholder",
-        netDirection: "not-connected",
-        notableActivity: "Use SEC ownership filings before any Finviz fallback.",
-      },
+      SEC_OWNERSHIP_NORMALIZED_PREVIEW,
     ],
     newsTickerPreview: [
       {
