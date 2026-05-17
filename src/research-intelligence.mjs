@@ -1,3 +1,8 @@
+import {
+  SEC_COMPANYFACTS_ADAPTER_CONTRACT,
+  normalizeSecCompanyFacts,
+} from "./sec-companyfacts-adapter.mjs";
+
 const OFFICIAL_SOURCE_PRIORITY = Object.freeze([
   {
     id: "sec-companyfacts",
@@ -208,32 +213,79 @@ const PROVIDER_READINESS = Object.freeze([
   }),
 ]);
 
+const SEC_COMPANYFACTS_FIXTURE_PREVIEW = Object.freeze({
+  cik: 320193,
+  entityName: "Apple Inc.",
+  tickers: ["AAPL"],
+  facts: {
+    "us-gaap": {
+      Revenues: {
+        units: {
+          USD: [
+            { val: 391035000000, fy: 2024, fp: "FY", form: "10-K", filed: "2024-11-01", end: "2024-09-28" },
+          ],
+        },
+      },
+      NetIncomeLoss: {
+        units: {
+          USD: [
+            { val: 93736000000, fy: 2024, fp: "FY", form: "10-K", filed: "2024-11-01", end: "2024-09-28" },
+          ],
+        },
+      },
+      Assets: {
+        units: {
+          USD: [
+            { val: 364980000000, fy: 2024, fp: "FY", form: "10-K", filed: "2024-11-01", end: "2024-09-28" },
+          ],
+        },
+      },
+      Liabilities: {
+        units: {
+          USD: [
+            { val: 308030000000, fy: 2024, fp: "FY", form: "10-K", filed: "2024-11-01", end: "2024-09-28" },
+          ],
+        },
+      },
+      StockholdersEquity: {
+        units: {
+          USD: [
+            { val: 56950000000, fy: 2024, fp: "FY", form: "10-K", filed: "2024-11-01", end: "2024-09-28" },
+          ],
+        },
+      },
+    },
+    dei: {
+      EntityCommonStockSharesOutstanding: {
+        units: {
+          shares: [
+            { val: 15115823000, fy: 2024, fp: "FY", form: "10-K", filed: "2024-11-01", end: "2024-10-18" },
+          ],
+        },
+      },
+    },
+  },
+});
+
+const SEC_COMPANYFACTS_NORMALIZED_PREVIEW = Object.freeze(
+  normalizeSecCompanyFacts({
+    companyFacts: SEC_COMPANYFACTS_FIXTURE_PREVIEW,
+    sourceUrl: "fixture://sec/companyfacts/CIK0000320193.json",
+    retrievedAt: "2026-05-17T00:00:00.000Z",
+  }),
+);
+
 export function researchIntelligenceStatus() {
   return {
     freeApiOptions: FREE_API_OPTIONS,
     providerFallbackPolicy: PROVIDER_FALLBACK_POLICY,
     providerReadiness: PROVIDER_READINESS,
+    adapterContracts: [SEC_COMPANYFACTS_ADAPTER_CONTRACT],
     sourcePriority: OFFICIAL_SOURCE_PRIORITY,
     scrapingPolicy: SCRAPING_POLICY,
     coverageStatePolicy: COVERAGE_STATE_POLICY,
     financialRecordsPreview: [
-      {
-        symbol: "AAPL",
-        assetClass: "Equity",
-        sourceState: "planned-sec-companyfacts",
-        coverageState: "mixed-records",
-        coverageBasis: [
-          "strong profitability placeholder",
-          "large cash-flow base placeholder",
-          "valuation needs live SEC-derived denominator",
-        ],
-        keyFigures: [
-          { label: "Revenue growth", value: "planned", source: "SEC companyfacts" },
-          { label: "Free cash flow", value: "planned", source: "SEC companyfacts" },
-          { label: "Debt to assets", value: "planned", source: "SEC companyfacts" },
-          { label: "Valuation", value: "needs price + share data", source: "derived" },
-        ],
-      },
+      SEC_COMPANYFACTS_NORMALIZED_PREVIEW,
       {
         symbol: "SPY",
         assetClass: "ETF",

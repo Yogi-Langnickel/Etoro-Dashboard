@@ -75,6 +75,11 @@ Public material currently describes API access for market data, portfolios, watc
   be sourced to normalized financial records, carry no-advice copy, and remain
   blocked from Money-maker-3000 execution or strategy triggers until a separate
   review gate approves a simulation-only contract.
+- SEC companyfacts now has a fixture-backed normalization adapter for Research
+  Desk financial-record context. Live SEC fetch remains blocked until a
+  server-side cache/rate-limit policy and SEC User-Agent contact value are
+  configured. Browser responses must expose normalized fields only, never raw
+  `facts`/`units` payloads.
 
 ## Questions To Confirm
 

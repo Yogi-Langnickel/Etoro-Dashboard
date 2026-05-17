@@ -11,6 +11,11 @@ in-memory cache/backoff metadata is allowed for freshness and rate-limit
 protection; account-linked history belongs in a separately reviewed
 Money-maker worker store if it is needed later.
 
+Research Desk financial-record context includes a fixture-backed SEC
+companyfacts normalizer. It exposes normalized coverage fields only and keeps
+live SEC fetching blocked until a server-side cache/rate-limit policy and SEC
+User-Agent contact value are configured.
+
 ## Local Demo Credentials
 
 Do not paste eToro keys into chat or commit them to the repo. Store your demo/read credentials at `${HOME}/.config/etoro/credentials.json`:
