@@ -1142,6 +1142,7 @@ test("read-only provider responses are cached without exposing secrets", async (
           status: 200,
           requestId: `request-${fetchCount}`,
           receivedAt: new Date().toISOString(),
+          durationMs: 12,
         },
       };
     },
@@ -1154,7 +1155,9 @@ test("read-only provider responses are cached without exposing secrets", async (
   assert.equal(second.status, 200);
   assert.equal(fetchCount, 1);
   assert.equal(first.json.cache.state, "miss");
+  assert.equal(first.json.provider.durationMs, 12);
   assert.equal(second.json.cache.state, "hit");
+  assert.equal(second.json.provider.durationMs, 12);
   assert.equal(second.text.includes("server-api-secret"), false);
   assert.equal(second.text.includes("server-user-secret"), false);
 });

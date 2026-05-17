@@ -315,6 +315,7 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const url = new URL(endpoint.path, `${credentials.baseUrl}/`);
   const secrets = [credentials.apiKey, credentials.userKey];
+  const startedAtMs = Date.now();
 
   try {
     const response = await fetchImpl(url, {
@@ -322,6 +323,7 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
       headers,
       signal: controller.signal,
     });
+    const receivedAtMs = Date.now();
     const payload = await parseProviderJson(response, requestId, secrets);
 
     if (!response.ok) {
@@ -341,7 +343,8 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
         baseUrl: credentials.baseUrl,
         status: response.status,
         requestId,
-        receivedAt: new Date().toISOString(),
+        receivedAt: new Date(receivedAtMs).toISOString(),
+        durationMs: Math.max(0, receivedAtMs - startedAtMs),
       },
     };
   } catch (error) {

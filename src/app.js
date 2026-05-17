@@ -54,6 +54,14 @@ function formatCacheDuration(milliseconds) {
   return `${milliseconds} ms read cache`;
 }
 
+function formatProviderDuration(milliseconds) {
+  if (typeof milliseconds !== "number" || !Number.isFinite(milliseconds) || milliseconds < 0) {
+    return "Latency unavailable";
+  }
+
+  return `Latency: ${Math.round(milliseconds)} ms`;
+}
+
 async function getJson(path) {
   const response = await fetch(path, {
     headers: { accept: "application/json" },
@@ -148,7 +156,7 @@ function renderPnl(payload) {
   text("exposure", money(data.totalInvested));
   text("stale-data", `${data.positionCount} positions`);
   text("chart-provider", data.providerUpdatedAt ? `Provider timestamp: ${data.providerUpdatedAt}` : "Provider timestamp: unavailable");
-  text("chart-request", `Request ID: ${payload.provider.requestId}`);
+  text("chart-request", `Request ID: ${payload.provider.requestId} | ${formatProviderDuration(payload.provider.durationMs)}`);
   text("chart-cache", `Cache: ${labelize(payload.cache?.state)} (${payload.cache?.ttlMs ?? 0} ms)`);
   setTile("last-sync", "ok", "Last sync", new Date(payload.provider.receivedAt).toLocaleTimeString());
 }

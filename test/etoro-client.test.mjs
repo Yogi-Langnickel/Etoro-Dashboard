@@ -41,6 +41,8 @@ test("fetchReadOnlyEndpoint uses GET and normalizes identity without account ids
   assert.equal(captured.init.method, "GET");
   assert.equal(captured.url.toString(), "https://public-api.etoro.com/api/v1/me");
   assert.equal(captured.init.headers["x-request-id"], "00000000-0000-4000-8000-000000000000");
+  assert.equal(Number.isInteger(result.provider.durationMs), true);
+  assert.equal(result.provider.durationMs >= 0, true);
   assert.deepEqual(result.data, {
     authenticated: true,
     accountRefs: { hasGcid: true, hasRealCid: true, hasDemoCid: true },
