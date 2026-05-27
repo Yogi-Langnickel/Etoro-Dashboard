@@ -90,6 +90,19 @@ function providerError(message, options = {}) {
   return error;
 }
 
+function collectObjectKeys(value, keys = new Set()) {
+  if (!value || typeof value !== "object") {
+    return keys;
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    keys.add(key);
+    collectObjectKeys(child, keys);
+  }
+
+  return keys;
+}
+
 test("server exposes only internal API routes and no execution routes", () => {
   const serialized = JSON.stringify(INTERNAL_API_ROUTES).toLowerCase();
 
@@ -816,6 +829,32 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.text.includes('"facts"'), false);
   assert.equal(response.text.includes('"units"'), false);
   assert.equal(response.text.includes("finviz.com"), false);
+});
+
+test("research desk ETF preview stays normalized and excludes raw source fields", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/api/etoro/research/status",
+  });
+  const etfPreview = response.json.intelligence.financialRecordsPreview.find((item) => item.symbol === "SPY");
+  const etfPreviewKeys = collectObjectKeys(etfPreview);
+  const serialized = JSON.stringify(etfPreview);
+
+  assert.equal(response.status, 200);
+  assert.equal(etfPreview.assetClass, "ETF");
+  assert.equal(etfPreview.sourceState, "fixture-etf-source-records-normalized");
+  assert.equal(etfPreview.provider.liveNetworkConnected, false);
+  assert.equal(etfPreview.provider.rawPayloadIncluded, false);
+  assert.equal(etfPreview.safeguards.contextOnly, true);
+  assert.equal(etfPreview.safeguards.noExecutionUse, true);
+  assert.equal(etfPreviewKeys.has("factsheet"), false);
+  assert.equal(etfPreviewKeys.has("nport"), false);
+  assert.equal(etfPreviewKeys.has("rawXml"), false);
+  assert.equal(serialized.includes("accountId"), false);
+  assert.equal(serialized.includes("positionId"), false);
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes("x-api-key"), false);
+  assert.equal(response.text.includes("x-user-key"), false);
 });
 
 test("demo trading status is planning-only and does not expose secrets", async () => {
