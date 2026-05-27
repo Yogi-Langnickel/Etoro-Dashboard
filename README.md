@@ -16,6 +16,10 @@ companyfacts normalizer. It exposes normalized coverage fields only and keeps
 live SEC fetching blocked until a server-side cache/rate-limit policy and SEC
 User-Agent contact value are configured.
 
+ETF context is also fixture-normalized from issuer factsheet and SEC
+N-PORT-style records. It is display context only: live fetching, raw payload
+persistence, trading signals, and bot inputs remain blocked.
+
 ## Local Demo Credentials
 
 Do not paste eToro keys into chat or commit them to the repo. Store your demo/read credentials at `${HOME}/.config/etoro/credentials.json`:

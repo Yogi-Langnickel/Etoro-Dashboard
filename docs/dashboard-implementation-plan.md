@@ -257,7 +257,9 @@ Run these before using real credentials:
 - [x] Implement fixture-backed SEC Forms 3/4/5 insider activity normalization
   before considering Finviz scraping; live fetching remains blocked until SEC
   User-Agent, cache/rate-limit, and terms controls are configured.
-- [ ] Implement ETF source adapters for issuer factsheets and SEC N-PORT
+- [x] Implement fixture-backed ETF source normalization for issuer factsheets
+  and SEC N-PORT-style holdings/context; live fetching remains blocked until
+  source allowlists, cache/rate-limit policy, and terms controls are configured.
   datasets where practical.
 - [x] Document free API/source options for eToro Dashboard and expose the
   Research Desk provider plan through `/api/etoro/research/status`.
