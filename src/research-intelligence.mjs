@@ -6,6 +6,10 @@ import {
   SEC_OWNERSHIP_ADAPTER_CONTRACT,
   normalizeSecOwnershipFilings,
 } from "./sec-ownership-adapter.mjs";
+import {
+  ETF_SOURCE_ADAPTER_CONTRACT,
+  normalizeEtfSourceRecord,
+} from "./etf-source-adapter.mjs";
 
 const OFFICIAL_SOURCE_PRIORITY = Object.freeze([
   {
@@ -194,6 +198,17 @@ const PROVIDER_READINESS = Object.freeze([
     fallbackRole: "first fallback for Forms 3, 4, and 5 insider activity",
   }),
   Object.freeze({
+    id: "etf-source-records",
+    label: "ETF issuer factsheets and SEC N-PORT",
+    defaultState: "planned-free-official",
+    credentialHandling: "no API key; server-side source allowlist required",
+    requestMetadata: ["source-url", "retrieved-at", "cache-state"],
+    liveNetworkConnected: false,
+    readOnlyDefault: true,
+    termsStatus: "issuer-and-sec-terms-review-before-adapter",
+    fallbackRole: "first ETF holdings, fee, sector, and distribution context",
+  }),
+  Object.freeze({
     id: "alpha-vantage",
     label: "Alpha Vantage",
     defaultState: "disabled-optional-key",
@@ -305,6 +320,31 @@ const SEC_OWNERSHIP_NORMALIZED_PREVIEW = Object.freeze(
   }),
 );
 
+const ETF_SOURCE_NORMALIZED_PREVIEW = Object.freeze(
+  normalizeEtfSourceRecord({
+    symbol: "SPY",
+    fundName: "SPDR S&P 500 ETF Trust",
+    issuer: "State Street",
+    sourceUrl: "fixture://etf/spy/factsheet-and-nport.json",
+    retrievedAt: "2026-05-17T00:00:00.000Z",
+    factsheet: {
+      expenseRatio: 0.0945,
+      distributionYield: 1.22,
+      topHoldings: [
+        { name: "Microsoft", weightPct: 7.1 },
+        { name: "Apple", weightPct: 6.2 },
+        { name: "NVIDIA", weightPct: 5.8 },
+      ],
+    },
+    nport: {
+      sectorExposure: [
+        { name: "Information Technology", weightPct: 31.4 },
+        { name: "Financials", weightPct: 13.2 },
+      ],
+    },
+  }),
+);
+
 export function researchIntelligenceStatus() {
   return {
     freeApiOptions: FREE_API_OPTIONS,
@@ -313,29 +353,14 @@ export function researchIntelligenceStatus() {
     adapterContracts: [
       SEC_COMPANYFACTS_ADAPTER_CONTRACT,
       SEC_OWNERSHIP_ADAPTER_CONTRACT,
+      ETF_SOURCE_ADAPTER_CONTRACT,
     ],
     sourcePriority: OFFICIAL_SOURCE_PRIORITY,
     scrapingPolicy: SCRAPING_POLICY,
     coverageStatePolicy: COVERAGE_STATE_POLICY,
     financialRecordsPreview: [
       SEC_COMPANYFACTS_NORMALIZED_PREVIEW,
-      {
-        symbol: "SPY",
-        assetClass: "ETF",
-        sourceState: "planned-sec-nport-and-issuer",
-        coverageState: "needs-review",
-        coverageBasis: [
-          "broad-market ETF placeholder",
-          "expense and concentration metrics pending",
-          "holdings source not connected",
-        ],
-        keyFigures: [
-          { label: "Expense ratio", value: "planned", source: "issuer factsheet" },
-          { label: "Top holdings", value: "planned", source: "issuer or N-PORT" },
-          { label: "Sector exposure", value: "planned", source: "issuer or N-PORT" },
-          { label: "Distribution yield", value: "planned", source: "issuer factsheet" },
-        ],
-      },
+      ETF_SOURCE_NORMALIZED_PREVIEW,
       {
         symbol: "BTC",
         assetClass: "Crypto",

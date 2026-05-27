@@ -768,10 +768,17 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.intelligence.adapterContracts[1].id, "sec-ownership-filings");
   assert.equal(response.json.intelligence.adapterContracts[1].liveFetchEnabled, false);
   assert.equal(response.json.intelligence.adapterContracts[1].rawPayloadPersistence, "blocked");
+  assert.equal(response.json.intelligence.adapterContracts[2].id, "etf-source-records");
+  assert.equal(response.json.intelligence.adapterContracts[2].liveFetchEnabled, false);
+  assert.equal(response.json.intelligence.adapterContracts[2].rawPayloadPersistence, "blocked");
   assert.equal(response.json.intelligence.providerReadiness[0].id, "etoro-public-api");
   assert.equal(response.json.intelligence.providerReadiness[0].credentialHandling, "server-side provider keys only");
   assert.equal(response.json.intelligence.providerReadiness[0].requestMetadata.includes("provider-auth-headers-redacted"), true);
   assert.equal(response.json.intelligence.providerReadiness.every((provider) => provider.liveNetworkConnected === false), true);
+  assert.equal(
+    response.json.intelligence.providerReadiness.find((provider) => provider.id === "etf-source-records").defaultState,
+    "planned-free-official",
+  );
   assert.equal(
     response.json.intelligence.providerReadiness.find((provider) => provider.id === "alpha-vantage").defaultState,
     "disabled-optional-key",
@@ -786,6 +793,10 @@ test("research desk status is read-only, synthetic, and redacted", async () => {
   assert.equal(response.json.intelligence.financialRecordsPreview[0].coverageState, "sufficient-data");
   assert.equal(response.json.intelligence.financialRecordsPreview[0].provider.rawPayloadIncluded, false);
   assert.equal(response.json.intelligence.financialRecordsPreview[0].safeguards.noExecutionUse, true);
+  assert.equal(response.json.intelligence.financialRecordsPreview[1].sourceState, "fixture-etf-source-records-normalized");
+  assert.equal(response.json.intelligence.financialRecordsPreview[1].coverageState, "sufficient-data");
+  assert.equal(response.json.intelligence.financialRecordsPreview[1].provider.rawPayloadIncluded, false);
+  assert.equal(response.json.intelligence.financialRecordsPreview[1].safeguards.noExecutionUse, true);
   assert.equal(response.json.intelligence.insiderActivityPreview[0].sourceState, "fixture-sec-ownership-normalized");
   assert.equal(response.json.intelligence.insiderActivityPreview[0].provider.rawPayloadIncluded, false);
   assert.equal(response.json.intelligence.insiderActivityPreview[0].safeguards.noExecutionUse, true);
