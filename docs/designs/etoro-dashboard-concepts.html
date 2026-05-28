@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>eToro Dashboard Concepts</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #f5f3ea;
+        --muted: #a8afba;
+        --line: #343c46;
+        --panel: #171b20;
+        --panel-2: #20262d;
+        --amber: #e4b755;
+        --red: #e36969;
+        --cyan: #7eb8d9;
+        --blue: #8eb6ff;
+        --green: #79c59b;
+        --violet: #b39ddb;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #0f1216;
+        color: var(--ink);
+      }
+
+      main {
+        width: min(1480px, 100%);
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
+        gap: 18px;
+        margin-bottom: 20px;
+      }
+
+      .intro,
+      .guardrail,
+      .concept,
+      .panel,
+      .tile {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .intro,
+      .guardrail {
+        padding: 18px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: clamp(2rem, 4vw, 3.4rem);
+        line-height: 1;
+      }
+
+      h2 {
+        margin-bottom: 8px;
+        font-size: 1.35rem;
+      }
+
+      h3 {
+        margin-bottom: 6px;
+        font-size: 0.95rem;
+      }
+
+      p,
+      li,
+      small {
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--cyan);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .guardrail {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .guardrail span {
+        display: block;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-2);
+        font-size: 0.82rem;
+        font-weight: 750;
+      }
+
+      .stack {
+        display: grid;
+        gap: 22px;
+      }
+
+      .concept {
+        overflow: hidden;
+      }
+
+      .concept-head {
+        display: grid;
+        grid-template-columns: minmax(220px, 0.72fr) minmax(320px, 1.28fr);
+        gap: 16px;
+        padding: 18px;
+        border-bottom: 1px solid var(--line);
+        background: #14181e;
+      }
+
+      .concept-tag {
+        display: inline-flex;
+        width: fit-content;
+        margin-bottom: 12px;
+        padding: 6px 9px;
+        border-radius: 999px;
+        background: var(--panel-2);
+        color: var(--ink);
+        font-size: 0.72rem;
+        font-weight: 800;
+      }
+
+      .mock {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+      }
+
+      .loss .mock {
+        grid-template-columns: 1.15fr 0.9fr 0.7fr;
+        grid-template-areas:
+          "drawdown exposure docket"
+          "autopsy autopsy docket";
+      }
+
+      .narrative .mock {
+        grid-template-columns: 0.45fr 1.1fr 0.55fr;
+        grid-template-areas:
+          "brief brief brief"
+          "index stories rail"
+          "catalysts stories rail";
+      }
+
+      .triage .mock {
+        grid-template-columns: 0.7fr 1.1fr 0.55fr;
+        grid-template-areas:
+          "command command command"
+          "queue case anomalies"
+          "actions actions audit";
+      }
+
+      .panel {
+        min-height: 150px;
+        padding: 14px;
+      }
+
+      .panel-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .pill {
+        display: inline-flex;
+        padding: 5px 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink);
+        font-size: 0.7rem;
+        font-weight: 800;
+      }
+
+      .amber {
+        color: var(--amber);
+      }
+
+      .red {
+        color: var(--red);
+      }
+
+      .cyan {
+        color: var(--cyan);
+      }
+
+      .blue {
+        color: var(--blue);
+      }
+
+      .green {
+        color: var(--green);
+      }
+
+      .violet {
+        color: var(--violet);
+      }
+
+      .drawdown {
+        grid-area: drawdown;
+      }
+
+      .exposure {
+        grid-area: exposure;
+      }
+
+      .docket {
+        grid-area: docket;
+      }
+
+      .autopsy {
+        grid-area: autopsy;
+      }
+
+      .brief {
+        grid-area: brief;
+      }
+
+      .index {
+        grid-area: index;
+      }
+
+      .stories {
+        grid-area: stories;
+      }
+
+      .rail {
+        grid-area: rail;
+      }
+
+      .catalysts {
+        grid-area: catalysts;
+      }
+
+      .command {
+        grid-area: command;
+      }
+
+      .queue {
+        grid-area: queue;
+      }
+
+      .case {
+        grid-area: case;
+      }
+
+      .anomalies {
+        grid-area: anomalies;
+      }
+
+      .actions {
+        grid-area: actions;
+      }
+
+      .audit {
+        grid-area: audit;
+      }
+
+      .bars {
+        display: grid;
+        gap: 9px;
+      }
+
+      .bar {
+        height: 24px;
+        border-radius: 6px;
+        background: #29313a;
+        overflow: hidden;
+      }
+
+      .bar span {
+        display: block;
+        height: 100%;
+        background: var(--amber);
+      }
+
+      .line-chart {
+        height: 130px;
+        position: relative;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background:
+          linear-gradient(#2b333d 1px, transparent 1px),
+          linear-gradient(90deg, #2b333d 1px, transparent 1px);
+        background-size: 100% 33%, 16.66% 100%;
+      }
+
+      .line-chart::before {
+        content: "";
+        position: absolute;
+        inset: 18px 16px 26px;
+        clip-path: polygon(0 15%, 18% 20%, 18% 44%, 35% 44%, 35% 58%, 53% 58%, 53% 45%, 70% 45%, 70% 72%, 100% 72%, 100% 86%, 0 86%);
+        background: rgba(227, 105, 105, 0.45);
+      }
+
+      .rows {
+        display: grid;
+        gap: 8px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 0.8fr 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 9px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel-2);
+      }
+
+      .story {
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-2);
+      }
+
+      .story + .story {
+        margin-top: 10px;
+      }
+
+      .case-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      .tile {
+        padding: 12px;
+        background: var(--panel-2);
+      }
+
+      @media (max-width: 980px) {
+        header,
+        .concept-head,
+        .loss .mock,
+        .narrative .mock,
+        .triage .mock {
+          grid-template-columns: 1fr;
+          grid-template-areas: none;
+        }
+
+        .panel,
+        .command,
+        .queue,
+        .case,
+        .anomalies,
+        .actions,
+        .audit,
+        .drawdown,
+        .exposure,
+        .docket,
+        .autopsy,
+        .brief,
+        .index,
+        .stories,
+        .rail,
+        .catalysts {
+          grid-area: auto;
+        }
+
+        .guardrail,
+        .case-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section class="intro">
+          <p class="eyebrow">Review draft</p>
+          <h1>eToro Dashboard Concepts</h1>
+          <p>Three intentionally different directions for a read-only financial dashboard with Stock-Analyst-style enrichment.</p>
+        </section>
+        <section class="guardrail" aria-label="Design guardrails">
+          <span>Read-only by default</span>
+          <span>No advice language</span>
+          <span>Server-side credentials</span>
+          <span>Contextual enrichment</span>
+        </section>
+      </header>
+
+      <div class="stack">
+        <article class="concept loss">
+          <div class="concept-head">
+            <div>
+              <span class="concept-tag">Option 1</span>
+              <h2>Loss Lab</h2>
+              <p>Anti-PnL risk laboratory focused on drawdown, exposure, process quality, and weak evidence.</p>
+            </div>
+            <p>Contrarian stance: hide celebratory performance, sort by risk contribution, and make “do nothing until evidence improves” a first-class outcome.</p>
+          </div>
+          <div class="mock">
+            <section class="panel drawdown">
+              <div class="panel-title"><h3>Drawdown Map</h3><span class="pill red">-6.8%</span></div>
+              <div class="line-chart" aria-hidden="true"></div>
+            </section>
+            <section class="panel exposure">
+              <div class="panel-title"><h3>Exposure Stack</h3><span class="pill amber">1.42x gross</span></div>
+              <div class="bars">
+                <div class="bar"><span style="width: 82%"></span></div>
+                <div class="bar"><span style="width: 56%; background: var(--cyan)"></span></div>
+                <div class="bar"><span style="width: 43%; background: var(--violet)"></span></div>
+                <div class="bar"><span style="width: 29%; background: var(--red)"></span></div>
+              </div>
+            </section>
+            <section class="panel docket">
+              <div class="panel-title"><h3>Decision Quality Docket</h3><span class="pill amber">7 gaps</span></div>
+              <div class="rows">
+                <div class="row"><strong>NVDA</strong><small>Largest risk contributor</small><span class="amber">Review</span></div>
+                <div class="row"><strong>BTC</strong><small>Volatility jump</small><span class="red">Breach</span></div>
+                <div class="row"><strong>QQQ</strong><small>ETF look-through missing</small><span>Blocked</span></div>
+              </div>
+            </section>
+            <section class="panel autopsy">
+              <div class="panel-title"><h3>Position Autopsy</h3><span class="pill cyan">Risk sorted</span></div>
+              <div class="rows">
+                <div class="row"><strong>SPY</strong><small>Process score 76 / source coverage high</small><span class="green">Control passed</span></div>
+                <div class="row"><strong>EURUSD</strong><small>Stale quote and no thesis note</small><span class="amber">Weak evidence</span></div>
+              </div>
+            </section>
+          </div>
+        </article>
+
+        <article class="concept narrative">
+          <div class="concept-head">
+            <div>
+              <span class="concept-tag">Option 2</span>
+              <h2>Narrative Ledger</h2>
+              <p>Editorial intelligence desk where every holding and watchlist item becomes an evidence-backed story.</p>
+            </div>
+            <p>Contrarian stance: replace quote grids with a newsroom flow of “what changed,” “why surfaced,” source confidence, and catalyst history.</p>
+          </div>
+          <div class="mock">
+            <section class="panel brief">
+              <div class="panel-title"><h3>Market Brief</h3><span class="pill blue">Fixture mode</span></div>
+              <p>5 stories surfaced: two stale reads, one ETF record gap, one ownership update, one macro context note.</p>
+            </section>
+            <section class="panel index">
+              <div class="panel-title"><h3>Story Index</h3><span class="pill">Grouped</span></div>
+              <div class="rows">
+                <div class="row"><strong>Positions</strong><small>4 active</small><span>Open</span></div>
+                <div class="row"><strong>Watchlist</strong><small>6 catalysts</small><span>Scan</span></div>
+              </div>
+            </section>
+            <section class="panel stories">
+              <div class="panel-title"><h3>Today Stories</h3><span class="pill amber">Needs review</span></div>
+              <div class="story"><strong>SPY: ETF record is fresh, macro context changed</strong><p>Factsheet age improved; N-PORT cache still synthetic. Source coverage high.</p></div>
+              <div class="story"><strong>NVDA: profitable but evidence is thin</strong><p>Strong PnL is visually secondary to missing thesis and concentration context.</p></div>
+            </section>
+            <section class="panel rail">
+              <div class="panel-title"><h3>Evidence Rail</h3><span class="pill green">Source cards</span></div>
+              <div class="rows">
+                <div class="row"><strong>SEC</strong><small>Companyfacts</small><span class="green">Fresh</span></div>
+                <div class="row"><strong>ETF</strong><small>Issuer factsheet</small><span class="amber">Partial</span></div>
+                <div class="row"><strong>News</strong><small>RSS context</small><span>Queued</span></div>
+              </div>
+            </section>
+            <section class="panel catalysts">
+              <div class="panel-title"><h3>Catalyst Ticker</h3><span class="pill violet">Timeline</span></div>
+              <p>Earnings window, ETF holdings refresh, ownership filing context, and stale quote notes.</p>
+            </section>
+          </div>
+        </article>
+
+        <article class="concept triage">
+          <div class="concept-head">
+            <div>
+              <span class="concept-tag">Option 3</span>
+              <h2>Triage Control</h2>
+              <p>Mission-control workflow where positions, provider gaps, and anomalies become cases in a queue.</p>
+            </div>
+            <p>Contrarian stance: the dashboard is an operating room, not a portfolio trophy case. The primary interface is severity and evidence.</p>
+          </div>
+          <div class="mock">
+            <section class="panel command">
+              <div class="panel-title"><h3>Command Strip</h3><span class="pill">Read only locked</span></div>
+              <div class="case-grid">
+                <div class="tile"><strong>Provider</strong><p>Fixture read</p></div>
+                <div class="tile"><strong>Cache</strong><p>30s read TTL</p></div>
+                <div class="tile"><strong>Integrity</strong><p>No raw IDs exposed</p></div>
+              </div>
+            </section>
+            <section class="panel queue">
+              <div class="panel-title"><h3>Portfolio Triage Queue</h3><span class="pill red">Critical first</span></div>
+              <div class="rows">
+                <div class="row"><strong>EURUSD</strong><small>Stale quote</small><span class="red">Critical</span></div>
+                <div class="row"><strong>BTC</strong><small>Volatility</small><span class="amber">Elevated</span></div>
+                <div class="row"><strong>QQQ</strong><small>Evidence gap</small><span>Watch</span></div>
+              </div>
+            </section>
+            <section class="panel case">
+              <div class="panel-title"><h3>Active Case Bay</h3><span class="pill cyan">EURUSD</span></div>
+              <p>Case combines exposure, stale-data status, provider metadata, missing coverage, and redacted audit history.</p>
+              <div class="case-grid">
+                <div class="tile"><strong>Freshness</strong><p class="red">Expired</p></div>
+                <div class="tile"><strong>Exposure</strong><p>16% gross</p></div>
+                <div class="tile"><strong>Action</strong><p>Review source</p></div>
+              </div>
+            </section>
+            <section class="panel anomalies">
+              <div class="panel-title"><h3>Anomaly Stack</h3><span class="pill amber">6 alerts</span></div>
+              <div class="rows">
+                <div class="row"><strong>Concentration</strong><small>Threshold crossed</small><span>Watch</span></div>
+                <div class="row"><strong>Bot veto</strong><small>Simulation only</small><span>Blocked</span></div>
+              </div>
+            </section>
+            <section class="panel actions">
+              <div class="panel-title"><h3>Read-Only Action Queue</h3><span class="pill green">Session</span></div>
+              <p>Verify source, refresh read, inspect evidence, mark reviewed, open Risk Radar, open Research Desk.</p>
+            </section>
+            <section class="panel audit">
+              <div class="panel-title"><h3>Audit Timeline</h3><span class="pill">Redacted</span></div>
+              <p>Provider read, cache hit, route source, latency, and normalization status.</p>
+            </section>
+          </div>
+        </article>
+      </div>
+    </main>
+  </body>
+</html>
