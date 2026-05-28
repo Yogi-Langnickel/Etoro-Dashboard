@@ -3,21 +3,23 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>eToro Dashboard Concepts</title>
+    <title>eToro Dashboard Design Reset</title>
     <style>
       :root {
-        color-scheme: dark;
-        --ink: #f5f3ea;
-        --muted: #a8afba;
-        --line: #343c46;
-        --panel: #171b20;
-        --panel-2: #20262d;
-        --amber: #e4b755;
-        --red: #e36969;
-        --cyan: #7eb8d9;
-        --blue: #8eb6ff;
-        --green: #79c59b;
-        --violet: #b39ddb;
+        color-scheme: light;
+        --ink: #1b2524;
+        --muted: #60706d;
+        --line: #cbd9d5;
+        --paper: #f7f3e8;
+        --paper-strong: #fffaf0;
+        --sea: #bcd9d8;
+        --sea-dark: #6e9fa0;
+        --rust: #a15b3c;
+        --green: #5d8d70;
+        --blue: #457db0;
+        --gold: #c79f45;
+        --fog: rgba(114, 124, 126, 0.24);
+        --shadow: rgba(47, 61, 58, 0.16);
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
 
@@ -27,7 +29,7 @@
 
       body {
         margin: 0;
-        background: #0f1216;
+        background: #e9eee9;
         color: var(--ink);
       }
 
@@ -39,24 +41,27 @@
 
       header {
         display: grid;
-        grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
+        grid-template-columns: minmax(300px, 0.82fr) minmax(360px, 1.18fr);
         gap: 18px;
-        margin-bottom: 20px;
+        align-items: stretch;
+        margin-bottom: 18px;
       }
 
-      .intro,
-      .guardrail,
+      .hero,
+      .review,
       .concept,
       .panel,
-      .tile {
+      .receipt,
+      .criterion {
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: var(--panel);
+        background: var(--paper-strong);
+        box-shadow: 0 14px 30px var(--shadow);
       }
 
-      .intro,
-      .guardrail {
-        padding: 18px;
+      .hero,
+      .review {
+        padding: 20px;
       }
 
       h1,
@@ -67,9 +72,11 @@
       }
 
       h1 {
-        margin-bottom: 8px;
-        font-size: clamp(2rem, 4vw, 3.4rem);
-        line-height: 1;
+        margin-bottom: 10px;
+        max-width: 760px;
+        font-size: clamp(2.2rem, 5vw, 4.9rem);
+        line-height: 0.95;
+        letter-spacing: 0;
       }
 
       h2 {
@@ -78,314 +85,542 @@
       }
 
       h3 {
-        margin-bottom: 6px;
-        font-size: 0.95rem;
+        margin-bottom: 7px;
+        font-size: 0.98rem;
       }
 
       p,
-      li,
-      small {
+      li {
         color: var(--muted);
-        line-height: 1.45;
+        line-height: 1.58;
       }
 
-      .eyebrow {
-        margin-bottom: 8px;
-        color: var(--cyan);
-        font-size: 0.72rem;
-        font-weight: 800;
-        letter-spacing: 0;
-        text-transform: uppercase;
+      .tag-row,
+      .status-row,
+      .lens-row,
+      .receipt-row,
+      .score-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
       }
 
-      .guardrail {
+      .tag,
+      .status,
+      .lens,
+      .source {
+        display: inline-flex;
+        min-height: 30px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: rgba(255, 255, 255, 0.55);
+        color: var(--ink);
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+
+      .tag.strong,
+      .status.safe {
+        border-color: rgba(93, 141, 112, 0.55);
+        background: rgba(93, 141, 112, 0.14);
+      }
+
+      .tag.warn,
+      .status.warn {
+        border-color: rgba(199, 159, 69, 0.55);
+        background: rgba(199, 159, 69, 0.16);
+      }
+
+      .review {
+        background:
+          linear-gradient(135deg, rgba(69, 125, 176, 0.12), rgba(93, 141, 112, 0.1)),
+          var(--paper-strong);
+      }
+
+      .rubric {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(5, minmax(110px, 1fr));
+        gap: 8px;
+        margin-top: 16px;
       }
 
-      .guardrail span {
-        display: block;
-        padding: 12px;
+      .rubric div {
+        min-height: 94px;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: var(--panel-2);
-        font-size: 0.82rem;
-        font-weight: 750;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.52);
       }
 
-      .stack {
-        display: grid;
-        gap: 22px;
+      .rubric strong {
+        display: block;
+        color: var(--ink);
+        font-size: 0.86rem;
+      }
+
+      .rubric span {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 0.76rem;
+        line-height: 1.35;
       }
 
       .concept {
         overflow: hidden;
+        margin-bottom: 24px;
       }
 
       .concept-head {
         display: grid;
-        grid-template-columns: minmax(220px, 0.72fr) minmax(320px, 1.28fr);
+        grid-template-columns: minmax(260px, 0.8fr) minmax(360px, 1.2fr);
         gap: 16px;
-        padding: 18px;
+        padding: 20px;
         border-bottom: 1px solid var(--line);
-        background: #14181e;
       }
 
-      .concept-tag {
-        display: inline-flex;
-        width: fit-content;
-        margin-bottom: 12px;
-        padding: 6px 9px;
-        border-radius: 999px;
-        background: var(--panel-2);
-        color: var(--ink);
-        font-size: 0.72rem;
-        font-weight: 800;
-      }
-
-      .mock {
-        display: grid;
-        gap: 12px;
-        padding: 16px;
-      }
-
-      .loss .mock {
-        grid-template-columns: 1.15fr 0.9fr 0.7fr;
-        grid-template-areas:
-          "drawdown exposure docket"
-          "autopsy autopsy docket";
-      }
-
-      .narrative .mock {
-        grid-template-columns: 0.45fr 1.1fr 0.55fr;
-        grid-template-areas:
-          "brief brief brief"
-          "index stories rail"
-          "catalysts stories rail";
-      }
-
-      .triage .mock {
-        grid-template-columns: 0.7fr 1.1fr 0.55fr;
-        grid-template-areas:
-          "command command command"
-          "queue case anomalies"
-          "actions actions audit";
-      }
-
-      .panel {
-        min-height: 150px;
-        padding: 14px;
-      }
-
-      .panel-title {
+      .concept-title {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
+        flex-direction: column;
         gap: 10px;
-        margin-bottom: 12px;
       }
 
-      .pill {
-        display: inline-flex;
-        padding: 5px 8px;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        color: var(--ink);
-        font-size: 0.7rem;
-        font-weight: 800;
+      .concept-title h2 {
+        margin: 0;
+        font-size: clamp(1.9rem, 3.8vw, 3.6rem);
+        line-height: 0.98;
       }
 
-      .amber {
-        color: var(--amber);
-      }
-
-      .red {
-        color: var(--red);
-      }
-
-      .cyan {
-        color: var(--cyan);
-      }
-
-      .blue {
-        color: var(--blue);
-      }
-
-      .green {
-        color: var(--green);
-      }
-
-      .violet {
-        color: var(--violet);
-      }
-
-      .drawdown {
-        grid-area: drawdown;
-      }
-
-      .exposure {
-        grid-area: exposure;
-      }
-
-      .docket {
-        grid-area: docket;
-      }
-
-      .autopsy {
-        grid-area: autopsy;
-      }
-
-      .brief {
-        grid-area: brief;
-      }
-
-      .index {
-        grid-area: index;
-      }
-
-      .stories {
-        grid-area: stories;
-      }
-
-      .rail {
-        grid-area: rail;
-      }
-
-      .catalysts {
-        grid-area: catalysts;
-      }
-
-      .command {
-        grid-area: command;
-      }
-
-      .queue {
-        grid-area: queue;
-      }
-
-      .case {
-        grid-area: case;
-      }
-
-      .anomalies {
-        grid-area: anomalies;
-      }
-
-      .actions {
-        grid-area: actions;
-      }
-
-      .audit {
-        grid-area: audit;
-      }
-
-      .bars {
+      .concept-body {
         display: grid;
-        gap: 9px;
+        grid-template-columns: minmax(420px, 1.18fr) minmax(320px, 0.82fr);
+        gap: 0;
       }
 
-      .bar {
-        height: 24px;
-        border-radius: 6px;
-        background: #29313a;
+      .visual {
+        min-height: 510px;
+        border-right: 1px solid var(--line);
+        position: relative;
         overflow: hidden;
       }
 
-      .bar span {
-        display: block;
-        height: 100%;
-        background: var(--amber);
+      .side {
+        padding: 18px;
+        background: rgba(255, 255, 255, 0.34);
       }
 
-      .line-chart {
-        height: 130px;
-        position: relative;
-        border: 1px solid var(--line);
-        border-radius: 8px;
+      .panel {
+        padding: 14px;
+        margin-bottom: 12px;
+        box-shadow: none;
+      }
+
+      .panel ul {
+        padding-left: 18px;
+        margin-bottom: 0;
+      }
+
+      .soundings .visual {
         background:
-          linear-gradient(#2b333d 1px, transparent 1px),
-          linear-gradient(90deg, #2b333d 1px, transparent 1px);
-        background-size: 100% 33%, 16.66% 100%;
+          radial-gradient(circle at 19% 34%, rgba(244, 248, 236, 0.86) 0 5%, transparent 5.4%),
+          radial-gradient(circle at 59% 42%, rgba(244, 248, 236, 0.9) 0 9%, transparent 9.5%),
+          radial-gradient(circle at 77% 70%, rgba(244, 248, 236, 0.84) 0 6%, transparent 6.5%),
+          repeating-radial-gradient(circle at 54% 46%, transparent 0 36px, rgba(69, 125, 176, 0.18) 37px 39px),
+          linear-gradient(135deg, rgba(188, 217, 216, 0.92), rgba(233, 238, 233, 0.2));
       }
 
-      .line-chart::before {
+      .map-grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(27, 37, 36, 0.08) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(27, 37, 36, 0.08) 1px, transparent 1px);
+        background-size: 42px 42px;
+      }
+
+      .island,
+      .planet,
+      .pane-zone,
+      .plain-zone {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        border: 1px solid rgba(27, 37, 36, 0.35);
+        color: var(--ink);
+        font-weight: 800;
+      }
+
+      .island {
+        border-radius: 48% 52% 43% 57%;
+        background: #f8f0d5;
+        box-shadow: inset 0 0 0 9px rgba(93, 141, 112, 0.13), 0 16px 30px rgba(44, 72, 70, 0.18);
+      }
+
+      .island span,
+      .planet span,
+      .pane-zone span,
+      .plain-zone span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 700;
+      }
+
+      .island.one {
+        width: 140px;
+        height: 112px;
+        left: 12%;
+        top: 22%;
+      }
+
+      .island.two {
+        width: 186px;
+        height: 138px;
+        left: 45%;
+        top: 32%;
+      }
+
+      .island.three {
+        width: 122px;
+        height: 96px;
+        right: 12%;
+        bottom: 17%;
+      }
+
+      .reef {
+        position: absolute;
+        border: 2px dashed rgba(161, 91, 60, 0.72);
+        border-radius: 50%;
+        transform: rotate(-12deg);
+      }
+
+      .reef.one {
+        width: 260px;
+        height: 130px;
+        left: 39%;
+        top: 28%;
+      }
+
+      .reef.two {
+        width: 210px;
+        height: 106px;
+        left: 6%;
+        top: 18%;
+      }
+
+      .fog {
+        position: absolute;
+        right: -24px;
+        top: 70px;
+        width: 250px;
+        height: 300px;
+        border-radius: 45%;
+        background: var(--fog);
+        filter: blur(1px);
+      }
+
+      .tide {
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: 18px;
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr 0.5fr;
+        overflow: hidden;
+        border: 1px solid rgba(27, 37, 36, 0.25);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .tide div {
+        padding: 9px 12px;
+        font-size: 0.76rem;
+        font-weight: 800;
+      }
+
+      .tide div:nth-child(1) {
+        background: rgba(93, 141, 112, 0.16);
+      }
+
+      .tide div:nth-child(2) {
+        background: rgba(199, 159, 69, 0.2);
+      }
+
+      .tide div:nth-child(3) {
+        background: rgba(114, 124, 126, 0.18);
+      }
+
+      .glasshouse .visual {
+        background:
+          linear-gradient(90deg, rgba(255, 250, 240, 0.96), rgba(221, 238, 232, 0.9)),
+          var(--paper);
+      }
+
+      .glasshouse .visual::before {
         content: "";
         position: absolute;
-        inset: 18px 16px 26px;
-        clip-path: polygon(0 15%, 18% 20%, 18% 44%, 35% 44%, 35% 58%, 53% 58%, 53% 45%, 70% 45%, 70% 72%, 100% 72%, 100% 86%, 0 86%);
-        background: rgba(227, 105, 105, 0.45);
+        inset: 35px 55px;
+        border: 2px solid rgba(69, 125, 176, 0.42);
+        clip-path: polygon(50% 0, 100% 24%, 100% 100%, 0 100%, 0 24%);
+        background:
+          linear-gradient(120deg, rgba(255, 255, 255, 0.52), rgba(69, 125, 176, 0.08)),
+          repeating-linear-gradient(90deg, transparent 0 64px, rgba(69, 125, 176, 0.13) 65px 66px);
       }
 
-      .rows {
-        display: grid;
-        gap: 8px;
+      .pane-zone {
+        border-radius: 14px;
+        backdrop-filter: blur(2px);
+        background: rgba(255, 255, 255, 0.52);
       }
 
-      .row {
-        display: grid;
-        grid-template-columns: 0.8fr 1fr auto;
-        gap: 10px;
-        align-items: center;
-        padding: 9px;
-        border: 1px solid var(--line);
-        border-radius: 7px;
-        background: var(--panel-2);
+      .pane-zone.one {
+        width: 165px;
+        height: 110px;
+        left: 13%;
+        top: 30%;
       }
 
-      .story {
+      .pane-zone.two {
+        width: 200px;
+        height: 128px;
+        left: 43%;
+        top: 22%;
+      }
+
+      .pane-zone.three {
+        width: 160px;
+        height: 118px;
+        right: 12%;
+        bottom: 19%;
+      }
+
+      .growth {
+        position: absolute;
+        border: 1px solid rgba(93, 141, 112, 0.42);
+        border-radius: 50%;
+      }
+
+      .growth.one {
+        width: 260px;
+        height: 180px;
+        left: 39%;
+        top: 20%;
+      }
+
+      .growth.two {
+        width: 190px;
+        height: 190px;
+        right: 8%;
+        bottom: 10%;
+      }
+
+      .planetarium .visual {
+        color-scheme: dark;
+        background:
+          radial-gradient(circle at 50% 50%, rgba(69, 125, 176, 0.2), transparent 28%),
+          radial-gradient(circle at 32% 30%, rgba(199, 159, 69, 0.12), transparent 15%),
+          #101719;
+      }
+
+      .orbit {
+        position: absolute;
+        border: 1px solid rgba(247, 243, 232, 0.18);
+        border-radius: 50%;
+        transform: rotate(-18deg);
+      }
+
+      .orbit.one {
+        width: 520px;
+        height: 220px;
+        left: 8%;
+        top: 30%;
+      }
+
+      .orbit.two {
+        width: 380px;
+        height: 170px;
+        left: 23%;
+        top: 36%;
+      }
+
+      .orbit.three {
+        width: 250px;
+        height: 116px;
+        left: 35%;
+        top: 41%;
+      }
+
+      .planet {
+        border-radius: 50%;
+        background: #f0ead7;
+        box-shadow: 0 0 0 10px rgba(126, 184, 217, 0.15), 0 0 35px rgba(126, 184, 217, 0.2);
+      }
+
+      .planet span {
+        color: #42514f;
+      }
+
+      .planet.one {
+        width: 118px;
+        height: 118px;
+        left: 15%;
+        top: 26%;
+      }
+
+      .planet.two {
+        width: 150px;
+        height: 150px;
+        left: 50%;
+        top: 35%;
+      }
+
+      .planet.three {
+        width: 92px;
+        height: 92px;
+        right: 18%;
+        bottom: 18%;
+      }
+
+      .moon {
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--gold);
+        box-shadow: 0 0 14px rgba(199, 159, 69, 0.62);
+      }
+
+      .moon.one {
+        left: 32%;
+        top: 26%;
+      }
+
+      .moon.two {
+        right: 30%;
+        top: 33%;
+      }
+
+      .moon.three {
+        right: 13%;
+        bottom: 34%;
+      }
+
+      .plain .visual {
+        background:
+          linear-gradient(135deg, rgba(247, 243, 232, 0.96), rgba(233, 238, 233, 0.96)),
+          var(--paper);
+      }
+
+      .plain-zone {
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.7);
+        box-shadow: inset 0 0 0 8px rgba(188, 217, 216, 0.24);
+      }
+
+      .plain-zone.one {
+        width: 190px;
+        height: 120px;
+        left: 10%;
+        top: 16%;
+      }
+
+      .plain-zone.two {
+        width: 210px;
+        height: 140px;
+        left: 42%;
+        top: 24%;
+      }
+
+      .plain-zone.three {
+        width: 180px;
+        height: 110px;
+        right: 10%;
+        top: 13%;
+      }
+
+      .plain-zone.four {
+        width: 210px;
+        height: 126px;
+        left: 20%;
+        bottom: 16%;
+      }
+
+      .plain-zone.five {
+        width: 190px;
+        height: 118px;
+        right: 19%;
+        bottom: 18%;
+      }
+
+      .receipt {
         padding: 12px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel-2);
+        margin-bottom: 10px;
+        background: rgba(255, 255, 255, 0.66);
+        box-shadow: none;
       }
 
-      .story + .story {
+      .receipt strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .receipt p {
+        margin-bottom: 0;
+        font-size: 0.82rem;
+      }
+
+      .council {
         margin-top: 10px;
+        border: 2px solid rgba(93, 141, 112, 0.46);
       }
 
-      .case-grid {
+      .criteria-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 10px;
+        grid-template-columns: repeat(3, minmax(220px, 1fr));
+        gap: 12px;
       }
 
-      .tile {
-        padding: 12px;
-        background: var(--panel-2);
+      .criterion {
+        padding: 14px;
+        box-shadow: none;
       }
 
-      @media (max-width: 980px) {
+      .criterion strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      @media (max-width: 1040px) {
         header,
         .concept-head,
-        .loss .mock,
-        .narrative .mock,
-        .triage .mock {
+        .concept-body,
+        .criteria-grid {
           grid-template-columns: 1fr;
-          grid-template-areas: none;
         }
 
-        .panel,
-        .command,
-        .queue,
-        .case,
-        .anomalies,
-        .actions,
-        .audit,
-        .drawdown,
-        .exposure,
-        .docket,
-        .autopsy,
-        .brief,
-        .index,
-        .stories,
-        .rail,
-        .catalysts {
-          grid-area: auto;
+        .visual {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
         }
 
-        .guardrail,
-        .case-grid {
+        .rubric {
+          grid-template-columns: repeat(2, minmax(130px, 1fr));
+        }
+      }
+
+      @media (max-width: 680px) {
+        main {
+          padding: 14px;
+        }
+
+        .visual {
+          min-height: 440px;
+        }
+
+        .rubric {
           grid-template-columns: 1fr;
         }
       }
@@ -394,155 +629,227 @@
   <body>
     <main>
       <header>
-        <section class="intro">
-          <p class="eyebrow">Review draft</p>
-          <h1>eToro Dashboard Concepts</h1>
-          <p>Three intentionally different directions for a read-only financial dashboard with Stock-Analyst-style enrichment.</p>
+        <section class="hero">
+          <div class="tag-row">
+            <span class="tag strong">Second review draft</span>
+            <span class="tag">Read-only</span>
+            <span class="tag warn">No advice</span>
+          </div>
+          <h1>Design reset for a calmer personal dashboard</h1>
+          <p>
+            The first concepts were too close to professional finance workstations. This reset explores
+            spatial, personal, and source-receipt-driven interfaces that do not look like trading terminals.
+          </p>
+          <div class="status-row">
+            <span class="status safe">Read-only lock visible</span>
+            <span class="status">Demo/real mode visible</span>
+            <span class="status">Sources shown as receipts</span>
+            <span class="status warn">No buy/sell language</span>
+          </div>
         </section>
-        <section class="guardrail" aria-label="Design guardrails">
-          <span>Read-only by default</span>
-          <span>No advice language</span>
-          <span>Server-side credentials</span>
-          <span>Contextual enrichment</span>
+
+        <section class="review">
+          <h2>Non-specialist review rule</h2>
+          <p>
+            A smart family member should understand the first screen in 10 seconds: what mode this is,
+            whether data is fresh, what changed, what is missing, and why it is safe to inspect.
+          </p>
+          <div class="rubric">
+            <div><strong>25% understand</strong><span>Demo or real, read-only, fresh or stale, and what needs attention.</span></div>
+            <div><strong>25% restraint</strong><span>No trading nudges, scores, or urgency. Sources and privacy posture are visible.</span></div>
+            <div><strong>20% distance</strong><span>Not another dark risk command center with renamed panels.</span></div>
+            <div><strong>15% language</strong><span>Plain labels first. Expert terms stay inside drilldown.</span></div>
+            <div><strong>15% receipts</strong><span>Enrichment is context and provenance, never advice.</span></div>
+          </div>
         </section>
       </header>
 
-      <div class="stack">
-        <article class="concept loss">
-          <div class="concept-head">
-            <div>
-              <span class="concept-tag">Option 1</span>
-              <h2>Loss Lab</h2>
-              <p>Anti-PnL risk laboratory focused on drawdown, exposure, process quality, and weak evidence.</p>
+      <article class="concept soundings council">
+        <div class="concept-head">
+          <div class="concept-title">
+            <span class="tag strong">Council recommendation</span>
+            <h2>Personal Soundings</h2>
+          </div>
+          <p>
+            A calm account journal built around a map-like surface. Holdings become personal observations
+            with freshness, source coverage, and receipt-backed context. It borrows transparency from
+            Glasshouse Atlas without making the first screen abstract.
+          </p>
+        </div>
+        <div class="concept-body">
+          <div class="visual">
+            <div class="map-grid"></div>
+            <div class="fog"></div>
+            <div class="reef one"></div>
+            <div class="reef two"></div>
+            <div class="island one">Largest holding<span>fresh source</span></div>
+            <div class="island two">ETF area<span>holdings missing</span></div>
+            <div class="island three">Watchlist<span>news found</span></div>
+            <div class="tide">
+              <div>Fresh provider read</div>
+              <div>Cached public records</div>
+              <div>Fixture</div>
             </div>
-            <p>Contrarian stance: hide celebratory performance, sort by risk contribution, and make “do nothing until evidence improves” a first-class outcome.</p>
           </div>
-          <div class="mock">
-            <section class="panel drawdown">
-              <div class="panel-title"><h3>Drawdown Map</h3><span class="pill red">-6.8%</span></div>
-              <div class="line-chart" aria-hidden="true"></div>
-            </section>
-            <section class="panel exposure">
-              <div class="panel-title"><h3>Exposure Stack</h3><span class="pill amber">1.42x gross</span></div>
-              <div class="bars">
-                <div class="bar"><span style="width: 82%"></span></div>
-                <div class="bar"><span style="width: 56%; background: var(--cyan)"></span></div>
-                <div class="bar"><span style="width: 43%; background: var(--violet)"></span></div>
-                <div class="bar"><span style="width: 29%; background: var(--red)"></span></div>
-              </div>
-            </section>
-            <section class="panel docket">
-              <div class="panel-title"><h3>Decision Quality Docket</h3><span class="pill amber">7 gaps</span></div>
-              <div class="rows">
-                <div class="row"><strong>NVDA</strong><small>Largest risk contributor</small><span class="amber">Review</span></div>
-                <div class="row"><strong>BTC</strong><small>Volatility jump</small><span class="red">Breach</span></div>
-                <div class="row"><strong>QQQ</strong><small>ETF look-through missing</small><span>Blocked</span></div>
-              </div>
-            </section>
-            <section class="panel autopsy">
-              <div class="panel-title"><h3>Position Autopsy</h3><span class="pill cyan">Risk sorted</span></div>
-              <div class="rows">
-                <div class="row"><strong>SPY</strong><small>Process score 76 / source coverage high</small><span class="green">Control passed</span></div>
-                <div class="row"><strong>EURUSD</strong><small>Stale quote and no thesis note</small><span class="amber">Weak evidence</span></div>
-              </div>
-            </section>
-          </div>
-        </article>
+          <aside class="side">
+            <div class="panel">
+              <h3>Why the council chose it</h3>
+              <ul>
+                <li>Most creative break from finance workstation patterns.</li>
+                <li>Personal and calmer than a queue, lab, terminal, or newsroom.</li>
+                <li>Can expose enrichment as receipts without implying action.</li>
+              </ul>
+            </div>
+            <div class="receipt">
+              <strong>Receipt example</strong>
+              <p>ETF holdings unavailable. Source: issuer factsheet. Retrieved: cached. Context only.</p>
+            </div>
+            <div class="receipt">
+              <strong>Plain observation</strong>
+              <p>News context found for watchlist item. No recommendation generated.</p>
+            </div>
+            <div class="lens-row">
+              <span class="lens">Freshness</span>
+              <span class="lens">Sources</span>
+              <span class="lens">Missing data</span>
+              <span class="lens">Watchlist</span>
+            </div>
+          </aside>
+        </div>
+      </article>
 
-        <article class="concept narrative">
-          <div class="concept-head">
-            <div>
-              <span class="concept-tag">Option 2</span>
-              <h2>Narrative Ledger</h2>
-              <p>Editorial intelligence desk where every holding and watchlist item becomes an evidence-backed story.</p>
+      <article class="concept glasshouse">
+        <div class="concept-head">
+          <div class="concept-title">
+            <span class="tag">Designer exploration</span>
+            <h2>Glasshouse Ledger</h2>
+          </div>
+          <p>
+            A transparency-first design for users who want to know how every displayed fact is known.
+            The visual language is bright and architectural, with provenance and redaction always visible.
+          </p>
+        </div>
+        <div class="concept-body">
+          <div class="visual">
+            <div class="growth one"></div>
+            <div class="growth two"></div>
+            <div class="pane-zone one">Provider health<span>read-only</span></div>
+            <div class="pane-zone two">Research coverage<span>partial</span></div>
+            <div class="pane-zone three">Market context<span>cached</span></div>
+          </div>
+          <aside class="side">
+            <div class="panel">
+              <h3>Best for</h3>
+              <p>Compliance clarity, provider visibility, and redaction transparency.</p>
             </div>
-            <p>Contrarian stance: replace quote grids with a newsroom flow of “what changed,” “why surfaced,” source confidence, and catalyst history.</p>
-          </div>
-          <div class="mock">
-            <section class="panel brief">
-              <div class="panel-title"><h3>Market Brief</h3><span class="pill blue">Fixture mode</span></div>
-              <p>5 stories surfaced: two stale reads, one ETF record gap, one ownership update, one macro context note.</p>
-            </section>
-            <section class="panel index">
-              <div class="panel-title"><h3>Story Index</h3><span class="pill">Grouped</span></div>
-              <div class="rows">
-                <div class="row"><strong>Positions</strong><small>4 active</small><span>Open</span></div>
-                <div class="row"><strong>Watchlist</strong><small>6 catalysts</small><span>Scan</span></div>
-              </div>
-            </section>
-            <section class="panel stories">
-              <div class="panel-title"><h3>Today Stories</h3><span class="pill amber">Needs review</span></div>
-              <div class="story"><strong>SPY: ETF record is fresh, macro context changed</strong><p>Factsheet age improved; N-PORT cache still synthetic. Source coverage high.</p></div>
-              <div class="story"><strong>NVDA: profitable but evidence is thin</strong><p>Strong PnL is visually secondary to missing thesis and concentration context.</p></div>
-            </section>
-            <section class="panel rail">
-              <div class="panel-title"><h3>Evidence Rail</h3><span class="pill green">Source cards</span></div>
-              <div class="rows">
-                <div class="row"><strong>SEC</strong><small>Companyfacts</small><span class="green">Fresh</span></div>
-                <div class="row"><strong>ETF</strong><small>Issuer factsheet</small><span class="amber">Partial</span></div>
-                <div class="row"><strong>News</strong><small>RSS context</small><span>Queued</span></div>
-              </div>
-            </section>
-            <section class="panel catalysts">
-              <div class="panel-title"><h3>Catalyst Ticker</h3><span class="pill violet">Timeline</span></div>
-              <p>Earnings window, ETF holdings refresh, ownership filing context, and stale quote notes.</p>
-            </section>
-          </div>
-        </article>
+            <div class="receipt">
+              <strong>Source badge</strong>
+              <p>Official public source. Retrieved today. Raw payload not exposed to browser.</p>
+            </div>
+            <div class="receipt">
+              <strong>Safety envelope</strong>
+              <p>Mutation features disabled. Trading routes absent from this view.</p>
+            </div>
+          </aside>
+        </div>
+      </article>
 
-        <article class="concept triage">
-          <div class="concept-head">
-            <div>
-              <span class="concept-tag">Option 3</span>
-              <h2>Triage Control</h2>
-              <p>Mission-control workflow where positions, provider gaps, and anomalies become cases in a queue.</p>
+      <article class="concept planetarium">
+        <div class="concept-head">
+          <div class="concept-title">
+            <span class="tag">Designer exploration</span>
+            <h2>Portfolio Planetarium</h2>
+          </div>
+          <p>
+            A memorable observatory view where instruments are bodies and evidence records are moons.
+            The council considers this more experimental and less suitable as the default first screen.
+          </p>
+        </div>
+        <div class="concept-body">
+          <div class="visual">
+            <div class="orbit one"></div>
+            <div class="orbit two"></div>
+            <div class="orbit three"></div>
+            <div class="planet one">Holding<span>source ring</span></div>
+            <div class="planet two">ETF<span>3 receipts</span></div>
+            <div class="planet three">Watch<span>fresh</span></div>
+            <div class="moon one"></div>
+            <div class="moon two"></div>
+            <div class="moon three"></div>
+          </div>
+          <aside class="side">
+            <div class="panel">
+              <h3>Best for</h3>
+              <p>Memorability, whole-account overview, and playful exploration.</p>
             </div>
-            <p>Contrarian stance: the dashboard is an operating room, not a portfolio trophy case. The primary interface is severity and evidence.</p>
+            <div class="receipt">
+              <strong>Risk</strong>
+              <p>May become decorative or abstract. Needs plain labels and receipt drawer.</p>
+            </div>
+            <div class="lens-row">
+              <span class="lens">Coverage</span>
+              <span class="lens">Freshness</span>
+              <span class="lens">Provider state</span>
+            </div>
+          </aside>
+        </div>
+      </article>
+
+      <article class="concept plain">
+        <div class="concept-head">
+          <div class="concept-title">
+            <span class="tag">Council fallback</span>
+            <h2>Plain Atlas</h2>
           </div>
-          <div class="mock">
-            <section class="panel command">
-              <div class="panel-title"><h3>Command Strip</h3><span class="pill">Read only locked</span></div>
-              <div class="case-grid">
-                <div class="tile"><strong>Provider</strong><p>Fixture read</p></div>
-                <div class="tile"><strong>Cache</strong><p>30s read TTL</p></div>
-                <div class="tile"><strong>Integrity</strong><p>No raw IDs exposed</p></div>
-              </div>
-            </section>
-            <section class="panel queue">
-              <div class="panel-title"><h3>Portfolio Triage Queue</h3><span class="pill red">Critical first</span></div>
-              <div class="rows">
-                <div class="row"><strong>EURUSD</strong><small>Stale quote</small><span class="red">Critical</span></div>
-                <div class="row"><strong>BTC</strong><small>Volatility</small><span class="amber">Elevated</span></div>
-                <div class="row"><strong>QQQ</strong><small>Evidence gap</small><span>Watch</span></div>
-              </div>
-            </section>
-            <section class="panel case">
-              <div class="panel-title"><h3>Active Case Bay</h3><span class="pill cyan">EURUSD</span></div>
-              <p>Case combines exposure, stale-data status, provider metadata, missing coverage, and redacted audit history.</p>
-              <div class="case-grid">
-                <div class="tile"><strong>Freshness</strong><p class="red">Expired</p></div>
-                <div class="tile"><strong>Exposure</strong><p>16% gross</p></div>
-                <div class="tile"><strong>Action</strong><p>Review source</p></div>
-              </div>
-            </section>
-            <section class="panel anomalies">
-              <div class="panel-title"><h3>Anomaly Stack</h3><span class="pill amber">6 alerts</span></div>
-              <div class="rows">
-                <div class="row"><strong>Concentration</strong><small>Threshold crossed</small><span>Watch</span></div>
-                <div class="row"><strong>Bot veto</strong><small>Simulation only</small><span>Blocked</span></div>
-              </div>
-            </section>
-            <section class="panel actions">
-              <div class="panel-title"><h3>Read-Only Action Queue</h3><span class="pill green">Session</span></div>
-              <p>Verify source, refresh read, inspect evidence, mark reviewed, open Risk Radar, open Research Desk.</p>
-            </section>
-            <section class="panel audit">
-              <div class="panel-title"><h3>Audit Timeline</h3><span class="pill">Redacted</span></div>
-              <p>Provider read, cache hit, route source, latency, and normalization status.</p>
-            </section>
+          <p>
+            A simpler map of account areas for users who prefer navigation clarity over a stronger visual
+            metaphor. It keeps the first screen calm while preserving the receipt-first model.
+          </p>
+        </div>
+        <div class="concept-body">
+          <div class="visual">
+            <div class="map-grid"></div>
+            <div class="plain-zone one">Portfolio<span>fresh</span></div>
+            <div class="plain-zone two">Sources<span>2 partial</span></div>
+            <div class="plain-zone three">Research<span>context only</span></div>
+            <div class="plain-zone four">Provider<span>cached</span></div>
+            <div class="plain-zone five">Bot monitor<span>simulation</span></div>
           </div>
-        </article>
-      </div>
+          <aside class="side">
+            <div class="panel">
+              <h3>Best for</h3>
+              <p>Clear navigation, plain labels, and a low-risk path into implementation.</p>
+            </div>
+            <div class="receipt">
+              <strong>Header rule</strong>
+              <p>Read-only, demo/real mode, last refresh, source state, and cache status are always visible.</p>
+            </div>
+          </aside>
+        </div>
+      </article>
+
+      <section class="concept">
+        <div class="concept-head">
+          <div class="concept-title">
+            <span class="tag strong">Next implementation gate</span>
+            <h2>Acceptance criteria</h2>
+          </div>
+          <p>
+            These checks define when a selected design is ready to implement. They intentionally favor
+            trust, clarity, and restraint over finance-terminal density.
+          </p>
+        </div>
+        <div class="side">
+          <div class="criteria-grid">
+            <div class="criterion"><strong>Persistent safety</strong><p>Global header shows read-only, demo/real, provider state, last refresh, and stale/cache state.</p></div>
+            <div class="criterion"><strong>No trading language</strong><p>No buy, sell, close, copy, rebalance, recommend, optimize, execute, or best-move phrasing.</p></div>
+            <div class="criterion"><strong>Receipts everywhere</strong><p>Every displayed fact carries source type, freshness, retrieved time, or unavailable state.</p></div>
+            <div class="criterion"><strong>Plain copy</strong><p>Use fresh, stale, source missing, fixture, read-only, and needs review before expert terms.</p></div>
+            <div class="criterion"><strong>Designed empty states</strong><p>Fixture, stale, rate-limited, provider-offline, missing, and partial data states are first-class.</p></div>
+            <div class="criterion"><strong>Privacy boundary</strong><p>No account IDs, position IDs, exact balances, raw payloads, screenshots, credentials, or private exports.</p></div>
+          </div>
+        </div>
+      </section>
     </main>
   </body>
 </html>
