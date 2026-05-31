@@ -149,3 +149,6 @@ metaphor.
 
 The accompanying static design board is at
 `docs/designs/etoro-dashboard-concepts.html`.
+
+Additional visually distinct option mocks are at
+`docs/designs/etoro-dashboard-six-directions.html`.
