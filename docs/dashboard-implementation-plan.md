@@ -62,6 +62,69 @@ Initial libraries:
 
 The dashboard should grow as a tabbed workspace rather than a single fixed view. Start with the operational cockpit, then add focused views behind tabs as their API contracts stabilize.
 
+## 2026-05-31 Portfolio Requirements Refinement
+
+The primary dashboard job is quick portfolio understanding by instrument, not
+by individual position ticket. If the same stock, ETF, crypto asset, or other
+instrument has multiple open positions, the default portfolio view should show
+one aggregated row for that instrument. Raw positions can be available in an
+expandable drilldown, but they should not be the first scanning surface.
+
+The portfolio view should follow the eToro-style table shape from the reference
+screenshot while improving analysis and context:
+
+- Instrument/asset identity and market/category.
+- Current price.
+- Change for the currently selected performance period.
+- Total units across all open positions in that instrument.
+- Weighted average open price across positions.
+- Aggregated P/L and P/L percentage.
+- Total invested amount.
+- Net value.
+- Selected-period performance chart for the instrument.
+- Context-only enrichment links/status for insider trades, financial records,
+  and related news.
+
+Each instrument row needs a performance-period toggle shared by the view or
+available per row:
+
+- 24 hours.
+- 1 week.
+- 1 month.
+- 1 year.
+- 5 years.
+- Max.
+
+Changing the period should update both the displayed change value and the chart
+for that instrument. The chart is informational only and must show source and
+freshness metadata. It must not imply buy/sell/hold advice.
+
+Portfolio enrichment is useful, but must stay contextual:
+
+- Insider trades: source-linked records, preferably official filings first.
+- Financial information: source-linked fundamentals or filings coverage.
+- News: source-linked related headlines or summaries.
+
+Enrichment should appear as availability/status, links, or receipts attached to
+instrument rows and detail drawers. It must not create recommendations, bot
+signals, or trade triggers.
+
+The statistics view should be a separate first-class tab or section covering:
+
+- Performance breakdowns by period, market, asset class, instrument, and source
+  freshness where available.
+- Portfolio risk analysis including concentration, allocation, exposure, stale
+  data, leverage/margin indicators where available, and drawdown/volatility
+  style context where supported by safe data.
+- Dividend expectations with breakdown by market, payout frequency, portfolio
+  weight, yield, expected income, source, and confidence/coverage state.
+
+The Money-maker 3000 control area belongs in its own bot section. It should
+show current bot mode, strategy/config, budget/risk limits, allowed universe,
+cadence/no-HFT posture, run history, audit events, and kill-switch state.
+Execution remains disabled until a separate reviewed execution design approves
+it; current controls should stay simulation/backtest-first.
+
 Planned tabs:
 
 1. Landing / Widgets: modular overview with key figures and draggable widget layout later. Widget interactions can open compact detail popovers for small information or navigate to a deeper tab/page when the data volume is larger.

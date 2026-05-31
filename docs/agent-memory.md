@@ -1,7 +1,7 @@
 # Etoro Dashboard Agent Memory
 
 Status: active
-Last updated: 2026-05-16
+Last updated: 2026-05-31
 
 ## Current Truth
 
@@ -15,6 +15,20 @@ Last updated: 2026-05-16
 - Read-only live-provider routes use a configurable short server-side success cache plus short negative-cache/backoff metadata for 429, timeout, and 5xx failures, with request coalescing, freshness metadata, provider read duration metadata, and a redacted `/api/etoro/status` cache-policy summary; inactive tab status panels lazy-load on first activation so initial refreshes do not duplicate provider or planning calls.
 - API error responses fail closed for unexpected server exceptions: known eToro provider/config errors use fixed public messages, while unexpected failures return a generic public message without local paths, credential/header names, or secret-like values.
 - Planned UI direction is a switchable tab workspace: Landing / Widgets, Operational Cockpit, Risk Radar, Research Desk, and a demo-first Trading tab.
+- Current product requirement for the next design/implementation pass: the
+  primary portfolio view must aggregate multiple open positions by instrument
+  and show one summarized row per stock/ETF/crypto/asset by default. The row
+  should include asset, price, selected-period change, total units, weighted
+  average open price, P/L, P/L percentage, invested amount, net value, and a
+  selected-period performance chart. Supported periods are 24 hours, 1 week,
+  1 month, 1 year, 5 years, and max.
+- Instrument enrichment should appear as context-only receipts/links for
+  insider trades, financial information, and related news. These enrichments
+  must not become recommendations, bot signals, or trade triggers.
+- The dashboard needs a statistics view covering performance breakdowns,
+  portfolio risk analysis, and dividend expectations. Dividend analysis should
+  break down by market, payout frequency, portfolio weight, yield, expected
+  income, source, and coverage/confidence state.
 - The dashboard has a dedicated demo trading tab and non-executing preview behavior, but execution routes remain absent until a separate feature-flagged write flow is designed and reviewed. The preview/status surface hides provider endpoint paths from normal UI, exposes a permission/rate posture matrix, rejects sell-side, leverage-above-1, and close-position concepts, caps cash amount previews at the simulation budget ceiling, and bounds preview request bodies.
 - The dashboard has a Bot Monitor tab backed by `/api/etoro/bot/status`, `/api/etoro/bot/strategies`, `/api/etoro/bot/runs`, `/api/etoro/bot/audit`, `/api/etoro/bot/events`, `/api/etoro/bot/trade-log`, and `/api/etoro/bot/config`; it renders synthetic strategy cards, server-persisted simulation strategy/budget/market-group/instrument-class/cadence controls, hard budget stops, low-frequency/no-HFT posture, simulation ledger rows, event/audit feeds, and trade-log posture. Bot config is stored as a local server file outside the repo by default, requires local JSON requests with the GET-surfaced mutation token for PUT updates, writes through serialized atomic temp-file rename with fsync where practical, mirrors Money-maker's canonical `src/simulation-contract.mjs` shape through `test/fixtures/money-maker-simulation-contract.snapshot.json`, and does not enable execution or account mutation. The trade-log route also exposes redacted simulation report-contract metadata for planned dashboard/Sheets sinks without account identifiers, provider order IDs, position IDs, raw provider payloads, or replayable order details.
 - Bot Monitor config mirrors Money-maker's run-mode policy: `backtest` is the
@@ -77,3 +91,6 @@ Last updated: 2026-05-16
   spike until contracts and safety states are stable.
 - Next bot-monitoring work should keep execution and account mutation out of scope. The next provider-adjacent worker slice should start with historical market data for backtests, not dashboard account-data persistence.
 - Confirm authentication model for dashboard users if it will be accessible beyond the local machine.
+- Next UI design pass should produce visually inspectable mocks in
+  `docs/designs/` and use the instrument-aggregated portfolio table plus
+  statistics and Money-maker controls as the baseline requirement.

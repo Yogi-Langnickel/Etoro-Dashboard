@@ -152,3 +152,30 @@ The accompanying static design board is at
 
 Additional visually distinct option mocks are at
 `docs/designs/etoro-dashboard-six-directions.html`.
+
+## 2026-05-31 Requirement Refinement
+
+The next design pass should stop treating the first screen as an abstract
+metaphor. The user needs a practical portfolio dashboard first:
+
+- Default portfolio view aggregates positions by instrument. Multiple positions
+  in the same stock or asset appear as one summarized instrument row, with raw
+  positions available through drilldown.
+- The row model should include asset, price, selected-period change, units,
+  weighted average open price, P/L, P/L percentage, invested amount, net value,
+  and a selected-period chart.
+- Period controls must support 24 hours, 1 week, 1 month, 1 year, 5 years, and
+  max. The selected period drives both the row change value and chart.
+- Enrichment belongs beside each instrument as context-only receipts or links:
+  insider trades, financial information, and related news.
+- A statistics view is required for performance breakdowns, portfolio risk
+  analysis, and dividend expectations. Dividend analysis should break down by
+  market, payout frequency, portfolio weight, yield, expected income, source,
+  and coverage/confidence.
+- A Money-maker 3000 bot section is required for simulation/backtest controls,
+  strategy/config, risk limits, run history, audit events, and kill-switch
+  posture. Execution controls remain disabled unless a separate reviewed
+  execution design approves them.
+
+Future design options should be visually inspectable mocks under
+`docs/designs/`. They should differ structurally, not just by color palette.
