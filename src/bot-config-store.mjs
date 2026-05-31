@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 export const DEFAULT_BOT_CONFIG_FILE = join(homedir(), ".config", "etoro-dashboard", "bot-config.json");
-export const BOT_CONFIG_MIRROR_SOURCE = "Money-maker-3000/src/simulation-contract.mjs";
+export const BOT_CONFIG_MIRROR_SOURCE = "Money-maker-3000/src/money_maker_3000/contracts.py";
 export const BOT_CONFIG_CONTRACT_VERSION = "0.1.0-sim";
 
 export const ALLOWED_BOT_STRATEGY_IDS = Object.freeze([

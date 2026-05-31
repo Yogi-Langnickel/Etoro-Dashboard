@@ -1,5 +1,5 @@
 {
-  "source": "Money-maker-3000/src/simulation-contract.mjs",
+  "source": "Money-maker-3000/src/money_maker_3000/contracts.py",
   "version": "0.1.0-sim",
   "markets": [
     "US_EQUITIES",

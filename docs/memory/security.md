@@ -38,7 +38,7 @@ High-impact risks:
   mutation-protection token surfaced by the GET config payload. Saved config
   writes must use serialized atomic temp-file rename with fsync where
   practical, and must mirror the Money-maker canonical contract at
-  `Money-maker-3000/src/simulation-contract.mjs`; the local snapshot fixture is
+  `Money-maker-3000/src/money_maker_3000/contracts.py`; the local snapshot fixture is
   the drift check for this repo. Unexpected save failures must not expose local
   config or temp-file paths to browser responses. Bot config does not enable
   provider calls, order previews, demo execution, or live execution.

@@ -128,7 +128,7 @@ function renderStatus(payload) {
   text(
     "source-detail",
     configured
-      ? `${status.credentialSource}; ${formatCacheDuration(cacheTtlMs)}`
+      ? `Server configured; ${formatCacheDuration(cacheTtlMs)}`
       : `No server credentials; ${formatCacheDuration(cacheTtlMs)}`,
   );
   text("chart-provider", configured ? `Provider: ${status.baseUrl}` : "Provider timestamp: unavailable");
@@ -921,15 +921,7 @@ async function refreshRiskStatus() {
 
 async function refreshBotStatus() {
   try {
-    const [status, strategies, config, runs, audit, events, tradeLog] = await Promise.all([
-      getJson("/api/etoro/bot/status"),
-      getJson("/api/etoro/bot/strategies"),
-      getJson("/api/etoro/bot/config"),
-      getJson("/api/etoro/bot/runs"),
-      getJson("/api/etoro/bot/audit"),
-      getJson("/api/etoro/bot/events"),
-      getJson("/api/etoro/bot/trade-log"),
-    ]);
+    const { status, strategies, config, runs, audit, events, tradeLog } = await getJson("/api/etoro/bot/snapshot");
     renderBotStatus(status);
     renderBotControlSelects(status, strategies, config);
     renderBotStrategies(strategies);

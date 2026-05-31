@@ -54,7 +54,7 @@ Public material currently describes API access for market data, portfolios, watc
   PUT updates require application/json, a local dashboard Host/Origin, and the
   CSRF-style mutation header/token returned by GET. Writes use serialized
   atomic temp-file rename with fsync where practical. Validation mirrors the
-  Money-maker contract at `Money-maker-3000/src/simulation-contract.mjs`, and
+  Money-maker contract at `Money-maker-3000/src/money_maker_3000/contracts.py`, and
   the local snapshot fixture must be updated with any intentional contract
   change. Strategy-incompatible market-group/instrument-class/cadence
   combinations such as DCA plus FOREX are rejected.

@@ -43,8 +43,19 @@ async function callHandler(handler, { method = "GET", url = "/api/health", body 
     status: response.status,
     headers: response.headers,
     text: response.body,
-    json: response.body ? JSON.parse(response.body) : null,
+    json: parseJsonBody(response.body),
   };
+}
+
+function parseJsonBody(body) {
+  if (!body) {
+    return null;
+  }
+  try {
+    return JSON.parse(body);
+  } catch {
+    return null;
+  }
 }
 
 async function readBotConfigMutationProtection(handler) {
@@ -107,6 +118,7 @@ test("server exposes only internal API routes and no execution routes", () => {
     "/api/etoro/bot/events",
     "/api/etoro/bot/trade-log",
     "/api/etoro/bot/config",
+    "/api/etoro/bot/snapshot",
     "/api/etoro/risk/status",
     "/api/etoro/research/status",
   ]);
@@ -220,7 +232,7 @@ test("bot trade log is synthetic, budget-scoped, and redacted", async () => {
   assert.equal(response.json.mutationRoutesEnabled, false);
   assert.equal(response.json.summary.source, "synthetic-ledger-preview");
   assert.equal(response.json.summary.budgetRemainingUsd, 1000);
-  assert.equal(response.json.reportContract.source, "Money-maker-3000/src/simulation-contract.mjs");
+  assert.equal(response.json.reportContract.source, "Money-maker-3000/src/money_maker_3000/contracts.py");
   assert.equal(response.json.reportContract.version, "0.1.0-sim");
   assert.equal(response.json.reportContract.ledgerType, "simulation-report-preview");
   assert.equal(response.json.reportContract.executionCapability, "absent");
@@ -244,6 +256,28 @@ test("bot trade log is synthetic, budget-scoped, and redacted", async () => {
   assert.equal(response.text.includes("portfolio-snapshot"), false);
 });
 
+test("bot snapshot batches monitor routes without execution data", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/api/etoro/bot/snapshot",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.mode, "bot-snapshot");
+  assert.equal(response.json.readOnly, true);
+  assert.equal(response.json.status.mode, "bot-monitoring-planning");
+  assert.equal(response.json.strategies.strategies.length, 3);
+  assert.equal(response.json.config.mode, "bot-config");
+  assert.equal(response.json.runs.runs.length, 2);
+  assert.equal(response.json.audit.auditEvents.length, 3);
+  assert.equal(response.json.events.events.length, 3);
+  assert.equal(response.json.tradeLog.entries.length, 2);
+  assert.equal(response.json.safeguards.executionRoutes, "absent");
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes('"accountId"'), false);
+  assert.equal(response.text.includes('"positionId"'), false);
+});
+
 test("bot config returns default server-side simulation controls without secrets", async () => {
   const response = await callHandler(configuredHandler(), {
     url: "/api/etoro/bot/config",
@@ -265,7 +299,7 @@ test("bot config returns default server-side simulation controls without secrets
   assert.deepEqual(response.json.options.runModes, ["backtest", "execute"]);
   assert.equal(response.json.options.runModePolicy.backtest.enabled, true);
   assert.equal(response.json.options.runModePolicy.execute.enabled, false);
-  assert.equal(response.json.mirrorSource, "Money-maker-3000/src/simulation-contract.mjs");
+  assert.equal(response.json.mirrorSource, "Money-maker-3000/src/money_maker_3000/contracts.py");
   assert.equal(response.json.contractVersion, "0.1.0-sim");
   assert.deepEqual(response.json.options.strategyRules["dca-cash-reserve"].allowedInstrumentClasses, [
     "EQUITY",
@@ -1446,6 +1480,25 @@ test("non-GET API requests are rejected", async () => {
 
   assert.equal(response.status, 405);
   assert.equal(response.json.error.code, "METHOD_NOT_ALLOWED");
+});
+
+test("json responses include financial-dashboard security headers", async () => {
+  const response = await callHandler(createRequestHandler(), { url: "/api/health" });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers["x-content-type-options"], "nosniff");
+  assert.equal(response.headers["referrer-policy"], "no-referrer");
+  assert.equal(response.headers["cache-control"], "no-store");
+});
+
+test("static responses include restrictive browser security headers", async () => {
+  const response = await callHandler(createRequestHandler(), { url: "/index.html" });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers["x-content-type-options"], "nosniff");
+  assert.equal(response.headers["referrer-policy"], "no-referrer");
+  assert.equal(response.headers["content-security-policy"].includes("frame-ancestors 'none'"), true);
+  assert.equal(response.headers["content-security-policy"].includes("default-src 'self'"), true);
 });
 
 test("malformed URL paths return a controlled not-found response", async () => {

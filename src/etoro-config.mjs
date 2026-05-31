@@ -166,8 +166,7 @@ export function publicCredentialStatus(config) {
     configured: config.configured,
     demoTradePreviewEnabled: Boolean(config.demoTradePreviewEnabled),
     readCacheTtlMs: config.readCacheTtlMs,
-    credentialFileLoaded: config.credentialFileLoaded,
-    credentialSource: config.credentialSource,
+    credentialPosture: config.configured ? "server-configured" : "missing",
     missing: [...config.missing],
   };
 }

@@ -37,6 +37,7 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/bot/events",
   "/api/etoro/bot/trade-log",
   "/api/etoro/bot/config",
+  "/api/etoro/bot/snapshot",
   "/api/etoro/risk/status",
   "/api/etoro/research/status",
 ]);
@@ -74,6 +75,20 @@ const CONTENT_TYPES = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
+
+const JSON_SECURITY_HEADERS = Object.freeze({
+  "content-type": "application/json; charset=utf-8",
+  "cache-control": "no-store",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+});
+
+const STATIC_SECURITY_HEADERS = Object.freeze({
+  "cache-control": "no-store",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+  "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+});
 
 const STATIC_FILES = new Map([
   ["/", "index.html"],
@@ -178,8 +193,7 @@ function botStrategyRecords() {
 
 function sendJson(response, status, payload) {
   response.writeHead(status, {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store",
+    ...JSON_SECURITY_HEADERS,
   });
   response.end(JSON.stringify(payload, null, 2));
 }
@@ -386,8 +400,8 @@ async function serveStatic(request, response, pathname) {
   try {
     const body = await readFile(filePath);
     response.writeHead(200, {
+      ...STATIC_SECURITY_HEADERS,
       "content-type": CONTENT_TYPES[extname(filePath)] ?? "application/octet-stream",
-      "cache-control": "no-store",
     });
     response.end(request.method === "HEAD" ? undefined : body);
   } catch {
@@ -888,6 +902,43 @@ function botTradeLog(config) {
       rawProviderPayloads: "hidden",
       orderPayloads: "not-created",
       highFrequencyTrading: "blocked",
+    },
+  };
+}
+
+async function botSnapshot(config, options) {
+  const loadStoredBotConfig = options.loadBotConfig ?? loadBotConfig;
+  const loaded = await loadStoredBotConfig({
+    configFile: options.botConfigFile,
+  });
+
+  return {
+    ok: true,
+    mode: "bot-snapshot",
+    readOnly: true,
+    demoOnly: true,
+    mutationRoutesEnabled: false,
+    status: botMonitoringStatus(config),
+    strategies: botStrategyRegistry(config),
+    config: {
+      ...publicBotConfigPayload(loaded.config, loaded),
+      mutationProtection: {
+        csrfHeader: BOT_CONFIG_CSRF_HEADER,
+        csrfToken: botConfigCsrfToken,
+        localOriginOnly: true,
+        contentType: "application/json",
+      },
+    },
+    runs: botSimulationRuns(config),
+    audit: botAuditEvents(config),
+    events: botEventFeed(config),
+    tradeLog: botTradeLog(config),
+    safeguards: {
+      providerCalls: "blocked",
+      executionRoutes: "absent",
+      accountIdentifiers: "redacted",
+      rawProviderPayloads: "hidden",
+      payloadShape: "batched-read-only-status",
     },
   };
 }
@@ -1425,6 +1476,11 @@ async function handleApiRoute(pathname, response, options) {
 
     if (pathname === "/api/etoro/bot/trade-log") {
       sendJson(response, 200, botTradeLog(config));
+      return;
+    }
+
+    if (pathname === "/api/etoro/bot/snapshot") {
+      sendJson(response, 200, await botSnapshot(config, options));
       return;
     }
 

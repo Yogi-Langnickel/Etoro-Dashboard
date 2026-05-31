@@ -30,7 +30,25 @@ Last updated: 2026-05-31
   break down by market, payout frequency, portfolio weight, yield, expected
   income, source, and coverage/confidence state.
 - The dashboard has a dedicated demo trading tab and non-executing preview behavior, but execution routes remain absent until a separate feature-flagged write flow is designed and reviewed. The preview/status surface hides provider endpoint paths from normal UI, exposes a permission/rate posture matrix, rejects sell-side, leverage-above-1, and close-position concepts, caps cash amount previews at the simulation budget ceiling, and bounds preview request bodies.
-- The dashboard has a Bot Monitor tab backed by `/api/etoro/bot/status`, `/api/etoro/bot/strategies`, `/api/etoro/bot/runs`, `/api/etoro/bot/audit`, `/api/etoro/bot/events`, `/api/etoro/bot/trade-log`, and `/api/etoro/bot/config`; it renders synthetic strategy cards, server-persisted simulation strategy/budget/market-group/instrument-class/cadence controls, hard budget stops, low-frequency/no-HFT posture, simulation ledger rows, event/audit feeds, and trade-log posture. Bot config is stored as a local server file outside the repo by default, requires local JSON requests with the GET-surfaced mutation token for PUT updates, writes through serialized atomic temp-file rename with fsync where practical, mirrors Money-maker's canonical `src/simulation-contract.mjs` shape through `test/fixtures/money-maker-simulation-contract.snapshot.json`, and does not enable execution or account mutation. The trade-log route also exposes redacted simulation report-contract metadata for planned dashboard/Sheets sinks without account identifiers, provider order IDs, position IDs, raw provider payloads, or replayable order details.
+- The dashboard has a Bot Monitor tab backed by `/api/etoro/bot/snapshot`
+  plus focused routes for `/api/etoro/bot/status`,
+  `/api/etoro/bot/strategies`, `/api/etoro/bot/runs`,
+  `/api/etoro/bot/audit`, `/api/etoro/bot/events`,
+  `/api/etoro/bot/trade-log`, and `/api/etoro/bot/config`; the UI uses the
+  batched snapshot to avoid seven parallel reads when the tab opens. It renders
+  synthetic strategy cards, server-persisted simulation
+  strategy/budget/market-group/instrument-class/cadence controls, hard budget
+  stops, low-frequency/no-HFT posture, simulation ledger rows, event/audit
+  feeds, and trade-log posture. Bot config is stored as a local server file
+  outside the repo by default, requires local JSON requests with the
+  GET-surfaced mutation token for PUT updates, writes through serialized atomic
+  temp-file rename with fsync where practical, mirrors Money-maker's canonical
+  Python `src/money_maker_3000/contracts.py` shape through
+  `test/fixtures/money-maker-simulation-contract.snapshot.json`, and does not
+  enable execution or account mutation. The trade-log route also exposes
+  redacted simulation report-contract metadata for planned dashboard/Sheets
+  sinks without account identifiers, provider order IDs, position IDs, raw
+  provider payloads, or replayable order details.
 - Bot Monitor config mirrors Money-maker's run-mode policy: `backtest` is the
   only selectable enabled mode and is limited to offline fixture inputs;
   `execute` is visible in the contract/UI as disabled and is rejected by the
@@ -40,6 +58,9 @@ Last updated: 2026-05-31
 - Research Desk now exposes provider fallback/readiness metadata through `/api/etoro/research/status` and renders it in the dashboard. The metadata is synthetic and read-only: no live provider fetches, no credential values, no account identifiers, no raw payloads, and no trade or bot signal output.
 - Research intelligence should prefer free official APIs/datasets first: SEC companyfacts for US stock fundamentals, SEC Forms 3/4/5 insider transaction datasets/RSS for insiders, SEC N-PORT datasets and issuer factsheets for ETFs, and RSS/free APIs for news. Scrapling is fallback only after API/RSS options are checked. Use source allowlists, robots/terms review, caching, and no trade triggers; do not use anti-bot bypass/proxy/stealth modes for finance news without explicit terms/compliance approval.
 - Treat the app backend boundary as mandatory: all provider calls, credential handling, DTO normalization, caching/freshness metadata, rate-limit handling, and audit persistence belong server-side.
+- Default browser responses include financial-dashboard safety headers:
+  no-store caching, `X-Content-Type-Options: nosniff`, no referrer, and a
+  restrictive static-page CSP with `frame-ancestors 'none'`.
 - Dashboard account-linked data is non-durable by default. Use live read-only
   provider reads plus short in-memory server cache/backoff metadata only; do
   not persist portfolio exports, balances, holdings, position ids, order ids,
