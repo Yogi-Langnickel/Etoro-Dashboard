@@ -7,7 +7,10 @@ Canonical memory and durable docs now live in the central workspace memory repo:
 - Workspace memory: `/Users/yogi/Coding/docs/workspace/agent-memory.md`
 - eToro Dashboard memory: `/Users/yogi/Coding/docs/projects/etoro-dashboard/agent-memory.md`
 
-Repo-local `docs/` files are compatibility copies for existing scripts and historical links. Prefer the central docs above for new durable memory; update repo-local copies only when a repo script, CI check, or in-repo reference still requires it.
+Repo-local `docs/` files are compatibility references for existing scripts and
+historical links. Prefer the central docs above for new durable memory; update
+repo-local content only when a repo script, CI check, or in-repo reference still
+requires a local file.
 
 ## Project Security Classification
 
