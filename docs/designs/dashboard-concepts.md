@@ -179,3 +179,32 @@ metaphor. The user needs a practical portfolio dashboard first:
 
 Future design options should be visually inspectable mocks under
 `docs/designs/`. They should differ structurally, not just by color palette.
+
+## 2026-06-03 Visual Requirement Update
+
+The design board in
+`docs/designs/2026-06-02-portfolio-bot-tabs/` is rejected as an implementation
+baseline. Keep it only as an archive of explored directions. The next design
+or implementation pass must use these updated tab requirements instead:
+
+- The primary navigation has three top-level tabs:
+  - `Portfolio View`
+  - `Watchlist Items`
+  - `Bot Control`
+- `Portfolio View` keeps the left portfolio tree/list and right context/action
+  rail, but the central workspace must be split vertically:
+  - Top half: selected instrument performance graph with period controls.
+  - Bottom half: enrichments for the selected instrument, such as key financial
+    information, related news, and insider trading records.
+- Portfolio enrichments remain context-only receipts. They must not become
+  advice, recommendations, bot signals, rebalance triggers, or trade triggers.
+- `Watchlist Items` is a separate first-class tab, not a subsection of the
+  portfolio tab. Use `docs/designs/terminal_prime.html` as the current visual
+  reference for this tab: ticker tape, compact watchlist table, large selected
+  instrument chart, and right-side read-only/status/log panes. Treat it as a
+  mockup reference, not production code or an approved dependency model.
+- `Bot Control` remains separate from portfolio and watchlist workflows. It
+  should show Money-maker mode, strategy, budgets, risk stops, cadence, audit,
+  run history, and locked execution posture.
+- The visual style is not yet approved. Do not assume the rejected options are
+  acceptable just because their artifacts exist.

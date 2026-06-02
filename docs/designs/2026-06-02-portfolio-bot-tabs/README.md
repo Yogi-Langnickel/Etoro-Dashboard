@@ -1,10 +1,17 @@
 # eToro Dashboard Portfolio And Bot Tab Options
 
 Date: 2026-06-02
+Status: rejected as implementation baseline on 2026-06-03
 
 These are static, synthetic design mocks for the next practical dashboard pass.
 They are not implementation files and do not contain private account data,
 provider payloads, account identifiers, or real balances.
+
+The user rejected these options as too unsuitable for the desired visual
+direction. Keep this folder as historical design evidence only. The active
+visual requirement is now a three-tab workspace: `Portfolio View`, `Watchlist
+Items`, and `Bot Control`, with `docs/designs/terminal_prime.html` as the
+watchlist-tab visual reference.
 
 Open:
 

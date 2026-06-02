@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terminal Prime Mock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .glass-border {
+        border-color: rgba(63, 63, 70, 0.4);
+      }
+    </style>
+  </head>
+  <body
+    class="bg-black text-[#00ff00] min-h-screen p-2 text-xs uppercase tracking-tight overflow-hidden"
+  >
+    <!-- Top Ticker Tape -->
+    <div
+      class="border-b border-zinc-800 pb-1 mb-2 flex space-x-8 overflow-hidden whitespace-nowrap"
+    >
+      <span>AAPL 189.43 <span class="text-green-400">+1.23%</span></span>
+      <span>BTC 64,210.00 <span class="text-red-500">-2.45%</span></span>
+      <span>TSLA 175.22 <span class="text-green-400">+0.88%</span></span>
+      <span>NVDA 894.21 <span class="text-green-400">+3.12%</span></span>
+      <span>ETH 3,450.12 <span class="text-red-500">-1.15%</span></span>
+    </div>
+
+    <div class="grid grid-cols-12 gap-1 h-[calc(100vh-60px)]">
+      <!-- Left: Watchlist -->
+      <div
+        class="col-span-3 border border-zinc-800 p-2 overflow-y-auto bg-zinc-950"
+      >
+        <h2 class="text-zinc-500 mb-2 border-b border-zinc-800">
+          01_WATCHLIST
+        </h2>
+        <table class="w-full text-left">
+          <thead>
+            <tr class="text-zinc-600">
+              <th>SYM</th>
+              <th class="text-right">PX</th>
+              <th class="text-right">CHG</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-zinc-900">
+            <tr class="hover:bg-zinc-900 cursor-pointer">
+              <td>AAPL</td>
+              <td class="text-right">189.43</td>
+              <td class="text-right text-green-400">+1.2%</td>
+            </tr>
+            <tr class="hover:bg-zinc-900 cursor-pointer">
+              <td>BTC</td>
+              <td class="text-right">64.2K</td>
+              <td class="text-right text-red-500">-2.4%</td>
+            </tr>
+            <tr class="hover:bg-zinc-900 cursor-pointer">
+              <td>TSLA</td>
+              <td class="text-right">175.22</td>
+              <td class="text-right text-green-400">+0.8%</td>
+            </tr>
+            <tr class="hover:bg-zinc-900 cursor-pointer">
+              <td>NVDA</td>
+              <td class="text-right">894.21</td>
+              <td class="text-right text-green-400">+3.1%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Center: Main Chart Area -->
+      <div
+        class="col-span-7 border border-zinc-800 relative bg-zinc-950 flex flex-col"
+      >
+        <div class="p-2 border-b border-zinc-800 flex justify-between">
+          <span class="text-zinc-500">CHART_VIEW :: AAPL.US [1D]</span>
+          <div class="flex space-x-2">
+            <span class="px-1 border border-zinc-700">1M</span>
+            <span class="px-1 border border-green-500 bg-green-900/20">5M</span>
+            <span class="px-1 border border-zinc-700">1H</span>
+          </div>
+        </div>
+        <div
+          class="flex-grow flex items-center justify-center border-zinc-900 border-dashed border-2 m-4 text-zinc-800 text-lg"
+        >
+          <div class="text-center">
+            [SVG_CANDLESTICK_RENDERER]<br />
+            <span class="text-xs opacity-50"
+              >High-Frequency Data Stream Active</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Status Panes -->
+      <div class="col-span-2 space-y-1">
+        <div
+          class="border border-zinc-800 p-2 bg-zinc-950 h-1/2 overflow-hidden"
+        >
+          <h2 class="text-zinc-500 mb-1">SEC_STATUS</h2>
+          <div class="text-blue-400 flex items-center gap-1">
+            <div class="w-1 h-1 bg-blue-400 animate-pulse"></div>
+            [OK] READ_ONLY
+          </div>
+          <div class="text-yellow-500">[!] GATED_EXEC</div>
+          <div class="mt-4 text-[10px] text-zinc-600">
+            Node: v20.x<br />
+            Latency: 42ms<br />
+            Rate-Limit: 14/15
+          </div>
+        </div>
+        <div
+          class="border border-zinc-800 p-2 bg-zinc-900 h-1/2 font-mono text-zinc-400 overflow-hidden"
+        >
+          <div class="text-zinc-600 underline mb-1">BOT_LOGS:</div>
+          <div class="whitespace-pre overflow-hidden">
+            > Initializing...<br />> Cadence: Low<br />> API 200 OK<br />> No
+            Signals.
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

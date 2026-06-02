@@ -1,7 +1,7 @@
 # Etoro Dashboard Agent Memory
 
 Status: active
-Last updated: 2026-05-31
+Last updated: 2026-06-03
 
 ## Current Truth
 
@@ -14,7 +14,9 @@ Last updated: 2026-05-31
 - First local live-provider slice uses a dependency-free Node server with server-only eToro credentials, read-only routes, and built-in `node:test` coverage.
 - Read-only live-provider routes use a configurable short server-side success cache plus short negative-cache/backoff metadata for 429, timeout, and 5xx failures, with request coalescing, freshness metadata, provider read duration metadata, and a redacted `/api/etoro/status` cache-policy summary; inactive tab status panels lazy-load on first activation so initial refreshes do not duplicate provider or planning calls.
 - API error responses fail closed for unexpected server exceptions: known eToro provider/config errors use fixed public messages, while unexpected failures return a generic public message without local paths, credential/header names, or secret-like values.
-- Planned UI direction is a switchable tab workspace: Landing / Widgets, Operational Cockpit, Risk Radar, Research Desk, and a demo-first Trading tab.
+- Active visual direction is a three-tab workspace: `Portfolio View`,
+  `Watchlist Items`, and `Bot Control`. The rejected 2026-06-02 design board is
+  historical only; do not use it as the implementation baseline.
 - Current product requirement for the next design/implementation pass: the
   primary portfolio view must aggregate multiple open positions by instrument
   and show one summarized row per stock/ETF/crypto/asset by default. The row
@@ -25,6 +27,15 @@ Last updated: 2026-05-31
 - Instrument enrichment should appear as context-only receipts/links for
   insider trades, financial information, and related news. These enrichments
   must not become recommendations, bot signals, or trade triggers.
+- In `Portfolio View`, the central selected-instrument workspace must be split
+  vertically: top half is the selected-period graph, bottom half is selected
+  instrument enrichments such as key financial information, news, and insider
+  trading records.
+- `Watchlist Items` is a separate first-class tab for watchlist instruments.
+  Use `docs/designs/terminal_prime.html` as the current visual reference for
+  the watchlist tab: ticker tape, compact watchlist table, large selected chart,
+  and right-side read-only/status/log panes. Treat it as a mockup reference, not
+  production code or an approved dependency model.
 - The dashboard needs a statistics view covering performance breakdowns,
   portfolio risk analysis, and dividend expectations. Dividend analysis should
   break down by market, payout frequency, portfolio weight, yield, expected

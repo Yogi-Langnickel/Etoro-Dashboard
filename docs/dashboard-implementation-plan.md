@@ -125,7 +125,51 @@ cadence/no-HFT posture, run history, audit events, and kill-switch state.
 Execution remains disabled until a separate reviewed execution design approves
 it; current controls should stay simulation/backtest-first.
 
-Planned tabs:
+## 2026-06-03 Visual Tab Requirements
+
+The previous `2026-06-02` five-option portfolio/bot design board was rejected
+by the user and must not be treated as the active visual baseline. The current
+visual requirement is a three-tab workspace:
+
+1. `Portfolio View`.
+1. `Watchlist Items`.
+1. `Bot Control`.
+
+`Portfolio View` requirements:
+
+- Keep the portfolio tree/list on the left and a context/action rail on the
+  right.
+- The center workspace is split vertically into two equal-priority regions:
+  - Top: selected instrument performance graph with 24h, 1w, 1m, 1y, 5y, and
+    max controls.
+  - Bottom: selected instrument enrichments, including key financial
+    information, related news, and insider trading records.
+- Enrichments are source-backed context receipts only. They must not imply
+  buy/sell/hold advice, prediction, recommendation, rebalance instruction, bot
+  signal, or trade trigger.
+
+`Watchlist Items` requirements:
+
+- This is a separate first-class tab for watchlist instruments, not a portfolio
+  subsection.
+- Use `docs/designs/terminal_prime.html` as the current visual mockup reference:
+  top ticker tape, compact watchlist table, large selected-instrument chart,
+  and right-side status/log panes.
+- The mockup is a visual reference only. Production code must still follow the
+  repo security model, avoid browser-side secrets, keep provider calls
+  server-side, and avoid unreviewed external runtime dependencies.
+- Watchlist rows should support symbol, price, selected-period change,
+  freshness/source state, and selection into the main chart/enrichment area.
+
+`Bot Control` requirements:
+
+- Keep Money-maker controls separate from portfolio and watchlist workflows.
+- Show simulation/backtest mode, strategy/config, budget/risk stops, allowed
+  universe, cadence/no-HFT posture, audit, run history, and kill-switch state.
+- Execution remains visually and technically locked unless a separate reviewed
+  execution design approves it.
+
+Historical planned tabs:
 
 1. Landing / Widgets: modular overview with key figures and draggable widget layout later. Widget interactions can open compact detail popovers for small information or navigate to a deeper tab/page when the data volume is larger.
 1. Operational Cockpit: dense first-build dashboard for scanning account state, provider status, positions, watchlists, market chart, and redacted audit events.
