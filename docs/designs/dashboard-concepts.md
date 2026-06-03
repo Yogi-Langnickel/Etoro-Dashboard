@@ -180,12 +180,15 @@ metaphor. The user needs a practical portfolio dashboard first:
 Future design options should be visually inspectable mocks under
 `docs/designs/`. They should differ structurally, not just by color palette.
 
-## 2026-06-03 Visual Requirement Update
+## 2026-06-03 Selected Direction
 
-The design board in
-`docs/designs/2026-06-02-portfolio-bot-tabs/` is rejected as an implementation
-baseline. Keep it only as an archive of explored directions. The next design
-or implementation pass must use these updated tab requirements instead:
+The design board in `docs/designs/2026-06-02-portfolio-bot-tabs/` is rejected
+as an implementation baseline. Keep it only as an archive of explored
+directions.
+
+The current preferred direction is Option 1 in a dark theme, captured as
+`docs/designs/etoro-dashboard-concepts.html`. Treat it as the active visual
+baseline for the next design/implementation pass:
 
 - The primary navigation has three top-level tabs:
   - `Portfolio View`
@@ -206,5 +209,6 @@ or implementation pass must use these updated tab requirements instead:
 - `Bot Control` remains separate from portfolio and watchlist workflows. It
   should show Money-maker mode, strategy, budgets, risk stops, cadence, audit,
   run history, and locked execution posture.
-- The visual style is not yet approved. Do not assume the rejected options are
-  acceptable just because their artifacts exist.
+- The visual style is dark, dense, and operational, but must keep the
+  Glasshouse/receipt posture: source freshness, read-only mode, redaction, and
+  absent execution routes are first-class.

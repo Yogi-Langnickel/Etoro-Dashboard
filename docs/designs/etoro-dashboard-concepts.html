@@ -3,24 +3,28 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>eToro Dashboard Design Reset</title>
+    <title>eToro Dashboard Dark Three-Tab Baseline</title>
     <style>
       :root {
-        color-scheme: light;
-        --ink: #1b2524;
-        --muted: #60706d;
-        --line: #cbd9d5;
-        --paper: #f7f3e8;
-        --paper-strong: #fffaf0;
-        --sea: #bcd9d8;
-        --sea-dark: #6e9fa0;
-        --rust: #a15b3c;
-        --green: #5d8d70;
-        --blue: #457db0;
-        --gold: #c79f45;
-        --fog: rgba(114, 124, 126, 0.24);
-        --shadow: rgba(47, 61, 58, 0.16);
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color-scheme: dark;
+        --bg: #080b0d;
+        --panel: #10161a;
+        --panel-strong: #151d22;
+        --rail: #0c1114;
+        --line: #26333a;
+        --line-strong: #384a53;
+        --ink: #e8f1ec;
+        --muted: #8fa29d;
+        --soft: #526761;
+        --green: #49d28f;
+        --teal: #34b7c9;
+        --amber: #e5b85c;
+        --red: #ed6a5e;
+        --blue: #7ba7ff;
+        --violet: #9b8cff;
+        --shadow: rgba(0, 0, 0, 0.44);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+          BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
 
       * {
@@ -29,39 +33,25 @@
 
       body {
         margin: 0;
-        background: #e9eee9;
+        min-height: 100vh;
+        background:
+          linear-gradient(180deg, rgba(52, 183, 201, 0.08), transparent 38%),
+          var(--bg);
         color: var(--ink);
       }
 
       main {
-        width: min(1480px, 100%);
+        width: min(1560px, 100%);
         margin: 0 auto;
-        padding: 24px;
+        padding: 18px;
       }
 
       header {
         display: grid;
-        grid-template-columns: minmax(300px, 0.82fr) minmax(360px, 1.18fr);
-        gap: 18px;
-        align-items: stretch;
-        margin-bottom: 18px;
-      }
-
-      .hero,
-      .review,
-      .concept,
-      .panel,
-      .receipt,
-      .criterion {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--paper-strong);
-        box-shadow: 0 14px 30px var(--shadow);
-      }
-
-      .hero,
-      .review {
-        padding: 20px;
+        grid-template-columns: minmax(320px, 1fr) auto;
+        gap: 14px;
+        align-items: end;
+        margin-bottom: 12px;
       }
 
       h1,
@@ -72,556 +62,434 @@
       }
 
       h1 {
-        margin-bottom: 10px;
-        max-width: 760px;
-        font-size: clamp(2.2rem, 5vw, 4.9rem);
-        line-height: 0.95;
+        margin-bottom: 8px;
+        font-size: 1.6rem;
         letter-spacing: 0;
       }
 
       h2 {
-        margin-bottom: 8px;
-        font-size: 1.35rem;
+        margin-bottom: 10px;
+        font-size: 0.86rem;
+        letter-spacing: 0;
+        text-transform: uppercase;
       }
 
       h3 {
-        margin-bottom: 7px;
-        font-size: 0.98rem;
+        margin-bottom: 4px;
+        font-size: 0.84rem;
       }
 
-      p,
-      li {
+      p {
         color: var(--muted);
-        line-height: 1.58;
+        line-height: 1.45;
       }
 
-      .tag-row,
-      .status-row,
-      .lens-row,
-      .receipt-row,
-      .score-row {
+      .meta,
+      .tabs,
+      .mode-strip,
+      .portfolio-shell,
+      .watchlist-shell,
+      .bot-shell,
+      .panel,
+      .metric,
+      .receipt,
+      .row,
+      .ticker {
+        border: 1px solid var(--line);
+        background: rgba(16, 22, 26, 0.88);
+        box-shadow: 0 16px 32px var(--shadow);
+      }
+
+      .meta {
+        padding: 12px;
+      }
+
+      .tabs {
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .tag,
-      .status,
-      .lens,
-      .source {
-        display: inline-flex;
-        min-height: 30px;
+        gap: 4px;
         align-items: center;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        padding: 5px 10px;
-        background: rgba(255, 255, 255, 0.55);
-        color: var(--ink);
+        padding: 5px;
+        background: var(--rail);
+      }
+
+      .tab {
+        min-height: 36px;
+        border: 1px solid transparent;
+        padding: 9px 12px;
+        color: var(--muted);
         font-size: 0.78rem;
-        font-weight: 700;
+        font-weight: 800;
+        white-space: nowrap;
       }
 
-      .tag.strong,
-      .status.safe {
-        border-color: rgba(93, 141, 112, 0.55);
-        background: rgba(93, 141, 112, 0.14);
-      }
-
-      .tag.warn,
-      .status.warn {
-        border-color: rgba(199, 159, 69, 0.55);
-        background: rgba(199, 159, 69, 0.16);
-      }
-
-      .review {
-        background:
-          linear-gradient(135deg, rgba(69, 125, 176, 0.12), rgba(93, 141, 112, 0.1)),
-          var(--paper-strong);
-      }
-
-      .rubric {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(110px, 1fr));
-        gap: 8px;
-        margin-top: 16px;
-      }
-
-      .rubric div {
-        min-height: 94px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 10px;
-        background: rgba(255, 255, 255, 0.52);
-      }
-
-      .rubric strong {
-        display: block;
+      .tab.active {
+        border-color: rgba(73, 210, 143, 0.55);
+        background: rgba(73, 210, 143, 0.12);
         color: var(--ink);
+      }
+
+      .mode-strip {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(120px, 1fr));
+        gap: 1px;
+        margin-bottom: 12px;
+        overflow: hidden;
+        background: var(--line);
+      }
+
+      .mode-item {
+        min-height: 62px;
+        padding: 10px;
+        background: var(--rail);
+      }
+
+      .mode-item span,
+      .eyebrow {
+        display: block;
+        color: var(--soft);
+        font-size: 0.66rem;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .mode-item strong {
+        display: block;
+        margin-top: 5px;
         font-size: 0.86rem;
       }
 
-      .rubric span {
-        display: block;
-        margin-top: 6px;
-        color: var(--muted);
-        font-size: 0.76rem;
-        line-height: 1.35;
+      .safe {
+        color: var(--green);
       }
 
-      .concept {
-        overflow: hidden;
-        margin-bottom: 24px;
+      .warn {
+        color: var(--amber);
       }
 
-      .concept-head {
+      .bad {
+        color: var(--red);
+      }
+
+      .portfolio-shell {
         display: grid;
-        grid-template-columns: minmax(260px, 0.8fr) minmax(360px, 1.2fr);
-        gap: 16px;
-        padding: 20px;
+        grid-template-columns: minmax(270px, 0.9fr) minmax(520px, 1.75fr) minmax(240px, 0.78fr);
+        gap: 1px;
+        min-height: 730px;
+        overflow: hidden;
+        background: var(--line);
+      }
+
+      .pane {
+        min-width: 0;
+        background: var(--panel);
+      }
+
+      .pane-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        min-height: 48px;
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+        background: var(--rail);
+      }
+
+      .pane-body {
+        padding: 12px;
+      }
+
+      .portfolio-row {
+        display: grid;
+        grid-template-columns: minmax(90px, 1.15fr) 0.75fr 0.75fr;
+        gap: 8px;
+        align-items: center;
+        min-height: 52px;
+        border-bottom: 1px solid rgba(38, 51, 58, 0.72);
+        padding: 8px 10px;
+      }
+
+      .portfolio-row.selected {
+        border-left: 3px solid var(--green);
+        background: rgba(73, 210, 143, 0.08);
+      }
+
+      .portfolio-row small,
+      .table small,
+      .receipt small,
+      .metric small {
+        display: block;
+        color: var(--soft);
+        font-size: 0.66rem;
+      }
+
+      .value {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-rows: minmax(320px, 1fr) minmax(320px, 1fr);
+        gap: 1px;
+        background: var(--line);
+      }
+
+      .chart-panel,
+      .enrichment-panel {
+        min-width: 0;
+        background: var(--panel-strong);
+      }
+
+      .chart-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: start;
+        padding: 14px;
         border-bottom: 1px solid var(--line);
       }
 
-      .concept-title {
+      .periods {
         display: flex;
-        flex-direction: column;
-        gap: 10px;
+        flex-wrap: wrap;
+        gap: 5px;
       }
 
-      .concept-title h2 {
-        margin: 0;
-        font-size: clamp(1.9rem, 3.8vw, 3.6rem);
-        line-height: 0.98;
-      }
-
-      .concept-body {
-        display: grid;
-        grid-template-columns: minmax(420px, 1.18fr) minmax(320px, 0.82fr);
-        gap: 0;
-      }
-
-      .visual {
-        min-height: 510px;
-        border-right: 1px solid var(--line);
-        position: relative;
-        overflow: hidden;
-      }
-
-      .side {
-        padding: 18px;
-        background: rgba(255, 255, 255, 0.34);
-      }
-
-      .panel {
-        padding: 14px;
-        margin-bottom: 12px;
-        box-shadow: none;
-      }
-
-      .panel ul {
-        padding-left: 18px;
-        margin-bottom: 0;
-      }
-
-      .soundings .visual {
-        background:
-          radial-gradient(circle at 19% 34%, rgba(244, 248, 236, 0.86) 0 5%, transparent 5.4%),
-          radial-gradient(circle at 59% 42%, rgba(244, 248, 236, 0.9) 0 9%, transparent 9.5%),
-          radial-gradient(circle at 77% 70%, rgba(244, 248, 236, 0.84) 0 6%, transparent 6.5%),
-          repeating-radial-gradient(circle at 54% 46%, transparent 0 36px, rgba(69, 125, 176, 0.18) 37px 39px),
-          linear-gradient(135deg, rgba(188, 217, 216, 0.92), rgba(233, 238, 233, 0.2));
-      }
-
-      .map-grid {
-        position: absolute;
-        inset: 0;
-        background-image:
-          linear-gradient(rgba(27, 37, 36, 0.08) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(27, 37, 36, 0.08) 1px, transparent 1px);
-        background-size: 42px 42px;
-      }
-
-      .island,
-      .planet,
-      .pane-zone,
-      .plain-zone {
-        position: absolute;
-        display: grid;
-        place-items: center;
-        text-align: center;
-        border: 1px solid rgba(27, 37, 36, 0.35);
-        color: var(--ink);
-        font-weight: 800;
-      }
-
-      .island {
-        border-radius: 48% 52% 43% 57%;
-        background: #f8f0d5;
-        box-shadow: inset 0 0 0 9px rgba(93, 141, 112, 0.13), 0 16px 30px rgba(44, 72, 70, 0.18);
-      }
-
-      .island span,
-      .planet span,
-      .pane-zone span,
-      .plain-zone span {
-        display: block;
+      .period {
+        min-width: 38px;
+        border: 1px solid var(--line-strong);
+        padding: 5px 8px;
         color: var(--muted);
         font-size: 0.68rem;
-        font-weight: 700;
-      }
-
-      .island.one {
-        width: 140px;
-        height: 112px;
-        left: 12%;
-        top: 22%;
-      }
-
-      .island.two {
-        width: 186px;
-        height: 138px;
-        left: 45%;
-        top: 32%;
-      }
-
-      .island.three {
-        width: 122px;
-        height: 96px;
-        right: 12%;
-        bottom: 17%;
-      }
-
-      .reef {
-        position: absolute;
-        border: 2px dashed rgba(161, 91, 60, 0.72);
-        border-radius: 50%;
-        transform: rotate(-12deg);
-      }
-
-      .reef.one {
-        width: 260px;
-        height: 130px;
-        left: 39%;
-        top: 28%;
-      }
-
-      .reef.two {
-        width: 210px;
-        height: 106px;
-        left: 6%;
-        top: 18%;
-      }
-
-      .fog {
-        position: absolute;
-        right: -24px;
-        top: 70px;
-        width: 250px;
-        height: 300px;
-        border-radius: 45%;
-        background: var(--fog);
-        filter: blur(1px);
-      }
-
-      .tide {
-        position: absolute;
-        left: 20px;
-        right: 20px;
-        bottom: 18px;
-        display: grid;
-        grid-template-columns: 1.2fr 0.8fr 0.5fr;
-        overflow: hidden;
-        border: 1px solid rgba(27, 37, 36, 0.25);
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.72);
-      }
-
-      .tide div {
-        padding: 9px 12px;
-        font-size: 0.76rem;
         font-weight: 800;
+        text-align: center;
       }
 
-      .tide div:nth-child(1) {
-        background: rgba(93, 141, 112, 0.16);
+      .period.active {
+        border-color: rgba(52, 183, 201, 0.7);
+        background: rgba(52, 183, 201, 0.14);
+        color: var(--ink);
       }
 
-      .tide div:nth-child(2) {
-        background: rgba(199, 159, 69, 0.2);
-      }
-
-      .tide div:nth-child(3) {
-        background: rgba(114, 124, 126, 0.18);
-      }
-
-      .glasshouse .visual {
+      .chart {
+        position: relative;
+        height: 245px;
+        margin: 14px;
+        border: 1px solid var(--line);
         background:
-          linear-gradient(90deg, rgba(255, 250, 240, 0.96), rgba(221, 238, 232, 0.9)),
-          var(--paper);
+          linear-gradient(rgba(38, 51, 58, 0.45) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(38, 51, 58, 0.45) 1px, transparent 1px),
+          #0a0f12;
+        background-size: 100% 25%, 12.5% 100%;
+        overflow: hidden;
       }
 
-      .glasshouse .visual::before {
-        content: "";
+      .chart svg {
         position: absolute;
-        inset: 35px 55px;
-        border: 2px solid rgba(69, 125, 176, 0.42);
-        clip-path: polygon(50% 0, 100% 24%, 100% 100%, 0 100%, 0 24%);
-        background:
-          linear-gradient(120deg, rgba(255, 255, 255, 0.52), rgba(69, 125, 176, 0.08)),
-          repeating-linear-gradient(90deg, transparent 0 64px, rgba(69, 125, 176, 0.13) 65px 66px);
+        inset: 0;
+        width: 100%;
+        height: 100%;
       }
 
-      .pane-zone {
-        border-radius: 14px;
-        backdrop-filter: blur(2px);
-        background: rgba(255, 255, 255, 0.52);
-      }
-
-      .pane-zone.one {
-        width: 165px;
-        height: 110px;
-        left: 13%;
-        top: 30%;
-      }
-
-      .pane-zone.two {
-        width: 200px;
-        height: 128px;
-        left: 43%;
-        top: 22%;
-      }
-
-      .pane-zone.three {
-        width: 160px;
-        height: 118px;
-        right: 12%;
-        bottom: 19%;
-      }
-
-      .growth {
+      .chart-note {
         position: absolute;
-        border: 1px solid rgba(93, 141, 112, 0.42);
-        border-radius: 50%;
+        left: 12px;
+        bottom: 10px;
+        color: var(--soft);
+        font-size: 0.68rem;
       }
 
-      .growth.one {
-        width: 260px;
-        height: 180px;
-        left: 39%;
-        top: 20%;
-      }
-
-      .growth.two {
-        width: 190px;
-        height: 190px;
-        right: 8%;
-        bottom: 10%;
-      }
-
-      .planetarium .visual {
-        color-scheme: dark;
-        background:
-          radial-gradient(circle at 50% 50%, rgba(69, 125, 176, 0.2), transparent 28%),
-          radial-gradient(circle at 32% 30%, rgba(199, 159, 69, 0.12), transparent 15%),
-          #101719;
-      }
-
-      .orbit {
-        position: absolute;
-        border: 1px solid rgba(247, 243, 232, 0.18);
-        border-radius: 50%;
-        transform: rotate(-18deg);
-      }
-
-      .orbit.one {
-        width: 520px;
-        height: 220px;
-        left: 8%;
-        top: 30%;
-      }
-
-      .orbit.two {
-        width: 380px;
-        height: 170px;
-        left: 23%;
-        top: 36%;
-      }
-
-      .orbit.three {
-        width: 250px;
-        height: 116px;
-        left: 35%;
-        top: 41%;
-      }
-
-      .planet {
-        border-radius: 50%;
-        background: #f0ead7;
-        box-shadow: 0 0 0 10px rgba(126, 184, 217, 0.15), 0 0 35px rgba(126, 184, 217, 0.2);
-      }
-
-      .planet span {
-        color: #42514f;
-      }
-
-      .planet.one {
-        width: 118px;
-        height: 118px;
-        left: 15%;
-        top: 26%;
-      }
-
-      .planet.two {
-        width: 150px;
-        height: 150px;
-        left: 50%;
-        top: 35%;
-      }
-
-      .planet.three {
-        width: 92px;
-        height: 92px;
-        right: 18%;
-        bottom: 18%;
-      }
-
-      .moon {
-        position: absolute;
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        background: var(--gold);
-        box-shadow: 0 0 14px rgba(199, 159, 69, 0.62);
-      }
-
-      .moon.one {
-        left: 32%;
-        top: 26%;
-      }
-
-      .moon.two {
-        right: 30%;
-        top: 33%;
-      }
-
-      .moon.three {
-        right: 13%;
-        bottom: 34%;
-      }
-
-      .plain .visual {
-        background:
-          linear-gradient(135deg, rgba(247, 243, 232, 0.96), rgba(233, 238, 233, 0.96)),
-          var(--paper);
-      }
-
-      .plain-zone {
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.7);
-        box-shadow: inset 0 0 0 8px rgba(188, 217, 216, 0.24);
-      }
-
-      .plain-zone.one {
-        width: 190px;
-        height: 120px;
-        left: 10%;
-        top: 16%;
-      }
-
-      .plain-zone.two {
-        width: 210px;
-        height: 140px;
-        left: 42%;
-        top: 24%;
-      }
-
-      .plain-zone.three {
-        width: 180px;
-        height: 110px;
-        right: 10%;
-        top: 13%;
-      }
-
-      .plain-zone.four {
-        width: 210px;
-        height: 126px;
-        left: 20%;
-        bottom: 16%;
-      }
-
-      .plain-zone.five {
-        width: 190px;
-        height: 118px;
-        right: 19%;
-        bottom: 18%;
+      .enrichment-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px;
       }
 
       .receipt {
+        min-height: 164px;
         padding: 12px;
-        margin-bottom: 10px;
-        background: rgba(255, 255, 255, 0.66);
         box-shadow: none;
-      }
-
-      .receipt strong {
-        display: block;
-        margin-bottom: 4px;
       }
 
       .receipt p {
-        margin-bottom: 0;
-        font-size: 0.82rem;
+        margin-bottom: 10px;
+        font-size: 0.78rem;
       }
 
-      .council {
-        margin-top: 10px;
-        border: 2px solid rgba(93, 141, 112, 0.46);
-      }
-
-      .criteria-grid {
+      .rail-list {
         display: grid;
-        grid-template-columns: repeat(3, minmax(220px, 1fr));
-        gap: 12px;
+        gap: 10px;
       }
 
-      .criterion {
-        padding: 14px;
+      .metric {
+        padding: 12px;
         box-shadow: none;
       }
 
-      .criterion strong {
+      .metric strong {
         display: block;
-        margin-bottom: 6px;
+        margin-top: 4px;
+        font-size: 1.05rem;
       }
 
-      @media (max-width: 1040px) {
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .pill {
+        display: inline-flex;
+        min-height: 26px;
+        align-items: center;
+        border: 1px solid var(--line-strong);
+        padding: 4px 8px;
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 800;
+      }
+
+      .pill.locked {
+        border-color: rgba(237, 106, 94, 0.58);
+        color: #ffb5ad;
+      }
+
+      .watchlist-shell {
+        display: grid;
+        grid-template-rows: auto minmax(520px, 1fr);
+        gap: 1px;
+        margin-top: 18px;
+        overflow: hidden;
+        background: var(--line);
+      }
+
+      .ticker {
+        display: flex;
+        gap: 28px;
+        overflow: hidden;
+        padding: 9px 12px;
+        background: #050707;
+        box-shadow: none;
+        white-space: nowrap;
+      }
+
+      .watch-grid {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.88fr) minmax(520px, 1.7fr) minmax(230px, 0.76fr);
+        gap: 1px;
+        background: var(--line);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid rgba(38, 51, 58, 0.72);
+        padding: 8px;
+        text-align: left;
+      }
+
+      th {
+        color: var(--soft);
+        font-size: 0.66rem;
+        text-transform: uppercase;
+      }
+
+      td:last-child,
+      th:last-child {
+        text-align: right;
+      }
+
+      .terminal-chart {
+        height: 390px;
+        margin: 12px;
+        border: 1px dashed var(--line-strong);
+        display: grid;
+        place-items: center;
+        color: #1f3d29;
+        background: #060909;
+        text-align: center;
+      }
+
+      .log {
+        border-left: 2px solid rgba(73, 210, 143, 0.54);
+        padding: 8px 10px;
+        color: var(--muted);
+        font-size: 0.72rem;
+      }
+
+      .bot-shell {
+        display: grid;
+        grid-template-columns: minmax(300px, 1fr) minmax(420px, 1.2fr) minmax(260px, 0.8fr);
+        gap: 1px;
+        margin-top: 18px;
+        overflow: hidden;
+        background: var(--line);
+      }
+
+      .control-list {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .control {
+        border: 1px solid var(--line);
+        padding: 12px;
+        background: var(--rail);
+      }
+
+      .slider {
+        height: 7px;
+        margin-top: 10px;
+        background: linear-gradient(90deg, var(--green) 0 36%, var(--line) 36%);
+      }
+
+      @media (max-width: 1180px) {
         header,
-        .concept-head,
-        .concept-body,
-        .criteria-grid {
+        .portfolio-shell,
+        .watch-grid,
+        .bot-shell {
           grid-template-columns: 1fr;
         }
 
-        .visual {
-          border-right: 0;
-          border-bottom: 1px solid var(--line);
+        .mode-strip {
+          grid-template-columns: repeat(2, minmax(140px, 1fr));
         }
 
-        .rubric {
-          grid-template-columns: repeat(2, minmax(130px, 1fr));
+        .portfolio-shell,
+        .watchlist-shell,
+        .bot-shell {
+          min-height: 0;
         }
       }
 
-      @media (max-width: 680px) {
+      @media (max-width: 760px) {
         main {
-          padding: 14px;
+          padding: 10px;
         }
 
-        .visual {
-          min-height: 440px;
+        .tabs {
+          overflow-x: auto;
         }
 
-        .rubric {
+        .mode-strip,
+        .enrichment-grid {
           grid-template-columns: 1fr;
+        }
+
+        .workspace {
+          grid-template-rows: auto auto;
+        }
+
+        .chart {
+          height: 210px;
         }
       }
     </style>
@@ -629,226 +497,272 @@
   <body>
     <main>
       <header>
-        <section class="hero">
-          <div class="tag-row">
-            <span class="tag strong">Second review draft</span>
-            <span class="tag">Read-only</span>
-            <span class="tag warn">No advice</span>
-          </div>
-          <h1>Design reset for a calmer personal dashboard</h1>
+        <section class="meta">
+          <span class="eyebrow">Selected direction: option 1 dark theme</span>
+          <h1>Glasshouse Split Workbench</h1>
           <p>
-            The first concepts were too close to professional finance workstations. This reset explores
-            spatial, personal, and source-receipt-driven interfaces that do not look like trading terminals.
+            A darker variant of the option 1 workbench, now reshaped around the
+            active three-tab requirement. Portfolio rows aggregate open
+            positions by instrument. Enrichments are receipts only. Bot controls
+            are simulation/backtest posture, with execution and account
+            mutation locked out.
           </p>
-          <div class="status-row">
-            <span class="status safe">Read-only lock visible</span>
-            <span class="status">Demo/real mode visible</span>
-            <span class="status">Sources shown as receipts</span>
-            <span class="status warn">No buy/sell language</span>
-          </div>
         </section>
-
-        <section class="review">
-          <h2>Non-specialist review rule</h2>
-          <p>
-            A smart family member should understand the first screen in 10 seconds: what mode this is,
-            whether data is fresh, what changed, what is missing, and why it is safe to inspect.
-          </p>
-          <div class="rubric">
-            <div><strong>25% understand</strong><span>Demo or real, read-only, fresh or stale, and what needs attention.</span></div>
-            <div><strong>25% restraint</strong><span>No trading nudges, scores, or urgency. Sources and privacy posture are visible.</span></div>
-            <div><strong>20% distance</strong><span>Not another dark risk command center with renamed panels.</span></div>
-            <div><strong>15% language</strong><span>Plain labels first. Expert terms stay inside drilldown.</span></div>
-            <div><strong>15% receipts</strong><span>Enrichment is context and provenance, never advice.</span></div>
-          </div>
-        </section>
+        <nav class="tabs" aria-label="Primary dashboard tabs">
+          <div class="tab active">Portfolio View</div>
+          <div class="tab">Watchlist Items</div>
+          <div class="tab">Bot Control</div>
+        </nav>
       </header>
 
-      <article class="concept soundings council">
-        <div class="concept-head">
-          <div class="concept-title">
-            <span class="tag strong">Council recommendation</span>
-            <h2>Personal Soundings</h2>
-          </div>
-          <p>
-            A calm account journal built around a map-like surface. Holdings become personal observations
-            with freshness, source coverage, and receipt-backed context. It borrows transparency from
-            Glasshouse Atlas without making the first screen abstract.
-          </p>
+      <section class="mode-strip" aria-label="Safety and freshness status">
+        <div class="mode-item">
+          <span>Mode</span>
+          <strong class="safe">Read-only</strong>
         </div>
-        <div class="concept-body">
-          <div class="visual">
-            <div class="map-grid"></div>
-            <div class="fog"></div>
-            <div class="reef one"></div>
-            <div class="reef two"></div>
-            <div class="island one">Largest holding<span>fresh source</span></div>
-            <div class="island two">ETF area<span>holdings missing</span></div>
-            <div class="island three">Watchlist<span>news found</span></div>
-            <div class="tide">
-              <div>Fresh provider read</div>
-              <div>Cached public records</div>
-              <div>Fixture</div>
+        <div class="mode-item">
+          <span>Account context</span>
+          <strong>Demo/local</strong>
+        </div>
+        <div class="mode-item">
+          <span>Provider read</span>
+          <strong>Fresh 2m ago</strong>
+        </div>
+        <div class="mode-item">
+          <span>Source posture</span>
+          <strong>Receipts visible</strong>
+        </div>
+        <div class="mode-item">
+          <span>Trading routes</span>
+          <strong class="bad">Absent</strong>
+        </div>
+        <div class="mode-item">
+          <span>Bot mode</span>
+          <strong>Simulation only</strong>
+        </div>
+      </section>
+
+      <section class="portfolio-shell" aria-label="Portfolio View mock">
+        <aside class="pane">
+          <div class="pane-head">
+            <h2>Aggregated Instruments</h2>
+            <span class="eyebrow">Period: 1M</span>
+          </div>
+          <div class="portfolio-row selected">
+            <div><strong>AAPL</strong><small>3 open positions merged</small></div>
+            <div class="value">$189.43<small>+3.8%</small></div>
+            <div class="value">$8,941<small>net value</small></div>
+          </div>
+          <div class="portfolio-row">
+            <div><strong>VTI</strong><small>2 open positions merged</small></div>
+            <div class="value">$256.10<small>+1.1%</small></div>
+            <div class="value">$12,204<small>net value</small></div>
+          </div>
+          <div class="portfolio-row">
+            <div><strong>GLD</strong><small>1 open position</small></div>
+            <div class="value">$219.80<small>-0.4%</small></div>
+            <div class="value">$3,120<small>net value</small></div>
+          </div>
+          <div class="portfolio-row">
+            <div><strong>BTC</strong><small>2 open positions merged</small></div>
+            <div class="value">$64.2K<small>+7.5%</small></div>
+            <div class="value">$2,880<small>net value</small></div>
+          </div>
+          <div class="pane-body">
+            <div class="metric">
+              <small>Selected row contract</small>
+              <strong>Units, WAP, P/L, invested, net value, chart</strong>
             </div>
           </div>
-          <aside class="side">
-            <div class="panel">
-              <h3>Why the council chose it</h3>
-              <ul>
-                <li>Most creative break from finance workstation patterns.</li>
-                <li>Personal and calmer than a queue, lab, terminal, or newsroom.</li>
-                <li>Can expose enrichment as receipts without implying action.</li>
-              </ul>
+        </aside>
+
+        <section class="workspace">
+          <article class="chart-panel">
+            <div class="chart-top">
+              <div>
+                <span class="eyebrow">Selected instrument</span>
+                <h2>AAPL aggregated position graph</h2>
+                <p>Weighted average open price: $176.22. Total units: 47.2.</p>
+              </div>
+              <div class="periods" aria-label="Chart periods">
+                <span class="period">24h</span>
+                <span class="period">1w</span>
+                <span class="period active">1m</span>
+                <span class="period">1y</span>
+                <span class="period">5y</span>
+                <span class="period">max</span>
+              </div>
             </div>
-            <div class="receipt">
-              <strong>Receipt example</strong>
-              <p>ETF holdings unavailable. Source: issuer factsheet. Retrieved: cached. Context only.</p>
+            <div class="chart" aria-label="Synthetic line chart">
+              <svg viewBox="0 0 900 245" role="img">
+                <polyline
+                  points="0,190 80,177 150,184 220,150 310,160 390,118 480,126 570,82 680,92 780,48 900,60"
+                  fill="none"
+                  stroke="#49d28f"
+                  stroke-width="4"
+                />
+                <polyline
+                  points="0,206 90,202 180,192 280,176 380,170 500,151 620,143 760,130 900,114"
+                  fill="none"
+                  stroke="#34b7c9"
+                  stroke-width="2"
+                  opacity="0.65"
+                />
+              </svg>
+              <span class="chart-note">Synthetic chart mock. Source and freshness stay visible before production.</span>
             </div>
-            <div class="receipt">
-              <strong>Plain observation</strong>
-              <p>News context found for watchlist item. No recommendation generated.</p>
+          </article>
+
+          <article class="enrichment-panel">
+            <div class="pane-head">
+              <h2>Selected Instrument Receipts</h2>
+              <span class="eyebrow">Context only, no signals</span>
             </div>
-            <div class="lens-row">
-              <span class="lens">Freshness</span>
-              <span class="lens">Sources</span>
-              <span class="lens">Missing data</span>
-              <span class="lens">Watchlist</span>
+            <div class="enrichment-grid">
+              <div class="receipt">
+                <span class="eyebrow">Key financial information</span>
+                <h3>Coverage sufficient</h3>
+                <p>Public filings and fundamentals are available for review.</p>
+                <small>Source: official/public records. Retrieved: cached.</small>
+              </div>
+              <div class="receipt">
+                <span class="eyebrow">Related news</span>
+                <h3>4 headlines found</h3>
+                <p>Recent articles are attached as context, not ranked as actions.</p>
+                <small>Source: allowlisted RSS/public APIs. No recommendation.</small>
+              </div>
+              <div class="receipt">
+                <span class="eyebrow">Insider trading records</span>
+                <h3>Form 4 planning ready</h3>
+                <p>Open-market purchase records can be surfaced after mapping review.</p>
+                <small>Source: SEC EDGAR plan. Non-US coverage marked unavailable.</small>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <aside class="pane">
+          <div class="pane-head">
+            <h2>Context Rail</h2>
+          </div>
+          <div class="pane-body rail-list">
+            <div class="metric">
+              <small>Aggregated P/L</small>
+              <strong class="safe">+$624.20</strong>
+            </div>
+            <div class="metric">
+              <small>P/L percentage</small>
+              <strong class="safe">+7.49%</strong>
+            </div>
+            <div class="metric">
+              <small>Invested amount</small>
+              <strong>$8,316.80</strong>
+            </div>
+            <div class="metric">
+              <small>Provider privacy</small>
+              <strong>No account IDs shown</strong>
+            </div>
+            <div class="pill-row">
+              <span class="pill locked">No buy</span>
+              <span class="pill locked">No sell</span>
+              <span class="pill locked">No close</span>
+              <span class="pill locked">No copy</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="watchlist-shell" aria-label="Watchlist Items mock">
+        <div class="ticker">
+          <span>AAPL 189.43 <strong class="safe">+1.23%</strong></span>
+          <span>VTI 256.10 <strong class="safe">+0.42%</strong></span>
+          <span>GLD 219.80 <strong class="warn">-0.41%</strong></span>
+          <span>BTC 64.2K <strong class="safe">+2.12%</strong></span>
+          <span>TSLA 175.22 <strong class="bad">-1.08%</strong></span>
+        </div>
+        <div class="watch-grid">
+          <aside class="pane">
+            <div class="pane-head">
+              <h2>Watchlist Items</h2>
+              <span class="eyebrow">Terminal-prime reference</span>
+            </div>
+            <table class="table">
+              <thead>
+                <tr><th>Symbol</th><th>Price</th><th>Change</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>AAPL<small>fresh</small></td><td>189.43</td><td class="safe">+1.2%</td></tr>
+                <tr><td>NVDA<small>cached</small></td><td>894.21</td><td class="safe">+3.1%</td></tr>
+                <tr><td>BTC<small>fresh</small></td><td>64.2K</td><td class="bad">-2.4%</td></tr>
+                <tr><td>GLD<small>public source</small></td><td>219.80</td><td class="warn">-0.4%</td></tr>
+              </tbody>
+            </table>
+          </aside>
+          <section class="pane">
+            <div class="pane-head">
+              <h2>Selected Watchlist Chart</h2>
+              <div class="periods">
+                <span class="period">24h</span><span class="period active">1w</span><span class="period">1m</span>
+              </div>
+            </div>
+            <div class="terminal-chart">
+              <div>
+                [READ_ONLY_WATCHLIST_CHART]<br>
+                <small>Provider calls stay server-side. No advice or order preview.</small>
+              </div>
+            </div>
+          </section>
+          <aside class="pane">
+            <div class="pane-head"><h2>Status And Logs</h2></div>
+            <div class="pane-body rail-list">
+              <div class="log">[OK] read-only provider boundary</div>
+              <div class="log">[OK] browser receives normalized DTOs</div>
+              <div class="log">[LOCKED] execution routes absent</div>
+              <div class="log">[NOTE] enrichment opens receipt drawer only</div>
             </div>
           </aside>
         </div>
-      </article>
+      </section>
 
-      <article class="concept glasshouse">
-        <div class="concept-head">
-          <div class="concept-title">
-            <span class="tag">Designer exploration</span>
-            <h2>Glasshouse Ledger</h2>
+      <section class="bot-shell" aria-label="Bot Control mock">
+        <aside class="pane">
+          <div class="pane-head"><h2>Money-maker Mode</h2></div>
+          <div class="control-list">
+            <div class="control"><span class="eyebrow">Run mode</span><strong>Backtest / simulation</strong></div>
+            <div class="control"><span class="eyebrow">Execution</span><strong class="bad">Locked and absent</strong></div>
+            <div class="control"><span class="eyebrow">Cadence</span><strong>Low frequency only</strong></div>
           </div>
-          <p>
-            A transparency-first design for users who want to know how every displayed fact is known.
-            The visual language is bright and architectural, with provenance and redaction always visible.
-          </p>
-        </div>
-        <div class="concept-body">
-          <div class="visual">
-            <div class="growth one"></div>
-            <div class="growth two"></div>
-            <div class="pane-zone one">Provider health<span>read-only</span></div>
-            <div class="pane-zone two">Research coverage<span>partial</span></div>
-            <div class="pane-zone three">Market context<span>cached</span></div>
+        </aside>
+        <section class="pane">
+          <div class="pane-head"><h2>Strategy And Risk Stops</h2></div>
+          <div class="control-list">
+            <div class="control">
+              <span class="eyebrow">Strategy registry</span>
+              <strong>Predefined strategies only</strong>
+              <div class="slider"></div>
+            </div>
+            <div class="control">
+              <span class="eyebrow">Budget envelope</span>
+              <strong>$1,000 synthetic allocation cap</strong>
+              <div class="slider"></div>
+            </div>
+            <div class="pill-row">
+              <span class="pill locked">No credentials</span>
+              <span class="pill locked">No order preview</span>
+              <span class="pill locked">No demo trade</span>
+              <span class="pill locked">No live trade</span>
+            </div>
           </div>
-          <aside class="side">
-            <div class="panel">
-              <h3>Best for</h3>
-              <p>Compliance clarity, provider visibility, and redaction transparency.</p>
-            </div>
-            <div class="receipt">
-              <strong>Source badge</strong>
-              <p>Official public source. Retrieved today. Raw payload not exposed to browser.</p>
-            </div>
-            <div class="receipt">
-              <strong>Safety envelope</strong>
-              <p>Mutation features disabled. Trading routes absent from this view.</p>
-            </div>
-          </aside>
-        </div>
-      </article>
-
-      <article class="concept planetarium">
-        <div class="concept-head">
-          <div class="concept-title">
-            <span class="tag">Designer exploration</span>
-            <h2>Portfolio Planetarium</h2>
+        </section>
+        <aside class="pane">
+          <div class="pane-head"><h2>Audit Feed</h2></div>
+          <div class="pane-body rail-list">
+            <div class="log">Risk gate blocked: missing reconciliation</div>
+            <div class="log">Provider calls blocked for offline fixture batch</div>
+            <div class="log">Ledger DTO redacted for dashboard display</div>
+            <div class="log">Kill switch state visible before execution design</div>
           </div>
-          <p>
-            A memorable observatory view where instruments are bodies and evidence records are moons.
-            The council considers this more experimental and less suitable as the default first screen.
-          </p>
-        </div>
-        <div class="concept-body">
-          <div class="visual">
-            <div class="orbit one"></div>
-            <div class="orbit two"></div>
-            <div class="orbit three"></div>
-            <div class="planet one">Holding<span>source ring</span></div>
-            <div class="planet two">ETF<span>3 receipts</span></div>
-            <div class="planet three">Watch<span>fresh</span></div>
-            <div class="moon one"></div>
-            <div class="moon two"></div>
-            <div class="moon three"></div>
-          </div>
-          <aside class="side">
-            <div class="panel">
-              <h3>Best for</h3>
-              <p>Memorability, whole-account overview, and playful exploration.</p>
-            </div>
-            <div class="receipt">
-              <strong>Risk</strong>
-              <p>May become decorative or abstract. Needs plain labels and receipt drawer.</p>
-            </div>
-            <div class="lens-row">
-              <span class="lens">Coverage</span>
-              <span class="lens">Freshness</span>
-              <span class="lens">Provider state</span>
-            </div>
-          </aside>
-        </div>
-      </article>
-
-      <article class="concept plain">
-        <div class="concept-head">
-          <div class="concept-title">
-            <span class="tag">Council fallback</span>
-            <h2>Plain Atlas</h2>
-          </div>
-          <p>
-            A simpler map of account areas for users who prefer navigation clarity over a stronger visual
-            metaphor. It keeps the first screen calm while preserving the receipt-first model.
-          </p>
-        </div>
-        <div class="concept-body">
-          <div class="visual">
-            <div class="map-grid"></div>
-            <div class="plain-zone one">Portfolio<span>fresh</span></div>
-            <div class="plain-zone two">Sources<span>2 partial</span></div>
-            <div class="plain-zone three">Research<span>context only</span></div>
-            <div class="plain-zone four">Provider<span>cached</span></div>
-            <div class="plain-zone five">Bot monitor<span>simulation</span></div>
-          </div>
-          <aside class="side">
-            <div class="panel">
-              <h3>Best for</h3>
-              <p>Clear navigation, plain labels, and a low-risk path into implementation.</p>
-            </div>
-            <div class="receipt">
-              <strong>Header rule</strong>
-              <p>Read-only, demo/real mode, last refresh, source state, and cache status are always visible.</p>
-            </div>
-          </aside>
-        </div>
-      </article>
-
-      <section class="concept">
-        <div class="concept-head">
-          <div class="concept-title">
-            <span class="tag strong">Next implementation gate</span>
-            <h2>Acceptance criteria</h2>
-          </div>
-          <p>
-            These checks define when a selected design is ready to implement. They intentionally favor
-            trust, clarity, and restraint over finance-terminal density.
-          </p>
-        </div>
-        <div class="side">
-          <div class="criteria-grid">
-            <div class="criterion"><strong>Persistent safety</strong><p>Global header shows read-only, demo/real, provider state, last refresh, and stale/cache state.</p></div>
-            <div class="criterion"><strong>No trading language</strong><p>No buy, sell, close, copy, rebalance, recommend, optimize, execute, or best-move phrasing.</p></div>
-            <div class="criterion"><strong>Receipts everywhere</strong><p>Every displayed fact carries source type, freshness, retrieved time, or unavailable state.</p></div>
-            <div class="criterion"><strong>Plain copy</strong><p>Use fresh, stale, source missing, fixture, read-only, and needs review before expert terms.</p></div>
-            <div class="criterion"><strong>Designed empty states</strong><p>Fixture, stale, rate-limited, provider-offline, missing, and partial data states are first-class.</p></div>
-            <div class="criterion"><strong>Privacy boundary</strong><p>No account IDs, position IDs, exact balances, raw payloads, screenshots, credentials, or private exports.</p></div>
-          </div>
-        </div>
+        </aside>
       </section>
     </main>
   </body>
