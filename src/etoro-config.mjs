@@ -162,11 +162,12 @@ export async function loadEtoroConfig(options = {}) {
 
 export function publicCredentialStatus(config) {
   return {
-    baseUrl: config.baseUrl,
     configured: config.configured,
     demoTradePreviewEnabled: Boolean(config.demoTradePreviewEnabled),
     readCacheTtlMs: config.readCacheTtlMs,
     credentialPosture: config.configured ? "server-configured" : "missing",
+    providerHostPolicy: "official-host-allow-list",
+    providerEndpointDetails: "server-only",
     missing: [...config.missing],
   };
 }

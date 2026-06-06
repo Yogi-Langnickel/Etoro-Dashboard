@@ -5,6 +5,7 @@ const formatter = new Intl.NumberFormat("en-US", {
   style: "currency",
 });
 const overviewTabId = "overview-view";
+const botConfigCsrfResponseHeader = "x-etoro-dashboard-config-token";
 const loadedTabIds = new Set([overviewTabId]);
 let botConfigMutationProtection = null;
 let botConfigOptionsPayload = null;
@@ -75,6 +76,14 @@ async function getJson(path) {
     throw error;
   }
 
+  if (path === "/api/etoro/bot/config" && payload?.mutationProtection?.csrfHeader) {
+    const csrfToken = response.headers.get(botConfigCsrfResponseHeader);
+    payload.mutationProtection = {
+      ...payload.mutationProtection,
+      ...(csrfToken ? { csrfToken } : {}),
+    };
+  }
+
   return payload;
 }
 
@@ -123,7 +132,7 @@ function renderStatus(payload) {
     "provider-status",
     configured ? "ok" : "warn",
     configured ? "Provider configured" : "Provider offline",
-    configured ? `${status.baseUrl}` : "Using synthetic fixtures",
+    configured ? "Server-side provider boundary" : "Using synthetic fixtures",
   );
   text(
     "source-detail",
@@ -131,7 +140,7 @@ function renderStatus(payload) {
       ? `Server configured; ${formatCacheDuration(cacheTtlMs)}`
       : `No server credentials; ${formatCacheDuration(cacheTtlMs)}`,
   );
-  text("chart-provider", configured ? `Provider: ${status.baseUrl}` : "Provider timestamp: unavailable");
+  text("chart-provider", configured ? "Provider boundary: server-side only" : "Provider timestamp: unavailable");
 }
 
 function renderIdentity(payload) {

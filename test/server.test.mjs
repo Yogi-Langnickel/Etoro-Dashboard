@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import {
   ALLOWED_BOT_CADENCES,
   ALLOWED_BOT_INSTRUMENT_CLASSES,
@@ -22,6 +26,8 @@ import {
   createReadOnlyProviderCache,
   createRequestHandler,
 } from "../src/server.mjs";
+
+const BOT_CONFIG_CSRF_RESPONSE_HEADER = "x-etoro-dashboard-config-token";
 
 async function callHandler(handler, { method = "GET", url = "/api/health", body = "", headers = {} } = {}) {
   const response = {
@@ -58,13 +64,24 @@ function parseJsonBody(body) {
   }
 }
 
+const execFileAsync = promisify(execFile);
+
+async function readMoneyMakerContractSnapshot() {
+  return JSON.parse(
+    await readFile(new URL("./fixtures/money-maker-simulation-contract.snapshot.json", import.meta.url), "utf8"),
+  );
+}
+
 async function readBotConfigMutationProtection(handler) {
   const response = await callHandler(handler, {
     url: "/api/etoro/bot/config",
   });
 
   assert.equal(response.status, 200);
-  return response.json.mutationProtection;
+  return {
+    ...response.json.mutationProtection,
+    csrfToken: response.headers[BOT_CONFIG_CSRF_RESPONSE_HEADER],
+  };
 }
 
 function localBotConfigMutationHeaders(mutationProtection, overrides = {}) {
@@ -181,12 +198,20 @@ test("bot strategy registry is simulation-only and redacted", async () => {
   assert.equal(response.json.readOnly, true);
   assert.equal(response.json.botEnabled, false);
   assert.equal(response.json.mutationRoutesEnabled, false);
-  assert.equal(response.json.strategies.length, 3);
+  assert.equal(response.json.strategies.length, 5);
   assert.equal(response.json.strategies[0].strategyId, "dca-cash-reserve");
   assert.equal(response.json.strategies[0].allowedModes.includes("simulation"), true);
   assert.deepEqual(response.json.strategies[0].allowedMarkets, ["US_EQUITIES", "AU_EQUITIES"]);
   assert.deepEqual(response.json.strategies[0].allowedInstrumentClasses, ["EQUITY", "ETF"]);
   assert.equal(response.json.strategies[0].cadence, "daily");
+  assert.equal(
+    response.json.strategies.some((strategy) => strategy.strategyId === "volatility-band-accumulator"),
+    true,
+  );
+  assert.equal(
+    response.json.strategies.some((strategy) => strategy.strategyId === "slow-trend-allocation"),
+    true,
+  );
   assert.equal(response.json.strategies.some((strategy) => strategy.strategyId === "news-aware-watchlist"), true);
   assert.equal(response.json.budgetPolicy.maxConfigurableBudgetUsd, 2500);
   assert.equal(response.json.schedulePolicy.highFrequencyTrading, "blocked");
@@ -265,8 +290,11 @@ test("bot snapshot batches monitor routes without execution data", async () => {
   assert.equal(response.json.mode, "bot-snapshot");
   assert.equal(response.json.readOnly, true);
   assert.equal(response.json.status.mode, "bot-monitoring-planning");
-  assert.equal(response.json.strategies.strategies.length, 3);
+  assert.equal(response.json.strategies.strategies.length, 5);
   assert.equal(response.json.config.mode, "bot-config");
+  assert.equal(response.json.config.mutationProtection.csrfHeader, "x-etoro-dashboard-csrf");
+  assert.equal(response.json.config.mutationProtection.csrfToken, undefined);
+  assert.equal(response.json.config.mutationProtection.csrfTokenDelivery, "config-read-response-header");
   assert.equal(response.json.runs.runs.length, 2);
   assert.equal(response.json.audit.auditEvents.length, 3);
   assert.equal(response.json.events.events.length, 3);
@@ -292,11 +320,14 @@ test("bot config returns default server-side simulation controls without secrets
   assert.deepEqual(response.json.config.allowedInstrumentClasses, ["EQUITY", "ETF"]);
   assert.equal(response.json.config.minimumEvaluationIntervalMinutes, 240);
   assert.equal(response.json.mutationProtection.csrfHeader, "x-etoro-dashboard-csrf");
-  assert.equal(typeof response.json.mutationProtection.csrfToken, "string");
+  assert.equal(response.json.mutationProtection.csrfToken, undefined);
+  assert.equal(response.json.mutationProtection.csrfTokenDelivery, "config-read-response-header");
+  assert.equal(typeof response.headers[BOT_CONFIG_CSRF_RESPONSE_HEADER], "string");
+  assert.equal(response.text.includes(response.headers[BOT_CONFIG_CSRF_RESPONSE_HEADER]), false);
   assert.equal(response.json.mutationProtection.localOriginOnly, true);
   assert.equal(response.json.mutationProtection.contentType, "application/json");
   assert.equal(response.json.options.strategyRules["dca-cash-reserve"].status, "simulation-only");
-  assert.deepEqual(response.json.options.runModes, ["backtest", "execute"]);
+  assert.deepEqual(response.json.options.runModes, ["backtest"]);
   assert.equal(response.json.options.runModePolicy.backtest.enabled, true);
   assert.equal(response.json.options.runModePolicy.execute.enabled, false);
   assert.equal(response.json.mirrorSource, "Money-maker-3000/src/money_maker_3000/contracts.py");
@@ -316,13 +347,13 @@ test("bot config returns default server-side simulation controls without secrets
 });
 
 test("bot config mirror matches the Money-maker simulation contract snapshot", async () => {
-  const snapshot = JSON.parse(
-    await readFile(new URL("./fixtures/money-maker-simulation-contract.snapshot.json", import.meta.url), "utf8"),
-  );
+  const snapshot = await readMoneyMakerContractSnapshot();
 
   assert.equal(BOT_CONFIG_MIRROR_SOURCE, snapshot.source);
   assert.equal(BOT_CONFIG_CONTRACT_VERSION, snapshot.version);
   assert.deepEqual(ALLOWED_BOT_RUN_MODES, snapshot.runModes);
+  assert.deepEqual(snapshot.disabledRunModes, ["execute"]);
+  assert.equal(ALLOWED_BOT_RUN_MODES.includes("execute"), false);
   assert.deepEqual(BOT_RUN_MODE_POLICY, snapshot.runModePolicy);
   assert.deepEqual(ALLOWED_BOT_MARKETS, snapshot.markets);
   assert.deepEqual(ALLOWED_BOT_INSTRUMENT_CLASSES, snapshot.instrumentClasses);
@@ -330,6 +361,69 @@ test("bot config mirror matches the Money-maker simulation contract snapshot", a
   assert.deepEqual(ALLOWED_BOT_CADENCES, snapshot.cadences);
   assert.equal(MIN_BOT_EVALUATION_INTERVAL_MINUTES, snapshot.minimumEvaluationIntervalMinutes);
   assert.deepEqual(BOT_STRATEGY_CONFIG_RULES, snapshot.strategyRules);
+});
+
+test("bot config snapshot matches local Money-maker Python contract when available", async (context) => {
+  const moneyMakerSrc = fileURLToPath(new URL("../../Money-maker-3000/src", import.meta.url));
+  const contractPath = fileURLToPath(
+    new URL("../../Money-maker-3000/src/money_maker_3000/contracts.py", import.meta.url),
+  );
+
+  if (!existsSync(contractPath)) {
+    context.skip("Money-maker-3000 sibling repo is not available");
+    return;
+  }
+
+  const python = `
+import json
+from money_maker_3000.contracts import (
+    BLOCKED_SIMULATION_INSTRUMENT_CLASSES,
+    MINIMUM_SIMULATION_EVALUATION_INTERVAL_MINUTES,
+    SIMULATION_ALLOWED_RUN_MODES,
+    SIMULATION_CADENCES,
+    SIMULATION_CONTRACT_SOURCE,
+    SIMULATION_CONTRACT_VERSION,
+    SIMULATION_DISABLED_RUN_MODES,
+    SIMULATION_INSTRUMENT_CLASSES,
+    SIMULATION_MARKET_INSTRUMENT_CLASS_RULES,
+    SIMULATION_MARKETS,
+    SIMULATION_RUN_MODE_POLICY,
+    SIMULATION_STRATEGY_CONFIG_RULES,
+)
+
+print(json.dumps({
+    "source": SIMULATION_CONTRACT_SOURCE,
+    "version": SIMULATION_CONTRACT_VERSION,
+    "markets": list(SIMULATION_MARKETS),
+    "instrumentClasses": list(SIMULATION_INSTRUMENT_CLASSES),
+    "blockedInstrumentClasses": list(BLOCKED_SIMULATION_INSTRUMENT_CLASSES),
+    "runModes": list(SIMULATION_ALLOWED_RUN_MODES),
+    "disabledRunModes": list(SIMULATION_DISABLED_RUN_MODES),
+    "runModePolicy": SIMULATION_RUN_MODE_POLICY,
+    "marketInstrumentClassRules": {
+        key: list(value)
+        for key, value in SIMULATION_MARKET_INSTRUMENT_CLASS_RULES.items()
+    },
+    "cadences": list(SIMULATION_CADENCES),
+    "minimumEvaluationIntervalMinutes": MINIMUM_SIMULATION_EVALUATION_INTERVAL_MINUTES,
+    "strategyRules": {
+        key: {
+            **value,
+            "allowedMarkets": list(value["allowedMarkets"]),
+            "allowedInstrumentClasses": list(value["allowedInstrumentClasses"]),
+        }
+        for key, value in SIMULATION_STRATEGY_CONFIG_RULES.items()
+    },
+}, sort_keys=True))
+`;
+  const { stdout } = await execFileAsync("python3", ["-c", python], {
+    env: {
+      ...process.env,
+      PYTHONPATH: moneyMakerSrc,
+    },
+  });
+
+  assert.deepEqual(await readMoneyMakerContractSnapshot(), JSON.parse(stdout));
 });
 
 test("bot config update persists validated server-side config and redacts storage path", async () => {
@@ -616,7 +710,7 @@ test("bot config update rejects unsupported strategy, markets, and high-frequenc
   assert.equal(response.text.includes("server-api-secret"), false);
 });
 
-test("bot config exposes execute mode as disabled and rejects selecting it", async () => {
+test("bot config rejects execute mode while retaining disabled policy metadata", async () => {
   const handler = configuredHandler();
   const mutationProtection = await readBotConfigMutationProtection(handler);
   const response = await callHandler(handler, {
@@ -975,6 +1069,34 @@ test("demo trade preview caps amount tickets to the simulation budget ceiling", 
   assert.equal(response.text.includes("100000"), false);
 });
 
+test("demo trade preview caps unit tickets to the simulation unit ceiling", async () => {
+  const response = await callHandler(createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      configured: true,
+      credentialFileLoaded: false,
+      credentialSource: "environment",
+      demoTradePreviewEnabled: true,
+      missing: [],
+    }),
+  }), {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    body: JSON.stringify({
+      orderType: "marketOpenByUnits",
+      instrumentId: "100000",
+      side: "BUY",
+      units: "1000.01",
+      leverage: "1",
+    }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(response.json.executionBlocked, true);
+  assert.match(response.json.error.message, /1000 or lower/);
+  assert.equal(response.text.includes("100000"), false);
+});
+
 test("demo trade preview blocks close-position tickets until audited close flow exists", async () => {
   const response = await callHandler(createRequestHandler({
     loadConfig: async () => ({
@@ -1102,9 +1224,14 @@ test("status route never returns configured secret values", async () => {
   assert.equal(response.json.cachePolicy.failureBackoffMs, DEFAULT_PROVIDER_FAILURE_BACKOFF_MS);
   assert.equal(response.json.cachePolicy.requestCoalescing, true);
   assert.equal(response.json.cachePolicy.storage, "server-memory");
+  assert.equal(response.json.credentialStatus.providerEndpointDetails, "server-only");
+  assert.equal(response.json.credentialStatus.baseUrl, undefined);
+  assert.equal(response.json.provider.endpointDetails, "server-only");
+  assert.equal(response.json.provider.baseUrlDetails, "server-only");
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
-  assert.match(response.text, /public-api\.etoro\.com/);
+  assert.equal(response.text.includes("public-api.etoro.com"), false);
+  assert.equal(response.text.includes("/api/v1/"), false);
 });
 
 test("status route reports configured read cache policy without secrets", async () => {
@@ -1126,6 +1253,8 @@ test("status route reports configured read cache policy without secrets", async 
   assert.equal(response.json.credentialStatus.readCacheTtlMs, 30_000);
   assert.equal(response.text.includes("server-api-secret"), false);
   assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes("public-api.etoro.com"), false);
+  assert.equal(response.text.includes("/api/v1/"), false);
 });
 
 test("unexpected API errors return generic public messages without local paths or secrets", async () => {
@@ -1202,10 +1331,16 @@ test("read-only provider responses are cached without exposing secrets", async (
   assert.equal(fetchCount, 1);
   assert.equal(first.json.cache.state, "miss");
   assert.equal(first.json.provider.durationMs, 12);
+  assert.equal(first.json.provider.path, undefined);
+  assert.equal(first.json.provider.baseUrl, undefined);
+  assert.equal(first.json.provider.endpointDetails, "server-only");
+  assert.equal(first.json.provider.baseUrlDetails, "server-only");
   assert.equal(second.json.cache.state, "hit");
   assert.equal(second.json.provider.durationMs, 12);
   assert.equal(second.text.includes("server-api-secret"), false);
   assert.equal(second.text.includes("server-user-secret"), false);
+  assert.equal(second.text.includes("public-api.etoro.com"), false);
+  assert.equal(second.text.includes("/api/v1/"), false);
 });
 
 test("read-only provider rate-limit failures use short backoff without exposing secrets", async () => {

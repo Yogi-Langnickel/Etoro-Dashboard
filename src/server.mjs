@@ -7,6 +7,7 @@ import {
   ALLOWED_BOT_BUDGETS_USD,
   ALLOWED_BOT_INSTRUMENT_CLASSES,
   ALLOWED_BOT_MARKETS,
+  ALLOWED_BOT_STRATEGY_IDS,
   BOT_RUN_MODE_POLICY,
   BOT_CONFIG_CONTRACT_VERSION,
   BOT_CONFIG_MIRROR_SOURCE,
@@ -16,7 +17,7 @@ import {
   publicBotConfigPayload,
   saveBotConfig,
 } from "./bot-config-store.mjs";
-import { fetchReadOnlyEndpoint, readOnlyEndpointSummary } from "./etoro-client.mjs";
+import { fetchReadOnlyEndpoint } from "./etoro-client.mjs";
 import { DEFAULT_READ_CACHE_TTL_MS, loadEtoroConfig, publicCredentialStatus } from "./etoro-config.mjs";
 import { researchIntelligenceStatus } from "./research-intelligence.mjs";
 
@@ -45,6 +46,7 @@ export const INTERNAL_API_ROUTES = Object.freeze([
 const DEMO_TRADE_PREVIEW_ROUTE = "/api/etoro/demo/trading/preview";
 const BOT_CONFIG_ROUTE = "/api/etoro/bot/config";
 const BOT_CONFIG_CSRF_HEADER = "x-etoro-dashboard-csrf";
+const BOT_CONFIG_CSRF_RESPONSE_HEADER = "x-etoro-dashboard-config-token";
 const botConfigCsrfToken = randomBytes(32).toString("base64url");
 const MAX_API_BODY_BYTES = 16 * 1024;
 export const DEFAULT_PROVIDER_FAILURE_BACKOFF_MS = 5_000;
@@ -110,6 +112,7 @@ const BOT_BUDGET_POLICY = Object.freeze({
   }),
 });
 const MAX_DEMO_TRADE_PREVIEW_AMOUNT_USD = BOT_BUDGET_POLICY.maxConfigurableBudgetUsd;
+const MAX_DEMO_TRADE_PREVIEW_UNITS = 1000;
 
 const BOT_SCHEDULE_POLICY = Object.freeze({
   mode: "low-frequency-only",
@@ -120,80 +123,43 @@ const BOT_SCHEDULE_POLICY = Object.freeze({
 });
 
 function botStrategyRecords() {
-  const dcaRule = BOT_STRATEGY_CONFIG_RULES["dca-cash-reserve"];
-  const newsRule = BOT_STRATEGY_CONFIG_RULES["news-aware-watchlist"];
-  const thresholdRule = BOT_STRATEGY_CONFIG_RULES["threshold-rebalance"];
+  return ALLOWED_BOT_STRATEGY_IDS.map((strategyId) => {
+    const rule = BOT_STRATEGY_CONFIG_RULES[strategyId];
+    const contextOnly = rule.status === "context-only";
 
-  return [
-    {
-      strategyId: "dca-cash-reserve",
-      name: dcaRule.name,
-      version: dcaRule.version,
-      status: dcaRule.status,
+    return {
+      strategyId,
+      name: rule.name,
+      version: rule.version,
+      status: rule.status,
       allowedModes: ["simulation"],
-      allowedMarkets: dcaRule.allowedMarkets,
-      allowedInstrumentClasses: dcaRule.allowedInstrumentClasses,
-      cadence: dcaRule.cadence,
+      allowedMarkets: rule.allowedMarkets,
+      allowedInstrumentClasses: rule.allowedInstrumentClasses,
+      cadence: rule.cadence,
       riskBudget: {
-        maxPositionPct: 10,
-        maxWeeklyTurnoverPct: 5,
         maxBudgetUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
         leverage: "1-only",
         shorts: "blocked",
+        ...(strategyId === "threshold-rebalance" ? { maxDriftPct: 5, maxPositionPct: 20 } : {}),
+        ...(strategyId === "dca-cash-reserve" ? { maxPositionPct: 10, maxWeeklyTurnoverPct: 5 } : {}),
+        ...(strategyId === "volatility-band-accumulator" ? { maxPositionPct: 10, cooldown: "required" } : {}),
+        ...(strategyId === "slow-trend-allocation" ? { maxPositionPct: 15, trendConfirmation: "required" } : {}),
+        ...(contextOnly ? { profitReuse: "ledger-only", newsCanTriggerOrders: "blocked" } : {}),
       },
       lastValidation: {
         state: "not-run",
-        detail: "Synthetic strategy record only; no provider reads or orders are connected.",
+        detail: contextOnly
+          ? "Market-news context is display-only and cannot trigger orders."
+          : "Synthetic strategy record only; no provider reads or orders are connected.",
       },
-    },
-    {
-      strategyId: "news-aware-watchlist",
-      name: newsRule.name,
-      version: newsRule.version,
-      status: newsRule.status,
-      allowedModes: ["simulation"],
-      allowedMarkets: newsRule.allowedMarkets,
-      allowedInstrumentClasses: newsRule.allowedInstrumentClasses,
-      cadence: newsRule.cadence,
-      riskBudget: {
-        maxBudgetUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
-        profitReuse: "ledger-only",
-        newsCanTriggerOrders: "blocked",
-        leverage: "1-only",
-        shorts: "blocked",
-      },
-      lastValidation: {
-        state: "not-run",
-        detail: "Market-news signals are planned as context only and cannot trigger orders.",
-      },
-    },
-    {
-      strategyId: "threshold-rebalance",
-      name: thresholdRule.name,
-      version: thresholdRule.version,
-      status: thresholdRule.status,
-      allowedModes: ["simulation"],
-      allowedMarkets: thresholdRule.allowedMarkets,
-      allowedInstrumentClasses: thresholdRule.allowedInstrumentClasses,
-      cadence: thresholdRule.cadence,
-      riskBudget: {
-        maxDriftPct: 5,
-        maxPositionPct: 20,
-        maxBudgetUsd: BOT_BUDGET_POLICY.baseBudgetUsd,
-        leverage: "1-only",
-        shorts: "blocked",
-      },
-      lastValidation: {
-        state: "not-run",
-        detail: "Synthetic strategy record only; no provider reads or orders are connected.",
-      },
-    },
-  ];
+    };
+  });
 }
 
-function sendJson(response, status, payload) {
+function sendJson(response, status, payload, headers = {}) {
   response.writeHead(status, {
     ...JSON_SECURITY_HEADERS,
+    ...headers,
   });
   response.end(JSON.stringify(payload, null, 2));
 }
@@ -434,6 +400,19 @@ function readOnlyCachePolicy(config) {
     failureBackoffMs: DEFAULT_PROVIDER_FAILURE_BACKOFF_MS,
     requestCoalescing: true,
     storage: "server-memory",
+  };
+}
+
+function publicProviderMetadata(provider = {}) {
+  return {
+    endpoint: provider.endpoint,
+    method: provider.method,
+    status: provider.status,
+    requestId: provider.requestId,
+    receivedAt: provider.receivedAt,
+    durationMs: provider.durationMs,
+    endpointDetails: "server-only",
+    baseUrlDetails: "server-only",
   };
 }
 
@@ -930,7 +909,7 @@ async function botSnapshot(config, options) {
       ...publicBotConfigPayload(loaded.config, loaded),
       mutationProtection: {
         csrfHeader: BOT_CONFIG_CSRF_HEADER,
-        csrfToken: botConfigCsrfToken,
+        csrfTokenDelivery: "config-read-response-header",
         localOriginOnly: true,
         contentType: "application/json",
       },
@@ -1169,6 +1148,12 @@ function assertPreviewAmountLimit(amount) {
   }
 }
 
+function assertPreviewUnitLimit(units) {
+  if (units !== null && units > MAX_DEMO_TRADE_PREVIEW_UNITS) {
+    throw new Error(`Units must be ${MAX_DEMO_TRADE_PREVIEW_UNITS} or lower for preview`);
+  }
+}
+
 async function readJsonBody(request) {
   if (typeof request.body === "string") {
     if (Buffer.byteLength(request.body, "utf8") > MAX_API_BODY_BYTES) {
@@ -1248,6 +1233,8 @@ function buildTradePreview(payload) {
       throw new Error("Market open by units requires an instrument ID and units");
     }
 
+    assertPreviewUnitLimit(units);
+
     return {
       providerEndpoint: {
         category: "market-open-by-units",
@@ -1320,15 +1307,22 @@ async function handleBotConfigRead(response, options) {
     configFile: options.botConfigFile,
   });
 
-  sendJson(response, 200, {
-    ...publicBotConfigPayload(loaded.config, loaded),
-    mutationProtection: {
-      csrfHeader: BOT_CONFIG_CSRF_HEADER,
-      csrfToken: botConfigCsrfToken,
-      localOriginOnly: true,
-      contentType: "application/json",
+  sendJson(
+    response,
+    200,
+    {
+      ...publicBotConfigPayload(loaded.config, loaded),
+      mutationProtection: {
+        csrfHeader: BOT_CONFIG_CSRF_HEADER,
+        csrfTokenDelivery: "config-read-response-header",
+        localOriginOnly: true,
+        contentType: "application/json",
+      },
     },
-  });
+    {
+      [BOT_CONFIG_CSRF_RESPONSE_HEADER]: botConfigCsrfToken,
+    },
+  );
 }
 
 async function handleBotConfigUpdate(request, response, options) {
@@ -1416,8 +1410,9 @@ async function handleApiRoute(pathname, response, options) {
         credentialStatus: publicCredentialStatus(config),
         cachePolicy: readOnlyCachePolicy(config),
         provider: {
-          baseUrl: config.baseUrl,
-          endpoints: readOnlyEndpointSummary(),
+          endpointDetails: "server-only",
+          baseUrlDetails: "server-only",
+          allowedHostPolicy: "official-host-allow-list",
         },
       });
       return;
@@ -1516,6 +1511,7 @@ async function handleApiRoute(pathname, response, options) {
       ok: true,
       mode: "read-only",
       ...result,
+      provider: publicProviderMetadata(result.provider),
     });
   } catch (error) {
     sendJson(response, error?.status && error.status >= 400 ? error.status : 500, {

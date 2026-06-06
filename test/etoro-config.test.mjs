@@ -60,8 +60,12 @@ test("public credential status excludes secret values", async () => {
   const serialized = JSON.stringify(status);
 
   assert.equal(status.configured, true);
+  assert.equal(status.providerHostPolicy, "official-host-allow-list");
+  assert.equal(status.providerEndpointDetails, "server-only");
+  assert.equal(status.baseUrl, undefined);
   assert.equal(serialized.includes("secret-api-key"), false);
   assert.equal(serialized.includes("secret-user-key"), false);
+  assert.equal(serialized.includes("public-api.etoro.com"), false);
 });
 
 test("demo trade preview flag is explicit and public", async () => {

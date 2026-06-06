@@ -9,12 +9,14 @@ export const BOT_CONFIG_CONTRACT_VERSION = "0.1.0-sim";
 
 export const ALLOWED_BOT_STRATEGY_IDS = Object.freeze([
   "dca-cash-reserve",
-  "news-aware-watchlist",
   "threshold-rebalance",
+  "volatility-band-accumulator",
+  "slow-trend-allocation",
+  "news-aware-watchlist",
 ]);
 
 export const ALLOWED_BOT_BUDGETS_USD = Object.freeze([500, 1000, 1500, 2500]);
-export const ALLOWED_BOT_RUN_MODES = Object.freeze(["backtest", "execute"]);
+export const ALLOWED_BOT_RUN_MODES = Object.freeze(["backtest"]);
 export const ALLOWED_BOT_MARKETS = Object.freeze(["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"]);
 export const ALLOWED_BOT_INSTRUMENT_CLASSES = Object.freeze(["EQUITY", "ETF", "FOREX", "COMMODITY"]);
 export const ALLOWED_BOT_CADENCES = Object.freeze(["daily", "weekly"]);
@@ -56,6 +58,22 @@ export const BOT_STRATEGY_CONFIG_RULES = Object.freeze({
     status: "simulation-only",
     allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES", "COMMODITIES"]),
     allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF", "COMMODITY"]),
+    cadence: "weekly",
+  }),
+  "volatility-band-accumulator": Object.freeze({
+    name: "Volatility band accumulator",
+    version: "0.1.0-sim",
+    status: "simulation-only",
+    allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES"]),
+    allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF"]),
+    cadence: "daily",
+  }),
+  "slow-trend-allocation": Object.freeze({
+    name: "Slow trend allocation",
+    version: "0.1.0-sim",
+    status: "simulation-only",
+    allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES"]),
+    allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF"]),
     cadence: "weekly",
   }),
   "news-aware-watchlist": Object.freeze({

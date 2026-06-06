@@ -20,7 +20,9 @@
     "OPTION"
   ],
   "runModes": [
-    "backtest",
+    "backtest"
+  ],
+  "disabledRunModes": [
     "execute"
   ],
   "runModePolicy": {
@@ -90,6 +92,34 @@
         "EQUITY",
         "ETF",
         "COMMODITY"
+      ]
+    },
+    "volatility-band-accumulator": {
+      "name": "Volatility band accumulator",
+      "version": "0.1.0-sim",
+      "status": "simulation-only",
+      "cadence": "daily",
+      "allowedMarkets": [
+        "US_EQUITIES",
+        "AU_EQUITIES"
+      ],
+      "allowedInstrumentClasses": [
+        "EQUITY",
+        "ETF"
+      ]
+    },
+    "slow-trend-allocation": {
+      "name": "Slow trend allocation",
+      "version": "0.1.0-sim",
+      "status": "simulation-only",
+      "cadence": "weekly",
+      "allowedMarkets": [
+        "US_EQUITIES",
+        "AU_EQUITIES"
+      ],
+      "allowedInstrumentClasses": [
+        "EQUITY",
+        "ETF"
       ]
     },
     "news-aware-watchlist": {
