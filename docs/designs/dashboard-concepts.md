@@ -212,3 +212,118 @@ baseline for the next design/implementation pass:
 - The visual style is dark, dense, and operational, but must keep the
   Glasshouse/receipt posture: source freshness, read-only mode, redaction, and
   absent execution routes are first-class.
+
+## 2026-06-07 Composite Direction
+
+The selected direction is now a **dark Ledger Inspector plus Bot Operations
+Bay** composite:
+
+- `Portfolio View` should use Option 2, `Ledger Inspector`, as the structural
+  model, but in a darker operational theme. The instrument ledger is the first
+  visual priority: aggregated rows, compact period cells, weighted average open
+  price, P/L, invested amount, net value, and small selected-period charts.
+- The selected-instrument inspector should keep the Ledger Inspector density:
+  one large chart, a source/freshness strip, position drilldown, and receipt
+  panels for filings, insider records, news, dividend context, and missing-data
+  states.
+- `Bot Control` should use Option 5, `Bot Operations Bay`, as the structural
+  model, also in a darker theme. Money-maker controls, run-mode posture, budget
+  stops, allowed universe, cadence, audit feed, and simulation ledger should
+  dominate the tab.
+- Portfolio data inside Bot Control remains an input-review surface only. It
+  can show eligibility, exclusions, stale data, missing reconciliation, and
+  blocked assets, but it must not present rebalance instructions, advice, or
+  execution intent.
+- The dark palette should be purposeful, not generic terminal styling: deep
+  graphite background, low-glare panels, green only for positive/read-only
+  status, amber for review/stale/missing data, red only for blocked/error
+  states, and neutral blue or cyan for source receipts.
+- This supersedes the prior `Option 1 dark` preference in this document.
+
+Implementation note: do not change provider posture while applying this visual
+direction. The design remains synthetic/read-only unless a later feature
+explicitly adds server-side DTOs, validation, and tests.
+
+### Financial Analyst Review Notes
+
+The financial analyst review supports the dark Ledger Inspector plus Bot
+Operations Bay composite, with one guardrail: every added analysis surface must
+frame information as **context, confidence, freshness, and diagnostics**. Avoid
+`buy`, `sell`, `hold`, `best`, `opportunity`, `rebalance`, `execute`, or any
+copy that implies portfolio management advice or autonomous trading.
+
+Portfolio View should emphasize:
+
+- Aggregated instrument-ledger rows with selected-period contribution, exposure
+  weight, source badges, stale/partial states, and row-level receipt drawers.
+- Performance attribution by instrument, asset class, sector, currency,
+  dividend income, FX effect, and fees placeholder, using synthetic values in
+  design mocks until provider-backed DTOs exist.
+- Concentration and observed-risk context for single-name, sector, country,
+  currency, crypto/CFD separation, and drawdown bands. Label this as observed
+  context only.
+- Dividend intelligence with ex-date, pay-date, payout frequency, portfolio
+  weight, yield, estimated income, source/confidence, and explicit not-modeled
+  states for withholding/tax where unsupported.
+- A top completeness strip for positions aggregated, prices fresh, dividend
+  coverage mixed, insider data unavailable, and reconciliation missing.
+
+Bot Control should emphasize:
+
+- Money-maker mode, strategy configuration, simulation budget, cadence, run
+  history, audit events, kill-switch posture, and provider-write absence.
+- Input-readiness diagnostics such as missing data, excluded classes, stale
+  inputs, unresolved symbols, or simulation-contract mismatch. Use
+  `simulation coverage` or `readiness checks`, not `bot eligible`.
+- Append-only audit explainability for configuration changes, fixture batches,
+  provider writes absent, reconciliation gaps, and execution locked states.
+
+## Financial Analyst Enrichment Backlog
+
+Keep these proposals as later feature candidates. They are context and analysis
+features, not advice, recommendation, or trading triggers.
+
+### Safe For Static Or Synthetic Design Now
+
+- Portfolio exposure attribution by asset class, market, currency, and sector
+  bucket, with source labels and fixture/live watermarks.
+- Period contribution view that explains which instruments drove the selected
+  24h, 1w, 1m, 1y, 5y, or max portfolio movement.
+- Dividend calendar preview with payout frequency, expected income range,
+  source confidence, and missing-data state.
+- Source-confidence matrix per instrument covering provider portfolio data,
+  SEC/company filings, insider records, news/RSS, and manual notes.
+- Enrichment receipt drawer for source URL/type, timestamp, provider/cache
+  state, unavailable coverage, and conflict detection.
+- Portfolio quality/completeness strip summarizing aggregation, freshness,
+  coverage, provider fallback, and missing reconciliation states.
+- Bot readiness checklist showing data freshness, simulation contract match,
+  allowed universe, risk-limit completeness, reconciliation availability, and
+  execution absence.
+- Bot audit explainability feed showing fixture batch used, config changed,
+  reconciliation missing, provider writes absent, and execution locked.
+- Excluded-assets table for assets that Money-maker must ignore, such as crypto,
+  CFDs, shorts, derivatives, unresolved symbols, stale rows, or missing source
+  mappings.
+
+### Later Provider-Backed Or Integration Features
+
+- Real portfolio aggregation by instrument with position drilldown, still
+  redacting account IDs, position IDs, raw payloads, and exact provider
+  endpoint details from browser DTOs.
+- Market price enrichment with cache age, provider fallback, stale-state
+  handling, and explicit no-advice labeling.
+- Company fundamentals from official/free sources such as SEC companyfacts for
+  US equities and issuer factsheets or official datasets for ETFs.
+- Insider activity receipts from SEC Forms 3/4/5 for US-listed instruments,
+  plus clear not-covered states for non-US or unresolved instruments.
+- Dividend expectation model that separates declared dividends, historical
+  trailing yield, analyst/estimate-derived values if ever approved, and
+  confidence/coverage state.
+- Portfolio risk analytics such as concentration, currency exposure, sector
+  exposure, drawdown since selected period start, and sensitivity buckets.
+- Provider-backed completeness scoring from normalized server DTO fields,
+  provider freshness, cache age, request timing, public-source coverage, and
+  conflict detection.
+- Money-maker simulation reconciliation against read-only portfolio snapshots,
+  with durable audit in the worker/service, not browser state.
