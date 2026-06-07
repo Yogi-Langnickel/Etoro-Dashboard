@@ -23,7 +23,9 @@
     "backtest"
   ],
   "disabledRunModes": [
-    "execute"
+    "execute",
+    "trade",
+    "trading"
   ],
   "runModePolicy": {
     "backtest": {
@@ -39,6 +41,20 @@
       "demoExecution": "blocked",
       "liveExecution": "blocked",
       "reason": "demo execution requires a separate review and explicit approval"
+    },
+    "trade": {
+      "enabled": false,
+      "providerCalls": "blocked",
+      "demoExecution": "blocked",
+      "liveExecution": "blocked",
+      "reason": "trading aliases are disabled; only offline backtest mode is allowed"
+    },
+    "trading": {
+      "enabled": false,
+      "providerCalls": "blocked",
+      "demoExecution": "blocked",
+      "liveExecution": "blocked",
+      "reason": "trading aliases are disabled; only offline backtest mode is allowed"
     }
   },
   "marketInstrumentClassRules": {

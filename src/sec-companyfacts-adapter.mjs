@@ -110,7 +110,7 @@ export function normalizeSecCompanyFacts({
   };
 }
 
-export function latestFactForConcept(companyFacts, definition) {
+function latestFactForConcept(companyFacts, definition) {
   const taxonomy = definition.taxonomy ?? "us-gaap";
   const units = definition.units ?? DEFAULT_ALLOWED_UNITS;
   const concept = companyFacts.facts?.[taxonomy]?.[definition.concept];

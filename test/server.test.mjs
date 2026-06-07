@@ -17,6 +17,7 @@ import {
   BOT_RUN_MODE_POLICY,
   BOT_MARKET_INSTRUMENT_CLASS_RULES,
   BOT_STRATEGY_CONFIG_RULES,
+  DISABLED_BOT_RUN_MODES,
   MIN_BOT_EVALUATION_INTERVAL_MINUTES,
   saveBotConfig,
 } from "../src/bot-config-store.mjs";
@@ -352,8 +353,10 @@ test("bot config mirror matches the Money-maker simulation contract snapshot", a
   assert.equal(BOT_CONFIG_MIRROR_SOURCE, snapshot.source);
   assert.equal(BOT_CONFIG_CONTRACT_VERSION, snapshot.version);
   assert.deepEqual(ALLOWED_BOT_RUN_MODES, snapshot.runModes);
-  assert.deepEqual(snapshot.disabledRunModes, ["execute"]);
+  assert.deepEqual(DISABLED_BOT_RUN_MODES, snapshot.disabledRunModes);
   assert.equal(ALLOWED_BOT_RUN_MODES.includes("execute"), false);
+  assert.equal(ALLOWED_BOT_RUN_MODES.includes("trade"), false);
+  assert.equal(ALLOWED_BOT_RUN_MODES.includes("trading"), false);
   assert.deepEqual(BOT_RUN_MODE_POLICY, snapshot.runModePolicy);
   assert.deepEqual(ALLOWED_BOT_MARKETS, snapshot.markets);
   assert.deepEqual(ALLOWED_BOT_INSTRUMENT_CLASSES, snapshot.instrumentClasses);

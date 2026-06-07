@@ -3,7 +3,7 @@ import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
-export const DEFAULT_BOT_CONFIG_FILE = join(homedir(), ".config", "etoro-dashboard", "bot-config.json");
+const DEFAULT_BOT_CONFIG_FILE = join(homedir(), ".config", "etoro-dashboard", "bot-config.json");
 export const BOT_CONFIG_MIRROR_SOURCE = "Money-maker-3000/src/money_maker_3000/contracts.py";
 export const BOT_CONFIG_CONTRACT_VERSION = "0.1.0-sim";
 
@@ -17,6 +17,7 @@ export const ALLOWED_BOT_STRATEGY_IDS = Object.freeze([
 
 export const ALLOWED_BOT_BUDGETS_USD = Object.freeze([500, 1000, 1500, 2500]);
 export const ALLOWED_BOT_RUN_MODES = Object.freeze(["backtest"]);
+export const DISABLED_BOT_RUN_MODES = Object.freeze(["execute", "trade", "trading"]);
 export const ALLOWED_BOT_MARKETS = Object.freeze(["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"]);
 export const ALLOWED_BOT_INSTRUMENT_CLASSES = Object.freeze(["EQUITY", "ETF", "FOREX", "COMMODITY"]);
 export const ALLOWED_BOT_CADENCES = Object.freeze(["daily", "weekly"]);
@@ -35,6 +36,20 @@ export const BOT_RUN_MODE_POLICY = Object.freeze({
     demoExecution: "blocked",
     liveExecution: "blocked",
     reason: "demo execution requires a separate review and explicit approval",
+  }),
+  trade: Object.freeze({
+    enabled: false,
+    providerCalls: "blocked",
+    demoExecution: "blocked",
+    liveExecution: "blocked",
+    reason: "trading aliases are disabled; only offline backtest mode is allowed",
+  }),
+  trading: Object.freeze({
+    enabled: false,
+    providerCalls: "blocked",
+    demoExecution: "blocked",
+    liveExecution: "blocked",
+    reason: "trading aliases are disabled; only offline backtest mode is allowed",
   }),
 });
 export const BOT_MARKET_INSTRUMENT_CLASS_RULES = Object.freeze({
@@ -86,7 +101,7 @@ export const BOT_STRATEGY_CONFIG_RULES = Object.freeze({
   }),
 });
 
-export const DEFAULT_BOT_CONFIG = Object.freeze({
+const DEFAULT_BOT_CONFIG = Object.freeze({
   runMode: "backtest",
   strategyId: "dca-cash-reserve",
   budgetUsd: 1000,
@@ -228,7 +243,7 @@ function assertMarketInstrumentCompatibility(allowedMarkets, allowedInstrumentCl
   }
 }
 
-export function normalizeBotConfig(input = {}) {
+function normalizeBotConfig(input = {}) {
   const candidate = {
     ...DEFAULT_BOT_CONFIG,
     ...input,
