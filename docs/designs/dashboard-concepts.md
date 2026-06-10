@@ -1,7 +1,7 @@
 # eToro Dashboard Design Reset
 
-Status: second review draft  
-Created: 2026-05-28  
+Status: second review draft
+Created: 2026-05-28
 Supersedes: first draft with `Loss Lab`, `Narrative Ledger`, and `Triage Control`
 
 The first design round was rejected because the concepts felt too similar and
