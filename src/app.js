@@ -76,10 +76,17 @@ async function getJson(path) {
     throw error;
   }
 
-  if (path === "/api/etoro/bot/config" && payload?.mutationProtection?.csrfHeader) {
+  if (payload?.mutationProtection?.csrfHeader) {
     const csrfToken = response.headers.get(botConfigCsrfResponseHeader);
     payload.mutationProtection = {
       ...payload.mutationProtection,
+      ...(csrfToken ? { csrfToken } : {}),
+    };
+  }
+  if (payload?.config?.mutationProtection?.csrfHeader) {
+    const csrfToken = response.headers.get(botConfigCsrfResponseHeader);
+    payload.config.mutationProtection = {
+      ...payload.config.mutationProtection,
       ...(csrfToken ? { csrfToken } : {}),
     };
   }

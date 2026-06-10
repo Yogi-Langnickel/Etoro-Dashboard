@@ -296,6 +296,8 @@ test("bot snapshot batches monitor routes without execution data", async () => {
   assert.equal(response.json.config.mutationProtection.csrfHeader, "x-etoro-dashboard-csrf");
   assert.equal(response.json.config.mutationProtection.csrfToken, undefined);
   assert.equal(response.json.config.mutationProtection.csrfTokenDelivery, "config-read-response-header");
+  assert.equal(typeof response.headers[BOT_CONFIG_CSRF_RESPONSE_HEADER], "string");
+  assert.equal(response.text.includes(response.headers[BOT_CONFIG_CSRF_RESPONSE_HEADER]), false);
   assert.equal(response.json.runs.runs.length, 2);
   assert.equal(response.json.audit.auditEvents.length, 3);
   assert.equal(response.json.events.events.length, 3);

@@ -1481,7 +1481,14 @@ async function handleApiRoute(pathname, response, options) {
     }
 
     if (pathname === "/api/etoro/bot/snapshot") {
-      sendJson(response, 200, await botSnapshot(config, options));
+      sendJson(
+        response,
+        200,
+        await botSnapshot(config, options),
+        {
+          [BOT_CONFIG_CSRF_RESPONSE_HEADER]: botConfigCsrfToken,
+        },
+      );
       return;
     }
 
