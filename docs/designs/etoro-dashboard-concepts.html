@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>eToro Dashboard Dark Three-Tab Baseline</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #080b0d;
+        --panel: #10161a;
+        --panel-strong: #151d22;
+        --rail: #0c1114;
+        --line: #26333a;
+        --line-strong: #384a53;
+        --ink: #e8f1ec;
+        --muted: #8fa29d;
+        --soft: #526761;
+        --green: #49d28f;
+        --teal: #34b7c9;
+        --amber: #e5b85c;
+        --red: #ed6a5e;
+        --blue: #7ba7ff;
+        --violet: #9b8cff;
+        --shadow: rgba(0, 0, 0, 0.44);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+          BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          linear-gradient(180deg, rgba(52, 183, 201, 0.08), transparent 38%),
+          var(--bg);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(1560px, 100%);
+        margin: 0 auto;
+        padding: 18px;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(320px, 1fr) auto;
+        gap: 14px;
+        align-items: end;
+        margin-bottom: 12px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: 1.6rem;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        font-size: 0.86rem;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        margin-bottom: 4px;
+        font-size: 0.84rem;
+      }
+
+      p {
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .meta,
+      .tabs,
+      .mode-strip,
+      .portfolio-shell,
+      .watchlist-shell,
+      .bot-shell,
+      .panel,
+      .metric,
+      .receipt,
+      .row,
+      .ticker {
+        border: 1px solid var(--line);
+        background: rgba(16, 22, 26, 0.88);
+        box-shadow: 0 16px 32px var(--shadow);
+      }
+
+      .meta {
+        padding: 12px;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        padding: 5px;
+        background: var(--rail);
+      }
+
+      .tab {
+        min-height: 36px;
+        border: 1px solid transparent;
+        padding: 9px 12px;
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .tab.active {
+        border-color: rgba(73, 210, 143, 0.55);
+        background: rgba(73, 210, 143, 0.12);
+        color: var(--ink);
+      }
+
+      .mode-strip {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(120px, 1fr));
+        gap: 1px;
+        margin-bottom: 12px;
+        overflow: hidden;
+        background: var(--line);
+      }
+
+      .mode-item {
+        min-height: 62px;
+        padding: 10px;
+        background: var(--rail);
+      }
+
+      .mode-item span,
+      .eyebrow {
+        display: block;
+        color: var(--soft);
+        font-size: 0.66rem;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      .mode-item strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 0.86rem;
+      }
+
+      .safe {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--amber);
+      }
+
+      .bad {
+        color: var(--red);
+      }
+
+      .portfolio-shell {
+        display: grid;
+        grid-template-columns: minmax(270px, 0.9fr) minmax(520px, 1.75fr) minmax(240px, 0.78fr);
+        gap: 1px;
+        min-height: 730px;
+        overflow: hidden;
+        background: var(--line);
+      }
+
+      .pane {
+        min-width: 0;
+        background: var(--panel);
+      }
+
+      .pane-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        min-height: 48px;
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+        background: var(--rail);
+      }
+
+      .pane-body {
+        padding: 12px;
+      }
+
+      .portfolio-row {
+        display: grid;
+        grid-template-columns: minmax(90px, 1.15fr) 0.75fr 0.75fr;
+        gap: 8px;
+        align-items: center;
+        min-height: 52px;
+        border-bottom: 1px solid rgba(38, 51, 58, 0.72);
+        padding: 8px 10px;
+      }
+
+      .portfolio-row.selected {
+        border-left: 3px solid var(--green);
+        background: rgba(73, 210, 143, 0.08);
+      }
+
+      .portfolio-row small,
+      .table small,
+      .receipt small,
+      .metric small {
+        display: block;
+        color: var(--soft);
+        font-size: 0.66rem;
+      }
+
+      .value {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-rows: minmax(320px, 1fr) minmax(320px, 1fr);
+        gap: 1px;
+        background: var(--line);
+      }
+
+      .chart-panel,
+      .enrichment-panel {
+        min-width: 0;
+        background: var(--panel-strong);
+      }
+
+      .chart-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: start;
+        padding: 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .periods {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+
+      .period {
+        min-width: 38px;
+        border: 1px solid var(--line-strong);
+        padding: 5px 8px;
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .period.active {
+        border-color: rgba(52, 183, 201, 0.7);
+        background: rgba(52, 183, 201, 0.14);
+        color: var(--ink);
+      }
+
+      .chart {
+        position: relative;
+        height: 245px;
+        margin: 14px;
+        border: 1px solid var(--line);
+        background:
+          linear-gradient(rgba(38, 51, 58, 0.45) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(38, 51, 58, 0.45) 1px, transparent 1px),
+          #0a0f12;
+        background-size: 100% 25%, 12.5% 100%;
+        overflow: hidden;
+      }
+
+      .chart svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .chart-note {
+        position: absolute;
+        left: 12px;
+        bottom: 10px;
+        color: var(--soft);
+        font-size: 0.68rem;
+      }
+
+      .enrichment-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .receipt {
+        min-height: 164px;
+        padding: 12px;
+        box-shadow: none;
+      }
+
+      .receipt p {
+        margin-bottom: 10px;
+        font-size: 0.78rem;
+      }
+
+      .rail-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .metric {
+        padding: 12px;
+        box-shadow: none;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 1.05rem;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .pill {
+        display: inline-flex;
+        min-height: 26px;
+        align-items: center;
+        border: 1px solid var(--line-strong);
+        padding: 4px 8px;
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 800;
+      }
+
+      .pill.locked {
+        border-color: rgba(237, 106, 94, 0.58);
+        color: #ffb5ad;
+      }
+
+      .watchlist-shell {
+        display: grid;
+        grid-template-rows: auto minmax(520px, 1fr);
+        gap: 1px;
+        margin-top: 18px;
+        overflow: hidden;
+        background: var(--line);
+      }
+
+      .ticker {
+        display: flex;
+        gap: 28px;
+        overflow: hidden;
+        padding: 9px 12px;
+        background: #050707;
+        box-shadow: none;
+        white-space: nowrap;
+      }
+
+      .watch-grid {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.88fr) minmax(520px, 1.7fr) minmax(230px, 0.76fr);
+        gap: 1px;
+        background: var(--line);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid rgba(38, 51, 58, 0.72);
+        padding: 8px;
+        text-align: left;
+      }
+
+      th {
+        color: var(--soft);
+        font-size: 0.66rem;
+        text-transform: uppercase;
+      }
+
+      td:last-child,
+      th:last-child {
+        text-align: right;
+      }
+
+      .terminal-chart {
+        height: 390px;
+        margin: 12px;
+        border: 1px dashed var(--line-strong);
+        display: grid;
+        place-items: center;
+        color: #1f3d29;
+        background: #060909;
+        text-align: center;
+      }
+
+      .log {
+        border-left: 2px solid rgba(73, 210, 143, 0.54);
+        padding: 8px 10px;
+        color: var(--muted);
+        font-size: 0.72rem;
+      }
+
+      .bot-shell {
+        display: grid;
+        grid-template-columns: minmax(300px, 1fr) minmax(420px, 1.2fr) minmax(260px, 0.8fr);
+        gap: 1px;
+        margin-top: 18px;
+        overflow: hidden;
+        background: var(--line);
+      }
+
+      .control-list {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .control {
+        border: 1px solid var(--line);
+        padding: 12px;
+        background: var(--rail);
+      }
+
+      .slider {
+        height: 7px;
+        margin-top: 10px;
+        background: linear-gradient(90deg, var(--green) 0 36%, var(--line) 36%);
+      }
+
+      @media (max-width: 1180px) {
+        header,
+        .portfolio-shell,
+        .watch-grid,
+        .bot-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .mode-strip {
+          grid-template-columns: repeat(2, minmax(140px, 1fr));
+        }
+
+        .portfolio-shell,
+        .watchlist-shell,
+        .bot-shell {
+          min-height: 0;
+        }
+      }
+
+      @media (max-width: 760px) {
+        main {
+          padding: 10px;
+        }
+
+        .tabs {
+          overflow-x: auto;
+        }
+
+        .mode-strip,
+        .enrichment-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .workspace {
+          grid-template-rows: auto auto;
+        }
+
+        .chart {
+          height: 210px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section class="meta">
+          <span class="eyebrow">Selected direction: option 1 dark theme</span>
+          <h1>Glasshouse Split Workbench</h1>
+          <p>
+            A darker variant of the option 1 workbench, now reshaped around the
+            active three-tab requirement. Portfolio rows aggregate open
+            positions by instrument. Enrichments are receipts only. Bot controls
+            are simulation/backtest posture, with execution and account
+            mutation locked out.
+          </p>
+        </section>
+        <nav class="tabs" aria-label="Primary dashboard tabs">
+          <div class="tab active">Portfolio View</div>
+          <div class="tab">Watchlist Items</div>
+          <div class="tab">Bot Control</div>
+        </nav>
+      </header>
+
+      <section class="mode-strip" aria-label="Safety and freshness status">
+        <div class="mode-item">
+          <span>Mode</span>
+          <strong class="safe">Read-only</strong>
+        </div>
+        <div class="mode-item">
+          <span>Account context</span>
+          <strong>Demo/local</strong>
+        </div>
+        <div class="mode-item">
+          <span>Provider read</span>
+          <strong>Fresh 2m ago</strong>
+        </div>
+        <div class="mode-item">
+          <span>Source posture</span>
+          <strong>Receipts visible</strong>
+        </div>
+        <div class="mode-item">
+          <span>Trading routes</span>
+          <strong class="bad">Absent</strong>
+        </div>
+        <div class="mode-item">
+          <span>Bot mode</span>
+          <strong>Simulation only</strong>
+        </div>
+      </section>
+
+      <section class="portfolio-shell" aria-label="Portfolio View mock">
+        <aside class="pane">
+          <div class="pane-head">
+            <h2>Aggregated Instruments</h2>
+            <span class="eyebrow">Period: 1M</span>
+          </div>
+          <div class="portfolio-row selected">
+            <div><strong>AAPL</strong><small>3 open positions merged</small></div>
+            <div class="value">$189.43<small>+3.8%</small></div>
+            <div class="value">$8,941<small>net value</small></div>
+          </div>
+          <div class="portfolio-row">
+            <div><strong>VTI</strong><small>2 open positions merged</small></div>
+            <div class="value">$256.10<small>+1.1%</small></div>
+            <div class="value">$12,204<small>net value</small></div>
+          </div>
+          <div class="portfolio-row">
+            <div><strong>GLD</strong><small>1 open position</small></div>
+            <div class="value">$219.80<small>-0.4%</small></div>
+            <div class="value">$3,120<small>net value</small></div>
+          </div>
+          <div class="portfolio-row">
+            <div><strong>BTC</strong><small>2 open positions merged</small></div>
+            <div class="value">$64.2K<small>+7.5%</small></div>
+            <div class="value">$2,880<small>net value</small></div>
+          </div>
+          <div class="pane-body">
+            <div class="metric">
+              <small>Selected row contract</small>
+              <strong>Units, WAP, P/L, invested, net value, chart</strong>
+            </div>
+          </div>
+        </aside>
+
+        <section class="workspace">
+          <article class="chart-panel">
+            <div class="chart-top">
+              <div>
+                <span class="eyebrow">Selected instrument</span>
+                <h2>AAPL aggregated position graph</h2>
+                <p>Weighted average open price: $176.22. Total units: 47.2.</p>
+              </div>
+              <div class="periods" aria-label="Chart periods">
+                <span class="period">24h</span>
+                <span class="period">1w</span>
+                <span class="period active">1m</span>
+                <span class="period">1y</span>
+                <span class="period">5y</span>
+                <span class="period">max</span>
+              </div>
+            </div>
+            <div class="chart" aria-label="Synthetic line chart">
+              <svg viewBox="0 0 900 245" role="img">
+                <polyline
+                  points="0,190 80,177 150,184 220,150 310,160 390,118 480,126 570,82 680,92 780,48 900,60"
+                  fill="none"
+                  stroke="#49d28f"
+                  stroke-width="4"
+                />
+                <polyline
+                  points="0,206 90,202 180,192 280,176 380,170 500,151 620,143 760,130 900,114"
+                  fill="none"
+                  stroke="#34b7c9"
+                  stroke-width="2"
+                  opacity="0.65"
+                />
+              </svg>
+              <span class="chart-note">Synthetic chart mock. Source and freshness stay visible before production.</span>
+            </div>
+          </article>
+
+          <article class="enrichment-panel">
+            <div class="pane-head">
+              <h2>Selected Instrument Receipts</h2>
+              <span class="eyebrow">Context only, no signals</span>
+            </div>
+            <div class="enrichment-grid">
+              <div class="receipt">
+                <span class="eyebrow">Key financial information</span>
+                <h3>Coverage sufficient</h3>
+                <p>Public filings and fundamentals are available for review.</p>
+                <small>Source: official/public records. Retrieved: cached.</small>
+              </div>
+              <div class="receipt">
+                <span class="eyebrow">Related news</span>
+                <h3>4 headlines found</h3>
+                <p>Recent articles are attached as context, not ranked as actions.</p>
+                <small>Source: allowlisted RSS/public APIs. No recommendation.</small>
+              </div>
+              <div class="receipt">
+                <span class="eyebrow">Insider trading records</span>
+                <h3>Form 4 planning ready</h3>
+                <p>Open-market purchase records can be surfaced after mapping review.</p>
+                <small>Source: SEC EDGAR plan. Non-US coverage marked unavailable.</small>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <aside class="pane">
+          <div class="pane-head">
+            <h2>Context Rail</h2>
+          </div>
+          <div class="pane-body rail-list">
+            <div class="metric">
+              <small>Aggregated P/L</small>
+              <strong class="safe">+$624.20</strong>
+            </div>
+            <div class="metric">
+              <small>P/L percentage</small>
+              <strong class="safe">+7.49%</strong>
+            </div>
+            <div class="metric">
+              <small>Invested amount</small>
+              <strong>$8,316.80</strong>
+            </div>
+            <div class="metric">
+              <small>Provider privacy</small>
+              <strong>No account IDs shown</strong>
+            </div>
+            <div class="pill-row">
+              <span class="pill locked">No buy</span>
+              <span class="pill locked">No sell</span>
+              <span class="pill locked">No close</span>
+              <span class="pill locked">No copy</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="watchlist-shell" aria-label="Watchlist Items mock">
+        <div class="ticker">
+          <span>AAPL 189.43 <strong class="safe">+1.23%</strong></span>
+          <span>VTI 256.10 <strong class="safe">+0.42%</strong></span>
+          <span>GLD 219.80 <strong class="warn">-0.41%</strong></span>
+          <span>BTC 64.2K <strong class="safe">+2.12%</strong></span>
+          <span>TSLA 175.22 <strong class="bad">-1.08%</strong></span>
+        </div>
+        <div class="watch-grid">
+          <aside class="pane">
+            <div class="pane-head">
+              <h2>Watchlist Items</h2>
+              <span class="eyebrow">Terminal-prime reference</span>
+            </div>
+            <table class="table">
+              <thead>
+                <tr><th>Symbol</th><th>Price</th><th>Change</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>AAPL<small>fresh</small></td><td>189.43</td><td class="safe">+1.2%</td></tr>
+                <tr><td>NVDA<small>cached</small></td><td>894.21</td><td class="safe">+3.1%</td></tr>
+                <tr><td>BTC<small>fresh</small></td><td>64.2K</td><td class="bad">-2.4%</td></tr>
+                <tr><td>GLD<small>public source</small></td><td>219.80</td><td class="warn">-0.4%</td></tr>
+              </tbody>
+            </table>
+          </aside>
+          <section class="pane">
+            <div class="pane-head">
+              <h2>Selected Watchlist Chart</h2>
+              <div class="periods">
+                <span class="period">24h</span><span class="period active">1w</span><span class="period">1m</span>
+              </div>
+            </div>
+            <div class="terminal-chart">
+              <div>
+                [READ_ONLY_WATCHLIST_CHART]<br>
+                <small>Provider calls stay server-side. No advice or order preview.</small>
+              </div>
+            </div>
+          </section>
+          <aside class="pane">
+            <div class="pane-head"><h2>Status And Logs</h2></div>
+            <div class="pane-body rail-list">
+              <div class="log">[OK] read-only provider boundary</div>
+              <div class="log">[OK] browser receives normalized DTOs</div>
+              <div class="log">[LOCKED] execution routes absent</div>
+              <div class="log">[NOTE] enrichment opens receipt drawer only</div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="bot-shell" aria-label="Bot Control mock">
+        <aside class="pane">
+          <div class="pane-head"><h2>Money-maker Mode</h2></div>
+          <div class="control-list">
+            <div class="control"><span class="eyebrow">Run mode</span><strong>Backtest / simulation</strong></div>
+            <div class="control"><span class="eyebrow">Execution</span><strong class="bad">Locked and absent</strong></div>
+            <div class="control"><span class="eyebrow">Cadence</span><strong>Low frequency only</strong></div>
+          </div>
+        </aside>
+        <section class="pane">
+          <div class="pane-head"><h2>Strategy And Risk Stops</h2></div>
+          <div class="control-list">
+            <div class="control">
+              <span class="eyebrow">Strategy registry</span>
+              <strong>Predefined strategies only</strong>
+              <div class="slider"></div>
+            </div>
+            <div class="control">
+              <span class="eyebrow">Budget envelope</span>
+              <strong>$1,000 synthetic allocation cap</strong>
+              <div class="slider"></div>
+            </div>
+            <div class="pill-row">
+              <span class="pill locked">No credentials</span>
+              <span class="pill locked">No order preview</span>
+              <span class="pill locked">No demo trade</span>
+              <span class="pill locked">No live trade</span>
+            </div>
+          </div>
+        </section>
+        <aside class="pane">
+          <div class="pane-head"><h2>Audit Feed</h2></div>
+          <div class="pane-body rail-list">
+            <div class="log">Risk gate blocked: missing reconciliation</div>
+            <div class="log">Provider calls blocked for offline fixture batch</div>
+            <div class="log">Ledger DTO redacted for dashboard display</div>
+            <div class="log">Kill switch state visible before execution design</div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

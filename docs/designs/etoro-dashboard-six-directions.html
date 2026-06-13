@@ -1,0 +1,1165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>eToro Dashboard Six Visual Directions</title>
+    <link rel="icon" href="data:,">
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #17211f;
+        --muted: #66706d;
+        --line: #d7dedb;
+        --paper: #f5f1e7;
+        --white: #fffdf8;
+        --green: #35745a;
+        --amber: #b57b25;
+        --red: #a94d45;
+        --blue: #2f6f9f;
+        --violet: #62508a;
+        --shadow: rgba(21, 33, 31, 0.16);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #e6ebe8;
+        color: var(--ink);
+      }
+
+      main {
+        width: min(1500px, 100%);
+        margin: 0 auto;
+        padding: 22px;
+      }
+
+      header {
+        min-height: 58vh;
+        display: grid;
+        grid-template-columns: minmax(320px, 0.9fr) minmax(380px, 1.1fr);
+        gap: 18px;
+        align-items: stretch;
+        margin-bottom: 22px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 12px;
+        max-width: 760px;
+        font-size: clamp(2.3rem, 5vw, 5.2rem);
+        line-height: 0.96;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-bottom: 8px;
+        font-size: clamp(1.45rem, 2.4vw, 2.2rem);
+        letter-spacing: 0;
+      }
+
+      h3 {
+        margin-bottom: 6px;
+        font-size: 1rem;
+        letter-spacing: 0;
+      }
+
+      p,
+      li,
+      small {
+        color: var(--muted);
+        line-height: 1.48;
+      }
+
+      .intro,
+      .rules,
+      .direction {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--white);
+        box-shadow: 0 18px 42px var(--shadow);
+      }
+
+      .intro,
+      .rules {
+        padding: 22px;
+      }
+
+      .tag-row,
+      .nav,
+      .status-row,
+      .legend,
+      .metric-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tag,
+      .pill,
+      .nav a {
+        display: inline-flex;
+        min-height: 30px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--ink);
+        font-size: 0.78rem;
+        font-weight: 750;
+        text-decoration: none;
+      }
+
+      .tag.safe,
+      .pill.safe {
+        border-color: rgba(53, 116, 90, 0.42);
+        background: rgba(53, 116, 90, 0.12);
+      }
+
+      .tag.warn,
+      .pill.warn {
+        border-color: rgba(181, 123, 37, 0.42);
+        background: rgba(181, 123, 37, 0.13);
+      }
+
+      .tag.blocked,
+      .pill.blocked {
+        border-color: rgba(169, 77, 69, 0.36);
+        background: rgba(169, 77, 69, 0.12);
+      }
+
+      .nav {
+        margin-top: 18px;
+      }
+
+      .rules {
+        background:
+          linear-gradient(135deg, rgba(47, 111, 159, 0.08), rgba(53, 116, 90, 0.11)),
+          var(--white);
+      }
+
+      .rules-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .rule {
+        min-height: 94px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.65);
+      }
+
+      .rule strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .direction {
+        overflow: hidden;
+        margin-bottom: 26px;
+      }
+
+      .direction-head {
+        display: grid;
+        grid-template-columns: minmax(280px, 0.82fr) minmax(360px, 1.18fr);
+        gap: 18px;
+        padding: 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .direction-head p {
+        margin-bottom: 0;
+      }
+
+      .mock {
+        min-height: 620px;
+        padding: 18px;
+      }
+
+      .screen {
+        min-height: 580px;
+        overflow: hidden;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.42);
+      }
+
+      .screen-top {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+      }
+
+      .screen-title {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .screen-title strong {
+        font-size: 1.08rem;
+      }
+
+      .screen-title small {
+        font-size: 0.77rem;
+      }
+
+      .mini {
+        min-height: 58px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        padding: 10px;
+      }
+
+      .mini strong {
+        display: block;
+        font-size: 0.92rem;
+      }
+
+      .mini small {
+        display: block;
+        margin-top: 5px;
+      }
+
+      .tower-screen {
+        background: #101817;
+        color: #e9f2ef;
+      }
+
+      .tower-screen small,
+      .tower-screen p {
+        color: #9eb0aa;
+      }
+
+      .tower-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 14px;
+        padding: 0 16px 16px;
+      }
+
+      .tower-board {
+        display: grid;
+        gap: 9px;
+      }
+
+      .tower-row {
+        display: grid;
+        grid-template-columns: 130px 1fr 120px 130px;
+        gap: 8px;
+        align-items: center;
+        min-height: 62px;
+        border-radius: 8px;
+        padding: 10px;
+        background: #1b2826;
+        border: 1px solid #2d403b;
+      }
+
+      .tower-row .bar {
+        height: 10px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #4fa67d 0 55%, #d5a046 55% 72%, #394844 72%);
+      }
+
+      .tower-side {
+        display: grid;
+        gap: 10px;
+      }
+
+      .tower-side .mini {
+        background: #182320;
+        border-color: #2c3d39;
+      }
+
+      .ledger-screen {
+        background:
+          repeating-linear-gradient(#fbf7ee 0 42px, #efe6d5 42px 43px),
+          #fbf7ee;
+        color: #2b2620;
+      }
+
+      .ledger-body {
+        display: grid;
+        grid-template-columns: 1fr 310px;
+        gap: 14px;
+        padding: 0 16px 16px;
+      }
+
+      .ledger-entry {
+        display: grid;
+        grid-template-columns: 92px 1fr 130px;
+        gap: 14px;
+        align-items: start;
+        min-height: 92px;
+        border-left: 4px solid #517c61;
+        padding: 14px 12px;
+        background: rgba(255, 253, 248, 0.72);
+      }
+
+      .ledger-entry.warn {
+        border-left-color: #b57b25;
+      }
+
+      .ledger-entry.blocked {
+        border-left-color: #a94d45;
+      }
+
+      .ledger-stamp {
+        color: #7c6c56;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.76rem;
+      }
+
+      .ledger-side {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+
+      .ledger-side .mini {
+        background: rgba(255, 253, 248, 0.78);
+        border-color: #e4dac7;
+      }
+
+      .weather-screen {
+        background: #e8f1f3;
+        color: #13272e;
+      }
+
+      .weather-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 16px;
+        padding: 0 16px 16px;
+      }
+
+      .weather-map {
+        position: relative;
+        min-height: 486px;
+        border-radius: 8px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 24% 32%, rgba(72, 148, 129, 0.28), transparent 22%),
+          radial-gradient(circle at 70% 25%, rgba(221, 170, 76, 0.34), transparent 23%),
+          radial-gradient(circle at 55% 78%, rgba(54, 99, 141, 0.28), transparent 26%),
+          linear-gradient(145deg, #d3e5e9, #f7fbf8);
+        border: 1px solid #bed2d4;
+      }
+
+      .isobar {
+        position: absolute;
+        border: 2px solid rgba(34, 82, 92, 0.18);
+        border-radius: 48% 52% 55% 45%;
+      }
+
+      .isobar.one {
+        inset: 52px 70px 160px 52px;
+      }
+
+      .isobar.two {
+        inset: 132px 170px 68px 120px;
+      }
+
+      .isobar.three {
+        inset: 78px 210px 248px 260px;
+      }
+
+      .weather-label {
+        position: absolute;
+        width: 168px;
+        border-radius: 8px;
+        padding: 11px;
+        background: rgba(255, 253, 248, 0.84);
+        border: 1px solid rgba(27, 64, 73, 0.16);
+        box-shadow: 0 12px 24px rgba(31, 67, 74, 0.12);
+      }
+
+      .weather-label.one {
+        top: 54px;
+        left: 54px;
+      }
+
+      .weather-label.two {
+        top: 102px;
+        right: 48px;
+      }
+
+      .weather-label.three {
+        bottom: 62px;
+        left: 190px;
+      }
+
+      .weather-side {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+
+      .weather-side .mini {
+        background: rgba(255, 253, 248, 0.78);
+        border-color: #bfd0d3;
+      }
+
+      .dossier-screen {
+        background: #ece4d8;
+        color: #2a241f;
+      }
+
+      .dossier-body {
+        display: grid;
+        grid-template-columns: 230px 1fr 310px;
+        gap: 14px;
+        padding: 0 16px 16px;
+      }
+
+      .folder-stack {
+        display: grid;
+        gap: 8px;
+        align-content: start;
+      }
+
+      .folder {
+        min-height: 64px;
+        border-radius: 8px 8px 8px 3px;
+        padding: 11px;
+        background: #d7c5ad;
+        border: 1px solid #c6b295;
+      }
+
+      .folder.active {
+        background: #fff8e9;
+        border-color: #a77a42;
+      }
+
+      .evidence-board {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .note {
+        min-height: 126px;
+        border-radius: 4px;
+        padding: 12px;
+        background: #fffdf7;
+        border: 1px solid #dacdb8;
+        box-shadow: 0 8px 14px rgba(68, 53, 34, 0.08);
+      }
+
+      .note.pin {
+        border-top: 5px solid #517c61;
+      }
+
+      .dossier-side {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+
+      .dossier-side .mini {
+        background: #fff8e9;
+        border-color: #d6c3a6;
+      }
+
+      .workshop-screen {
+        background: #20231f;
+        color: #f3f1e8;
+      }
+
+      .workshop-screen small,
+      .workshop-screen p {
+        color: #bfc5ba;
+      }
+
+      .workshop-body {
+        display: grid;
+        grid-template-columns: 330px minmax(0, 1fr) 300px;
+        gap: 14px;
+        padding: 0 16px 16px;
+      }
+
+      .knob-panel,
+      .run-panel,
+      .safety-panel {
+        border-radius: 8px;
+        border: 1px solid #3c443c;
+        background: #2a2f2a;
+        padding: 12px;
+      }
+
+      .knob {
+        margin: 13px 0;
+      }
+
+      .track {
+        height: 8px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #6ca777 0 42%, #474f47 42%);
+      }
+
+      .run-panel {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+
+      .run-step {
+        min-height: 70px;
+        border-radius: 8px;
+        padding: 10px;
+        background: #343b34;
+        border: 1px solid #4a544a;
+      }
+
+      .safety-panel {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+
+      .safety-panel .mini {
+        background: #343b34;
+        border-color: #4a544a;
+      }
+
+      .spreadsheet-screen {
+        background: #f7f9f8;
+        color: #151d1b;
+      }
+
+      .spreadsheet-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 14px;
+        padding: 0 16px 16px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #ffffff;
+        border: 1px solid #dbe2df;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid #e6ece9;
+        padding: 12px 10px;
+        text-align: left;
+        font-size: 0.86rem;
+      }
+
+      th {
+        background: #edf3f0;
+        color: #41504c;
+        font-size: 0.76rem;
+        text-transform: uppercase;
+      }
+
+      tr.selected td {
+        background: #fff4d9;
+      }
+
+      .inspector {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+        border-left: 4px solid #2f6f9f;
+        border-radius: 8px;
+        padding: 12px;
+        background: #ffffff;
+        border-top: 1px solid #dbe2df;
+        border-right: 1px solid #dbe2df;
+        border-bottom: 1px solid #dbe2df;
+      }
+
+      .inspector .mini {
+        background: #f8fbfa;
+        border-color: #dbe2df;
+      }
+
+      @media (max-width: 980px) {
+        header,
+        .direction-head,
+        .tower-grid,
+        .ledger-body,
+        .weather-body,
+        .dossier-body,
+        .workshop-body,
+        .spreadsheet-body {
+          grid-template-columns: 1fr;
+        }
+
+        .rules-grid,
+        .evidence-board {
+          grid-template-columns: 1fr;
+        }
+
+        .tower-row {
+          grid-template-columns: 1fr;
+        }
+
+        .screen {
+          min-height: 0;
+        }
+
+        .mock {
+          min-height: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section class="intro">
+          <div class="tag-row">
+            <span class="tag safe">Read-only</span>
+            <span class="tag">Visual options</span>
+            <span class="tag warn">No advice copy</span>
+            <span class="tag blocked">No execution routes</span>
+          </div>
+          <h1>Six different dashboard directions</h1>
+          <p>
+            These mocks are intentionally different operating models, not theme
+            variations. All content is synthetic, privacy-safe, and framed as
+            inspection context rather than trading guidance.
+          </p>
+          <nav class="nav" aria-label="Design directions">
+            <a href="#control-tower">Control Tower</a>
+            <a href="#personal-ledger">Personal Ledger</a>
+            <a href="#risk-weather">Risk Weather</a>
+            <a href="#research-dossier">Research Dossier</a>
+            <a href="#simulation-workshop">Simulation Workshop</a>
+            <a href="#spreadsheet-inspector">Spreadsheet Inspector</a>
+          </nav>
+        </section>
+
+        <section class="rules">
+          <h2>Shared safety frame</h2>
+          <p>
+            Each mock keeps credentials server-side, hides private identifiers,
+            avoids exact private balances, and treats research as source context.
+          </p>
+          <div class="rules-grid">
+            <div class="rule">
+              <strong>Always visible</strong>
+              <small>Mode, read-only lock, freshness, provider state, cache/backoff state.</small>
+            </div>
+            <div class="rule">
+              <strong>Never shown</strong>
+              <small>Keys, account IDs, position IDs, raw payloads, real screenshots.</small>
+            </div>
+            <div class="rule">
+              <strong>No action language</strong>
+              <small>No buy, sell, close, copy, rebalance, optimize, best move, or recommendation.</small>
+            </div>
+            <div class="rule">
+              <strong>Every fact has receipt</strong>
+              <small>Source, freshness, coverage state, retrieved time, or unavailable state.</small>
+            </div>
+          </div>
+        </section>
+      </header>
+
+      <article class="direction" id="control-tower">
+        <div class="direction-head">
+          <div>
+            <span class="tag safe">Option 1</span>
+            <h2>Control Tower</h2>
+          </div>
+          <p>
+            A compact operations board for fast scanning. Best when the first
+            question is whether the local dashboard is safe, fresh, connected,
+            and worth inspecting further.
+          </p>
+        </div>
+        <div class="mock">
+          <div class="screen tower-screen">
+            <div class="screen-top">
+              <div class="screen-title">
+                <strong>Local eToro Control Tower</strong>
+                <small>Demo mode, read-only, provider reads only</small>
+              </div>
+              <div class="status-row">
+                <span class="pill safe">Read-only lock</span>
+                <span class="pill safe">Provider fresh</span>
+                <span class="pill warn">Research partial</span>
+                <span class="pill blocked">Execution absent</span>
+              </div>
+            </div>
+            <div class="tower-grid">
+              <section class="tower-board">
+                <div class="tower-row">
+                  <strong>Portfolio</strong>
+                  <div class="bar"></div>
+                  <span>fresh</span>
+                  <small>DTO only</small>
+                </div>
+                <div class="tower-row">
+                  <strong>Watchlists</strong>
+                  <div class="bar"></div>
+                  <span>cached</span>
+                  <small>no writes</small>
+                </div>
+                <div class="tower-row">
+                  <strong>Risk view</strong>
+                  <div class="bar"></div>
+                  <span>partial</span>
+                  <small>bucketed</small>
+                </div>
+                <div class="tower-row">
+                  <strong>Research</strong>
+                  <div class="bar"></div>
+                  <span>mixed</span>
+                  <small>context only</small>
+                </div>
+                <div class="tower-row">
+                  <strong>Bot sim</strong>
+                  <div class="bar"></div>
+                  <span>local</span>
+                  <small>no provider mutation</small>
+                </div>
+                <div class="tower-row">
+                  <strong>Audit</strong>
+                  <div class="bar"></div>
+                  <span>redacted</span>
+                  <small>request ids hidden</small>
+                </div>
+              </section>
+              <aside class="tower-side">
+                <div class="mini">
+                  <strong>Attention queue</strong>
+                  <small>Research coverage missing for one watchlist group.</small>
+                </div>
+                <div class="mini">
+                  <strong>Provider posture</strong>
+                  <small>Short cache active. Backoff not active.</small>
+                </div>
+                <div class="mini">
+                  <strong>Privacy posture</strong>
+                  <small>No raw payloads or identifiers in browser state.</small>
+                </div>
+                <div class="mini">
+                  <strong>Best fit</strong>
+                  <small>Practical first screen, strongest for operations.</small>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="direction" id="personal-ledger">
+        <div class="direction-head">
+          <div>
+            <span class="tag safe">Option 2</span>
+            <h2>Personal Ledger</h2>
+          </div>
+          <p>
+            A calm account journal. It emphasizes what changed, where it came
+            from, and what remains unknown, without looking like a trading desk.
+          </p>
+        </div>
+        <div class="mock">
+          <div class="screen ledger-screen">
+            <div class="screen-top">
+              <div class="screen-title">
+                <strong>Private Read-Only Account Ledger</strong>
+                <small>Observation log with source receipts</small>
+              </div>
+              <div class="status-row">
+                <span class="pill safe">Demo</span>
+                <span class="pill safe">Fresh read</span>
+                <span class="pill">No identifiers</span>
+              </div>
+            </div>
+            <div class="ledger-body">
+              <section>
+                <div class="ledger-entry">
+                  <div class="ledger-stamp">09:42<br>provider</div>
+                  <div>
+                    <strong>Portfolio snapshot refreshed</strong>
+                    <small>Summary DTO updated. Raw provider payload stayed server-side.</small>
+                  </div>
+                  <span class="pill safe">receipt ready</span>
+                </div>
+                <div class="ledger-entry warn">
+                  <div class="ledger-stamp">09:43<br>research</div>
+                  <div>
+                    <strong>Public record coverage is partial</strong>
+                    <small>Some instruments have public context; several remain source-missing.</small>
+                  </div>
+                  <span class="pill warn">partial</span>
+                </div>
+                <div class="ledger-entry">
+                  <div class="ledger-stamp">09:44<br>watchlist</div>
+                  <div>
+                    <strong>Watchlist preview loaded</strong>
+                    <small>Read-only list only. No watchlist mutation route is enabled.</small>
+                  </div>
+                  <span class="pill safe">no writes</span>
+                </div>
+                <div class="ledger-entry blocked">
+                  <div class="ledger-stamp">09:45<br>safety</div>
+                  <div>
+                    <strong>Trading path blocked by design</strong>
+                    <small>Preview and execution remain unavailable without separate review.</small>
+                  </div>
+                  <span class="pill blocked">blocked</span>
+                </div>
+              </section>
+              <aside class="ledger-side">
+                <div class="mini">
+                  <strong>Today at a glance</strong>
+                  <small>Fresh provider read, partial research, no mutation routes.</small>
+                </div>
+                <div class="mini">
+                  <strong>Missing context</strong>
+                  <small>ETF holdings coverage and one market-news source.</small>
+                </div>
+                <div class="mini">
+                  <strong>Best fit</strong>
+                  <small>Trust, calm review, and personal ownership.</small>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="direction" id="risk-weather">
+        <div class="direction-head">
+          <div>
+            <span class="tag safe">Option 3</span>
+            <h2>Risk Weather Station</h2>
+          </div>
+          <p>
+            Portfolio state becomes current conditions. This avoids advice
+            language by framing signals as weather-like context, not decisions.
+          </p>
+        </div>
+        <div class="mock">
+          <div class="screen weather-screen">
+            <div class="screen-top">
+              <div class="screen-title">
+                <strong>Current Conditions</strong>
+                <small>Context only, no forecast or recommendation</small>
+              </div>
+              <div class="status-row">
+                <span class="pill safe">Read-only</span>
+                <span class="pill warn">Coverage uneven</span>
+                <span class="pill">Cache short</span>
+              </div>
+            </div>
+            <div class="weather-body">
+              <section class="weather-map">
+                <div class="isobar one"></div>
+                <div class="isobar two"></div>
+                <div class="isobar three"></div>
+                <div class="weather-label one">
+                  <strong>Exposure pressure</strong>
+                  <small>Moderate concentration bucket. Source fresh.</small>
+                </div>
+                <div class="weather-label two">
+                  <strong>Research cloud</strong>
+                  <small>Coverage partial. Several receipts missing.</small>
+                </div>
+                <div class="weather-label three">
+                  <strong>Provider wind</strong>
+                  <small>No backoff. Last read recent.</small>
+                </div>
+              </section>
+              <aside class="weather-side">
+                <div class="mini">
+                  <strong>Conditions summary</strong>
+                  <small>Fresh provider read with partial public context.</small>
+                </div>
+                <div class="mini">
+                  <strong>Stale-data watch</strong>
+                  <small>No stale warning active. Cache state visible.</small>
+                </div>
+                <div class="mini">
+                  <strong>Best fit</strong>
+                  <small>Risk awareness without dashboard-as-advisor tone.</small>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="direction" id="research-dossier">
+        <div class="direction-head">
+          <div>
+            <span class="tag safe">Option 4</span>
+            <h2>Research Dossier</h2>
+          </div>
+          <p>
+            A source-evidence workspace for instruments and watchlist items.
+            The portfolio becomes a set of dossiers with facts, claims, missing
+            coverage, and receipts.
+          </p>
+        </div>
+        <div class="mock">
+          <div class="screen dossier-screen">
+            <div class="screen-top">
+              <div class="screen-title">
+                <strong>Instrument Dossiers</strong>
+                <small>Facts and receipts, no signals</small>
+              </div>
+              <div class="status-row">
+                <span class="pill safe">Sources cited</span>
+                <span class="pill warn">Some missing</span>
+                <span class="pill">Context only</span>
+              </div>
+            </div>
+            <div class="dossier-body">
+              <aside class="folder-stack">
+                <div class="folder active">
+                  <strong>Selected holding</strong>
+                  <small>3 receipts, 1 gap</small>
+                </div>
+                <div class="folder">
+                  <strong>ETF group</strong>
+                  <small>holdings coverage partial</small>
+                </div>
+                <div class="folder">
+                  <strong>Watchlist item</strong>
+                  <small>news context found</small>
+                </div>
+                <div class="folder">
+                  <strong>Public records</strong>
+                  <small>server-side only</small>
+                </div>
+              </aside>
+              <section class="evidence-board">
+                <div class="note pin">
+                  <strong>Known fact</strong>
+                  <small>Provider DTO confirms instrument exists in read-only snapshot.</small>
+                </div>
+                <div class="note">
+                  <strong>Missing coverage</strong>
+                  <small>Public ownership context unavailable for this item.</small>
+                </div>
+                <div class="note">
+                  <strong>Recent context</strong>
+                  <small>Market news summary attached as context only.</small>
+                </div>
+                <div class="note pin">
+                  <strong>Receipt</strong>
+                  <small>Source, retrieved time, freshness, and redaction state.</small>
+                </div>
+              </section>
+              <aside class="dossier-side">
+                <div class="mini">
+                  <strong>Dossier rule</strong>
+                  <small>Every statement is fact, context, missing, or unverified.</small>
+                </div>
+                <div class="mini">
+                  <strong>Best fit</strong>
+                  <small>Research-heavy use and source confidence review.</small>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="direction" id="simulation-workshop">
+        <div class="direction-head">
+          <div>
+            <span class="tag safe">Option 5</span>
+            <h2>Simulation Workshop</h2>
+          </div>
+          <p>
+            A lab-style dashboard centered on simulation and safety controls.
+            It makes the bot boundary clear: local config, no execution queue,
+            no provider mutations.
+          </p>
+        </div>
+        <div class="mock">
+          <div class="screen workshop-screen">
+            <div class="screen-top">
+              <div class="screen-title">
+                <strong>Simulation Workshop</strong>
+                <small>Local strategy config and redacted run status</small>
+              </div>
+              <div class="status-row">
+                <span class="pill safe">Simulation only</span>
+                <span class="pill blocked">Execution absent</span>
+                <span class="pill">Budget capped</span>
+              </div>
+            </div>
+            <div class="workshop-body">
+              <section class="knob-panel">
+                <h3>Local controls</h3>
+                <div class="knob">
+                  <strong>Strategy</strong>
+                  <small>Predefined only</small>
+                  <div class="track"></div>
+                </div>
+                <div class="knob">
+                  <strong>Market group</strong>
+                  <small>Allowed combinations only</small>
+                  <div class="track"></div>
+                </div>
+                <div class="knob">
+                  <strong>Cadence</strong>
+                  <small>Low-frequency simulation</small>
+                  <div class="track"></div>
+                </div>
+              </section>
+              <section class="run-panel">
+                <div class="run-step">
+                  <strong>Input snapshot</strong>
+                  <small>Read-only portfolio DTO, redacted.</small>
+                </div>
+                <div class="run-step">
+                  <strong>Assumption check</strong>
+                  <small>Missing source coverage blocks confidence escalation.</small>
+                </div>
+                <div class="run-step">
+                  <strong>Rejected output</strong>
+                  <small>Anything requiring provider mutation is blocked.</small>
+                </div>
+                <div class="run-step">
+                  <strong>Report export</strong>
+                  <small>Redacted simulation summary only.</small>
+                </div>
+              </section>
+              <aside class="safety-panel">
+                <div class="mini">
+                  <strong>Boundary</strong>
+                  <small>The dashboard controls config, not trades.</small>
+                </div>
+                <div class="mini">
+                  <strong>Best fit</strong>
+                  <small>Future bot monitoring and Money-maker integration.</small>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="direction" id="spreadsheet-inspector">
+        <div class="direction-head">
+          <div>
+            <span class="tag safe">Option 6</span>
+            <h2>Spreadsheet Plus Inspector</h2>
+          </div>
+          <p>
+            A power-user table with a serious inspector drawer. Less visual
+            metaphor, more fast scanning, sorting, and receipt inspection.
+          </p>
+        </div>
+        <div class="mock">
+          <div class="screen spreadsheet-screen">
+            <div class="screen-top">
+              <div class="screen-title">
+                <strong>Portfolio Inspection Table</strong>
+                <small>Rows are synthetic and bucketed for design review</small>
+              </div>
+              <div class="status-row">
+                <span class="pill safe">Read-only</span>
+                <span class="pill">Sort and filter</span>
+                <span class="pill warn">Partial sources</span>
+              </div>
+            </div>
+            <div class="spreadsheet-body">
+              <section>
+                <table aria-label="Synthetic portfolio inspection table">
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Area</th>
+                      <th>Freshness</th>
+                      <th>Source</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="selected">
+                      <td>Holding group A</td>
+                      <td>Equity bucket</td>
+                      <td>Fresh</td>
+                      <td>Provider DTO</td>
+                      <td>Inspect</td>
+                    </tr>
+                    <tr>
+                      <td>ETF group B</td>
+                      <td>Fund bucket</td>
+                      <td>Cached</td>
+                      <td>Public record</td>
+                      <td>Partial</td>
+                    </tr>
+                    <tr>
+                      <td>Watchlist C</td>
+                      <td>Context</td>
+                      <td>Fresh</td>
+                      <td>Server summary</td>
+                      <td>No writes</td>
+                    </tr>
+                    <tr>
+                      <td>Bot simulation</td>
+                      <td>Local config</td>
+                      <td>Local</td>
+                      <td>Config file</td>
+                      <td>Simulation</td>
+                    </tr>
+                    <tr>
+                      <td>Provider health</td>
+                      <td>System</td>
+                      <td>Recent</td>
+                      <td>Server route</td>
+                      <td>Stable</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </section>
+              <aside class="inspector">
+                <h3>Selected row inspector</h3>
+                <div class="mini">
+                  <strong>What is known</strong>
+                  <small>Provider DTO confirms this grouped row exists.</small>
+                </div>
+                <div class="mini">
+                  <strong>What is hidden</strong>
+                  <small>No account ID, position ID, exact private balance, or raw payload.</small>
+                </div>
+                <div class="mini">
+                  <strong>Receipts</strong>
+                  <small>Source type, freshness, cached state, retrieved time.</small>
+                </div>
+                <div class="mini">
+                  <strong>Best fit</strong>
+                  <small>Most practical for daily use, least distinctive visually.</small>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </article>
+    </main>
+  </body>
+</html>

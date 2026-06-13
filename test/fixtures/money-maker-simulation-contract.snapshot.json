@@ -1,5 +1,5 @@
 {
-  "source": "Money-maker-3000/src/simulation-contract.mjs",
+  "source": "Money-maker-3000/src/money_maker_3000/contracts.py",
   "version": "0.1.0-sim",
   "markets": [
     "US_EQUITIES",
@@ -20,8 +20,12 @@
     "OPTION"
   ],
   "runModes": [
-    "backtest",
-    "execute"
+    "backtest"
+  ],
+  "disabledRunModes": [
+    "execute",
+    "trade",
+    "trading"
   ],
   "runModePolicy": {
     "backtest": {
@@ -37,6 +41,20 @@
       "demoExecution": "blocked",
       "liveExecution": "blocked",
       "reason": "demo execution requires a separate review and explicit approval"
+    },
+    "trade": {
+      "enabled": false,
+      "providerCalls": "blocked",
+      "demoExecution": "blocked",
+      "liveExecution": "blocked",
+      "reason": "trading aliases are disabled; only offline backtest mode is allowed"
+    },
+    "trading": {
+      "enabled": false,
+      "providerCalls": "blocked",
+      "demoExecution": "blocked",
+      "liveExecution": "blocked",
+      "reason": "trading aliases are disabled; only offline backtest mode is allowed"
     }
   },
   "marketInstrumentClassRules": {
@@ -90,6 +108,34 @@
         "EQUITY",
         "ETF",
         "COMMODITY"
+      ]
+    },
+    "volatility-band-accumulator": {
+      "name": "Volatility band accumulator",
+      "version": "0.1.0-sim",
+      "status": "simulation-only",
+      "cadence": "daily",
+      "allowedMarkets": [
+        "US_EQUITIES",
+        "AU_EQUITIES"
+      ],
+      "allowedInstrumentClasses": [
+        "EQUITY",
+        "ETF"
+      ]
+    },
+    "slow-trend-allocation": {
+      "name": "Slow trend allocation",
+      "version": "0.1.0-sim",
+      "status": "simulation-only",
+      "cadence": "weekly",
+      "allowedMarkets": [
+        "US_EQUITIES",
+        "AU_EQUITIES"
+      ],
+      "allowedInstrumentClasses": [
+        "EQUITY",
+        "ETF"
       ]
     },
     "news-aware-watchlist": {

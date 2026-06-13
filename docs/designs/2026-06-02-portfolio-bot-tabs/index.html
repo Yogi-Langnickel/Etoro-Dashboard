@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>eToro Dashboard Portfolio And Bot Tab Options</title>
+    <link rel="icon" href="data:,">
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172126;
+        --muted: #617078;
+        --line: #d5dde0;
+        --paper: #f6f8f8;
+        --white: #ffffff;
+        --teal: #0f6b62;
+        --green: #23805a;
+        --amber: #b36b1e;
+        --red: #b3473f;
+        --blue: #275f8f;
+        --charcoal: #182227;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #e9eeee;
+        color: var(--ink);
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      .page {
+        width: min(1680px, 100%);
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .intro {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 20px;
+        align-items: end;
+        margin-bottom: 24px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: 2.2rem;
+        line-height: 1.05;
+      }
+
+      h2 {
+        margin-bottom: 8px;
+        font-size: 1.35rem;
+      }
+
+      h3 {
+        margin-bottom: 8px;
+        font-size: 0.96rem;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .eyebrow {
+        margin-bottom: 6px;
+        color: var(--teal);
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+      }
+
+      .toc {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .toc a,
+      .tab,
+      .chip,
+      .mini-button,
+      .icon-button {
+        border-radius: 7px;
+        text-decoration: none;
+      }
+
+      .toc a {
+        border: 1px solid var(--line);
+        background: var(--white);
+        color: var(--ink);
+        font-size: 0.82rem;
+        font-weight: 800;
+        padding: 9px 11px;
+      }
+
+      .option {
+        margin-bottom: 34px;
+      }
+
+      .option-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.48fr);
+        gap: 18px;
+        align-items: start;
+        margin-bottom: 14px;
+      }
+
+      .notes {
+        background: var(--white);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .notes ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .screen-pair {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      .screen {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--white);
+        overflow: hidden;
+      }
+
+      .mock-topbar {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .kpi {
+        min-height: 64px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 7px;
+        padding: 10px;
+      }
+
+      .kpi span,
+      .tiny,
+      .label {
+        display: block;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      .kpi strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 1rem;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 6px;
+        padding: 10px 12px 0;
+      }
+
+      .tab {
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 800;
+        padding: 7px 10px;
+      }
+
+      .tab.active {
+        background: var(--teal);
+        border-color: var(--teal);
+        color: #ffffff;
+      }
+
+      .tri {
+        display: grid;
+        grid-template-columns: 25% 55% 20%;
+        gap: 10px;
+        min-height: 520px;
+        padding: 12px;
+      }
+
+      .pane,
+      .module,
+      .row,
+      .action,
+      .bot-card,
+      .table-shell,
+      .quote-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.86);
+        min-width: 0;
+      }
+
+      .pane,
+      .module,
+      .bot-card,
+      .table-shell,
+      .quote-card {
+        padding: 12px;
+      }
+
+      .list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        min-height: 54px;
+        padding: 9px;
+      }
+
+      .row strong,
+      .action strong,
+      .asset-head strong,
+      .stat strong,
+      .module strong,
+      .bot-card strong,
+      .quote-card strong {
+        display: block;
+      }
+
+      .row span,
+      .action small,
+      .asset-head span,
+      .bot-card small,
+      .stat small {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .green {
+        color: var(--green);
+      }
+
+      .red {
+        color: var(--red);
+      }
+
+      .amber {
+        color: var(--amber);
+      }
+
+      .blue {
+        color: var(--blue);
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 24px;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 800;
+        padding: 3px 7px;
+        white-space: nowrap;
+      }
+
+      .chart {
+        position: relative;
+        min-height: 148px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background:
+          linear-gradient(180deg, rgba(15, 107, 98, 0.06), rgba(15, 107, 98, 0)),
+          repeating-linear-gradient(0deg, transparent 0, transparent 35px, rgba(0, 0, 0, 0.05) 36px);
+        overflow: hidden;
+      }
+
+      .chart svg {
+        width: 100%;
+        height: 148px;
+        display: block;
+      }
+
+      .tabs-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin: 10px 0;
+      }
+
+      .asset-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: start;
+        margin-bottom: 10px;
+      }
+
+      .stat-grid,
+      .bot-grid,
+      .control-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .stat-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .stat {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 74px;
+        padding: 10px;
+      }
+
+      .actions {
+        display: grid;
+        gap: 9px;
+      }
+
+      .action {
+        min-height: 72px;
+        padding: 10px;
+      }
+
+      .mini-button,
+      .icon-button {
+        min-height: 32px;
+        border: 1px solid var(--line);
+        background: var(--white);
+        color: var(--ink);
+        font-size: 0.78rem;
+        font-weight: 800;
+        padding: 6px 9px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.78rem;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 8px 7px;
+        text-align: right;
+        vertical-align: middle;
+        overflow-wrap: anywhere;
+      }
+
+      th:first-child,
+      td:first-child {
+        text-align: left;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 0.68rem;
+        text-transform: uppercase;
+      }
+
+      .bot-layout {
+        display: grid;
+        grid-template-columns: 34% 41% 25%;
+        gap: 10px;
+        min-height: 520px;
+        padding: 12px;
+      }
+
+      .slider {
+        height: 8px;
+        border-radius: 99px;
+        background: #d9e2e0;
+        overflow: hidden;
+      }
+
+      .slider span {
+        display: block;
+        height: 100%;
+        background: var(--teal);
+      }
+
+      .timeline {
+        display: grid;
+        gap: 9px;
+      }
+
+      .event {
+        border-left: 3px solid var(--teal);
+        padding: 3px 0 3px 9px;
+      }
+
+      .option-1 .screen {
+        background: #f5f7f6;
+      }
+
+      .option-1 .mock-topbar {
+        background: #172126;
+        color: #eef5f1;
+        border-bottom-color: #2d3d43;
+      }
+
+      .option-1 .mock-topbar .kpi {
+        background: #202d32;
+        border-color: #365057;
+      }
+
+      .option-1 .mock-topbar span {
+        color: #a9babd;
+      }
+
+      .option-1 .tab.active {
+        background: #0f6b62;
+        border-color: #0f6b62;
+      }
+
+      .option-2 .screen {
+        background: #f7f9fb;
+      }
+
+      .option-2 .tri {
+        grid-template-columns: 34% 43% 23%;
+      }
+
+      .option-2 .tab.active,
+      .option-2 .slider span {
+        background: #275f8f;
+        border-color: #275f8f;
+      }
+
+      .option-2 .table-shell {
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .option-3 .screen {
+        background: #192123;
+        color: #edf2ee;
+        border-color: #303b3d;
+      }
+
+      .option-3 .mock-topbar,
+      .option-3 .pane,
+      .option-3 .module,
+      .option-3 .row,
+      .option-3 .action,
+      .option-3 .bot-card,
+      .option-3 .table-shell {
+        background: #202b2e;
+        border-color: #354449;
+      }
+
+      .option-3 .tab {
+        border-color: #354449;
+        color: #b9c5c1;
+      }
+
+      .option-3 .tab.active,
+      .option-3 .slider span {
+        background: #c27b36;
+        border-color: #c27b36;
+        color: #151a1b;
+      }
+
+      .option-3 p,
+      .option-3 .tiny,
+      .option-3 .label,
+      .option-3 th {
+        color: #aab7b3;
+      }
+
+      .option-4 .screen {
+        background: #eef4f1;
+      }
+
+      .option-4 .tri {
+        grid-template-columns: 22% 58% 20%;
+      }
+
+      .option-4 .tab.active,
+      .option-4 .slider span {
+        background: #7a4f7d;
+        border-color: #7a4f7d;
+      }
+
+      .option-4 .module.feature {
+        min-height: 238px;
+      }
+
+      .option-5 .screen {
+        background: #f2f5f3;
+      }
+
+      .option-5 .mock-topbar {
+        grid-template-columns: 1.5fr 1fr 1fr 1fr;
+        background: #22312b;
+        color: #f2f8f4;
+      }
+
+      .option-5 .mock-topbar span {
+        color: #b9cbc1;
+      }
+
+      .option-5 .tri {
+        grid-template-columns: 20% 49% 31%;
+      }
+
+      .option-5 .bot-layout {
+        grid-template-columns: 25% 45% 30%;
+      }
+
+      .option-5 .tab.active,
+      .option-5 .slider span {
+        background: #4d6b34;
+        border-color: #4d6b34;
+      }
+
+      @media (max-width: 980px) {
+        .intro,
+        .option-header,
+        .screen-pair,
+        .tri,
+        .bot-layout,
+        .option-2 .tri,
+        .option-4 .tri,
+        .option-5 .tri,
+        .option-5 .bot-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .mock-topbar,
+        .stat-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .toc {
+          justify-content: flex-start;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .page {
+          padding: 16px;
+        }
+
+        .mock-topbar,
+        .stat-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .tabs {
+          flex-wrap: wrap;
+        }
+
+        table {
+          table-layout: fixed;
+          font-size: 0.68rem;
+        }
+
+        th,
+        td {
+          padding: 6px 4px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="intro">
+        <div>
+          <p class="eyebrow">Static design board</p>
+          <h1>Portfolio View and Bot Control tab options</h1>
+          <p>
+            Five synthetic dashboard directions based on the requested 25/55/20
+            portfolio split and a separate Money-maker control tab. No private
+            balances, account identifiers, positions, or provider payloads are used.
+          </p>
+        </div>
+        <nav class="toc" aria-label="Design option links">
+          <a href="#option-1">Split Workbench</a>
+          <a href="#option-2">Ledger Inspector</a>
+          <a href="#option-3">Command Deck</a>
+          <a href="#option-4">Research Console</a>
+          <a href="#option-5">Bot Operations Bay</a>
+        </nav>
+      </header>
+
+      <section class="option option-1" id="option-1">
+        <div class="option-header">
+          <div>
+            <p class="eyebrow">Option 1</p>
+            <h2>Split Workbench</h2>
+            <p>Closest to your sketch: stable top KPIs, 25/55/20 working columns, and tabs that keep portfolio and bot work separate without changing the mental model.</p>
+          </div>
+          <div class="notes">
+            <ul>
+              <li>Best fit for a first implementation slice.</li>
+              <li>Fast instrument scanning with a strong selected-asset workspace.</li>
+              <li>Automation rail stays context-only and avoids advice language.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="screen-pair">
+          <article class="screen" aria-label="Option 1 portfolio view">
+            <div class="mock-topbar">
+              <div class="kpi"><span>Net portfolio value</span><strong>$128,420</strong></div>
+              <div class="kpi"><span>Total gain/loss</span><strong class="green">+4.6%</strong></div>
+              <div class="kpi"><span>Available cash</span><strong>$18,250</strong></div>
+              <div class="kpi"><span>Market status</span><strong class="amber">Mixed open</strong></div>
+            </div>
+            <div class="tabs"><span class="tab active">Portfolio View</span><span class="tab">Bot Control</span></div>
+            <div class="tri">
+              <aside class="pane">
+                <p class="eyebrow">Portfolio tree</p>
+                <div class="list">
+                  <div class="row"><span><strong>All holdings</strong><small>42 instruments</small></span><span class="chip">Active</span></div>
+                  <div class="row"><span><strong>Stocks</strong><small>ASX and global</small></span><span>31</span></div>
+                  <div class="row"><span><strong>ETFs</strong><small>Core, income</small></span><span>7</span></div>
+                  <div class="row"><span><strong>Crypto</strong><small>High volatility</small></span><span>4</span></div>
+                  <div class="row"><span><strong>Watchlists</strong><small>Long-term ideas</small></span><span>18</span></div>
+                </div>
+              </aside>
+              <section class="pane">
+                <div class="asset-head">
+                  <span><strong>NVDA</strong><small>Aggregated across 3 open positions</small></span>
+                  <span class="chip">1M selected</span>
+                </div>
+                <div class="chart">
+                  <svg viewBox="0 0 520 148" role="img" aria-label="NVDA mini chart">
+                    <polyline fill="none" stroke="#0f6b62" stroke-width="4" points="10,118 70,110 125,84 188,92 250,62 318,68 390,38 510,28"/>
+                  </svg>
+                </div>
+                <div class="tabs-row">
+                  <span class="chip">24h</span><span class="chip">1w</span><span class="chip">1m</span><span class="chip">1y</span><span class="chip">5y</span><span class="chip">Max</span>
+                </div>
+                <div class="table-shell">
+                  <table aria-label="Aggregated portfolio rows">
+                    <thead><tr><th>Asset</th><th>Price</th><th>Change</th><th>Units</th><th>Avg open</th><th>P/L</th><th>Net value</th></tr></thead>
+                    <tbody>
+                      <tr><td>NVDA</td><td>$1,024.20</td><td class="green">+8.2%</td><td>12.4</td><td>$842.10</td><td class="green">+$2,258</td><td>$12,700</td></tr>
+                      <tr><td>VAS.ASX</td><td>$98.40</td><td class="green">+1.4%</td><td>210</td><td>$91.20</td><td class="green">+$1,512</td><td>$20,664</td></tr>
+                      <tr><td>BTC</td><td>$68,420</td><td class="red">-3.1%</td><td>0.38</td><td>$61,100</td><td class="green">+$2,782</td><td>$25,999</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="stat-grid" style="margin-top:10px">
+                  <div class="stat"><span class="label">Fundamentals</span><strong>Coverage good</strong><small>Latest filing linked</small></div>
+                  <div class="stat"><span class="label">Risk</span><strong class="amber">High beta</strong><small>Position weight 9.8%</small></div>
+                  <div class="stat"><span class="label">Valuation</span><strong>Needs review</strong><small>No recommendation</small></div>
+                </div>
+              </section>
+              <aside class="pane">
+                <p class="eyebrow">Automated actions</p>
+                <div class="actions">
+                  <div class="action"><strong>Rebalance triggers</strong><small>2 context flags, no orders</small></div>
+                  <div class="action"><strong>AI/System insights</strong><small>Receipts only, no advice</small></div>
+                  <div class="action"><strong>Economic calendar</strong><small>FOMC, CPI, AU jobs</small></div>
+                  <button class="mini-button" type="button">Open receipts</button>
+                </div>
+              </aside>
+            </div>
+          </article>
+
+          <article class="screen" aria-label="Option 1 bot control">
+            <div class="mock-topbar">
+              <div class="kpi"><span>Bot mode</span><strong>Backtest</strong></div>
+              <div class="kpi"><span>Execution</span><strong class="red">Locked</strong></div>
+              <div class="kpi"><span>Budget</span><strong>$1,000</strong></div>
+              <div class="kpi"><span>Last run</span><strong>Fixture batch</strong></div>
+            </div>
+            <div class="tabs"><span class="tab">Portfolio View</span><span class="tab active">Bot Control</span></div>
+            <div class="bot-layout">
+              <aside class="pane">
+                <p class="eyebrow">Strategy config</p>
+                <div class="list">
+                  <div class="row"><span><strong>DCA reserve</strong><small>Low-frequency</small></span><span class="chip">On</span></div>
+                  <div class="row"><span><strong>Markets</strong><small>US, AU equities</small></span><span>2</span></div>
+                  <div class="row"><span><strong>Instrument class</strong><small>Equity, ETF</small></span><span>2</span></div>
+                  <div class="row"><span><strong>Cadence</strong><small>240 min minimum</small></span><span class="chip">Safe</span></div>
+                </div>
+              </aside>
+              <section class="pane">
+                <p class="eyebrow">Guarded controls</p>
+                <div class="control-grid">
+                  <div class="bot-card"><strong>Simulation budget</strong><div class="slider"><span style="width:42%"></span></div><small>$1,000 of $2,500 ceiling</small></div>
+                  <div class="bot-card"><strong>Risk stops</strong><div class="stat-grid"><div class="stat"><span>Daily</span><strong>$50</strong></div><div class="stat"><span>Weekly</span><strong>$140</strong></div><div class="stat"><span>Open max</span><strong>5</strong></div></div></div>
+                  <div class="bot-card"><strong>Provider boundary</strong><small>Dashboard config only. Money-maker owns simulation. Execution routes absent.</small></div>
+                </div>
+              </section>
+              <aside class="pane">
+                <p class="eyebrow">Audit</p>
+                <div class="timeline">
+                  <div class="event"><strong>Config saved</strong><small>Local mutation token accepted</small></div>
+                  <div class="event"><strong>Batch diagnostics</strong><small>SPY, GLD fixtures</small></div>
+                  <div class="event"><strong>Execution blocked</strong><small>Expected posture</small></div>
+                </div>
+              </aside>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="option option-2" id="option-2">
+        <div class="option-header">
+          <div>
+            <p class="eyebrow">Option 2</p>
+            <h2>Ledger Inspector</h2>
+            <p>A table-first design for fast portfolio inspection. It makes the aggregated instrument ledger the primary surface and uses the middle/right columns as inspector and control context.</p>
+          </div>
+          <div class="notes">
+            <ul>
+              <li>Best if portfolio scanning is the dominant workflow.</li>
+              <li>More traditional financial-tool feel, less visual drama.</li>
+              <li>Bot tab mirrors the same ledger idea for runs and settings.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="screen-pair">
+          <article class="screen">
+            <div class="mock-topbar">
+              <div class="kpi"><span>Net value</span><strong>$128,420</strong></div>
+              <div class="kpi"><span>P/L</span><strong class="green">+$5,612</strong></div>
+              <div class="kpi"><span>Cash</span><strong>$18,250</strong></div>
+              <div class="kpi"><span>Data state</span><strong class="amber">Partial</strong></div>
+            </div>
+            <div class="tabs"><span class="tab active">Portfolio View</span><span class="tab">Bot Control</span></div>
+            <div class="tri">
+              <section class="table-shell">
+                <table>
+                  <thead><tr><th>Instrument</th><th>1m</th><th>Weight</th></tr></thead>
+                  <tbody>
+                    <tr><td><strong>BHP.ASX</strong><br><small>2 positions</small></td><td class="green">+2.1%</td><td>11.2%</td></tr>
+                    <tr><td><strong>VGS.ASX</strong><br><small>1 position</small></td><td class="green">+1.2%</td><td>18.4%</td></tr>
+                    <tr><td><strong>TSLA</strong><br><small>4 positions</small></td><td class="red">-4.8%</td><td>6.6%</td></tr>
+                    <tr><td><strong>GLD</strong><br><small>2 positions</small></td><td class="amber">+0.4%</td><td>5.1%</td></tr>
+                    <tr><td><strong>BTC</strong><br><small>1 position</small></td><td class="red">-3.1%</td><td>8.4%</td></tr>
+                  </tbody>
+                </table>
+              </section>
+              <section class="pane">
+                <div class="asset-head"><span><strong>BHP.ASX inspector</strong><small>Summary row selected from instrument ledger</small></span><span class="chip">ASX</span></div>
+                <div class="chart"><svg viewBox="0 0 520 148"><polyline fill="none" stroke="#275f8f" stroke-width="4" points="10,90 80,78 150,84 225,66 300,70 390,52 510,46"/></svg></div>
+                <div class="stat-grid" style="margin-top:10px">
+                  <div class="stat"><span>Units</span><strong>420</strong></div>
+                  <div class="stat"><span>Avg open</span><strong>$39.80</strong></div>
+                  <div class="stat"><span>Net value</span><strong>$18,690</strong></div>
+                </div>
+                <div class="table-shell" style="margin-top:10px">
+                  <table><thead><tr><th>Enrichment</th><th>State</th><th>Source</th></tr></thead><tbody><tr><td>Financials</td><td>Linked</td><td>Company filing</td></tr><tr><td>Insiders</td><td>Unavailable</td><td>ASX source review</td></tr><tr><td>News</td><td>Context only</td><td>RSS/API</td></tr></tbody></table>
+                </div>
+              </section>
+              <aside class="pane">
+                <p class="eyebrow">Action ledger</p>
+                <div class="actions">
+                  <div class="action"><strong>Dividend review</strong><small>Quarterly estimator ready</small></div>
+                  <div class="action"><strong>Risk note</strong><small>Materials concentration</small></div>
+                  <div class="action"><strong>Calendar</strong><small>Ex-div date watch</small></div>
+                </div>
+              </aside>
+            </div>
+          </article>
+
+          <article class="screen">
+            <div class="mock-topbar">
+              <div class="kpi"><span>Run mode</span><strong>Backtest</strong></div>
+              <div class="kpi"><span>Fixtures</span><strong>2 symbols</strong></div>
+              <div class="kpi"><span>Provider</span><strong class="red">Blocked</strong></div>
+              <div class="kpi"><span>Audit rows</span><strong>18</strong></div>
+            </div>
+            <div class="tabs"><span class="tab">Portfolio View</span><span class="tab active">Bot Control</span></div>
+            <div class="bot-layout">
+              <section class="table-shell">
+                <table><thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody><tr><td>Strategy</td><td>DCA reserve</td></tr><tr><td>Budget</td><td>$1,000</td></tr><tr><td>Cadence</td><td>240 min</td></tr><tr><td>Markets</td><td>US, AU</td></tr><tr><td>Execution</td><td>Absent</td></tr></tbody></table>
+              </section>
+              <section class="pane">
+                <p class="eyebrow">Run ledger</p>
+                <div class="table-shell"><table><thead><tr><th>Run</th><th>Input</th><th>Result</th><th>State</th></tr></thead><tbody><tr><td>R-104</td><td>SPY</td><td>Diagnostics</td><td class="green">Valid</td></tr><tr><td>R-103</td><td>GLD</td><td>Diagnostics</td><td class="green">Valid</td></tr><tr><td>R-102</td><td>Portfolio</td><td>Deferred</td><td class="amber">Blocked</td></tr></tbody></table></div>
+                <div class="bot-card" style="margin-top:10px"><strong>Mutation boundary</strong><small>Config updates are local-only and use CSRF token. No provider calls from this tab.</small></div>
+              </section>
+              <aside class="pane">
+                <p class="eyebrow">Stop posture</p>
+                <div class="actions">
+                  <div class="action"><strong>Kill switch</strong><small class="green">Armed</small></div>
+                  <div class="action"><strong>Daily loss</strong><small>$50 hard stop</small></div>
+                  <div class="action"><strong>Live route</strong><small class="red">Not present</small></div>
+                </div>
+              </aside>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="option option-3" id="option-3">
+        <div class="option-header">
+          <div>
+            <p class="eyebrow">Option 3</p>
+            <h2>Command Deck</h2>
+            <p>A cockpit for daily operation. It makes market status, stale data, safety locks, and next review items more visible than raw portfolio density.</p>
+          </div>
+          <div class="notes">
+            <ul>
+              <li>Best if you want an operational status room.</li>
+              <li>Strong separation between observation and allowed actions.</li>
+              <li>Darker, compact, action-oriented, with fewer table rows visible.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="screen-pair">
+          <article class="screen">
+            <div class="mock-topbar">
+              <div class="kpi"><span>Portfolio</span><strong>$128,420</strong></div>
+              <div class="kpi"><span>Session drift</span><strong class="amber">3 alerts</strong></div>
+              <div class="kpi"><span>Cash</span><strong>$18,250</strong></div>
+              <div class="kpi"><span>Safety</span><strong class="green">Read only</strong></div>
+            </div>
+            <div class="tabs"><span class="tab active">Portfolio View</span><span class="tab">Bot Control</span></div>
+            <div class="tri">
+              <aside class="pane">
+                <p class="eyebrow">Queues</p>
+                <div class="list">
+                  <div class="row"><span><strong>Needs review</strong><small>TSLA, BTC, FX</small></span><span>3</span></div>
+                  <div class="row"><span><strong>Income watch</strong><small>Dividends</small></span><span>6</span></div>
+                  <div class="row"><span><strong>Fresh rows</strong><small>Updated today</small></span><span>29</span></div>
+                  <div class="row"><span><strong>Stale rows</strong><small>Provider backoff</small></span><span>4</span></div>
+                </div>
+              </aside>
+              <section class="pane">
+                <div class="asset-head"><span><strong>TSLA action room</strong><small>Risk and enrichment grouped for current review</small></span><span class="chip">No trade path</span></div>
+                <div class="stat-grid"><div class="stat"><span>Weight</span><strong>6.6%</strong></div><div class="stat"><span>1m move</span><strong class="red">-4.8%</strong></div><div class="stat"><span>Risk</span><strong class="amber">High beta</strong></div></div>
+                <div class="chart" style="margin-top:10px"><svg viewBox="0 0 520 148"><polyline fill="none" stroke="#c27b36" stroke-width="4" points="10,42 80,50 140,64 220,58 290,82 370,92 510,118"/></svg></div>
+                <div class="table-shell" style="margin-top:10px"><table><thead><tr><th>Receipt</th><th>Status</th><th>Use</th></tr></thead><tbody><tr><td>News</td><td>3 context items</td><td>No signal</td></tr><tr><td>Financials</td><td>Coverage mixed</td><td>Read only</td></tr><tr><td>Valuation</td><td>Needs source</td><td>Manual review</td></tr></tbody></table></div>
+              </section>
+              <aside class="pane">
+                <p class="eyebrow">Next safe steps</p>
+                <div class="actions">
+                  <div class="action"><strong>Open risk receipt</strong><small>Review volatility only</small></div>
+                  <div class="action"><strong>Check macro calendar</strong><small>Events, not triggers</small></div>
+                  <div class="action"><strong>Mark reviewed</strong><small>Dashboard-only note</small></div>
+                </div>
+              </aside>
+            </div>
+          </article>
+          <article class="screen">
+            <div class="mock-topbar">
+              <div class="kpi"><span>Bot state</span><strong>Monitoring</strong></div>
+              <div class="kpi"><span>Kill switch</span><strong class="green">Armed</strong></div>
+              <div class="kpi"><span>Pending</span><strong>0</strong></div>
+              <div class="kpi"><span>Writes</span><strong class="red">Blocked</strong></div>
+            </div>
+            <div class="tabs"><span class="tab">Portfolio View</span><span class="tab active">Bot Control</span></div>
+            <div class="bot-layout">
+              <aside class="pane">
+                <p class="eyebrow">Procedures</p>
+                <div class="actions"><div class="action"><strong>1. Load fixtures</strong><small>Historical only</small></div><div class="action"><strong>2. Run backtest</strong><small>Diagnostics only</small></div><div class="action"><strong>3. Review audit</strong><small>No order intents</small></div></div>
+              </aside>
+              <section class="pane">
+                <p class="eyebrow">Control board</p>
+                <div class="control-grid">
+                  <div class="bot-card"><strong>Run mode</strong><small>Backtest enabled. Execute disabled by contract.</small></div>
+                  <div class="bot-card"><strong>Allowed universe</strong><div class="tabs-row"><span class="chip">US equities</span><span class="chip">AU equities</span><span class="chip">ETF</span></div></div>
+                  <div class="bot-card"><strong>Budget guard</strong><div class="slider"><span style="width:38%"></span></div><small>$1,000 configured</small></div>
+                </div>
+              </section>
+              <aside class="pane">
+                <p class="eyebrow">Decision feed</p>
+                <div class="timeline"><div class="event"><strong>Risk blocked</strong><small>Missing reconciliation</small></div><div class="event"><strong>Provider absent</strong><small>Expected for offline batch</small></div><div class="event"><strong>No execution route</strong><small>System safe</small></div></div>
+              </aside>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="option option-4" id="option-4">
+        <div class="option-header">
+          <div>
+            <p class="eyebrow">Option 4</p>
+            <h2>Research Console</h2>
+            <p>A dossier-like interface where selecting an instrument opens a rich workspace for fundamentals, risk, valuation, news, and dividend context.</p>
+          </div>
+          <div class="notes">
+            <ul>
+              <li>Best if enrichment quality matters more than row density.</li>
+              <li>Portfolio tree is narrower; selected asset gets more space.</li>
+              <li>Bot tab emphasizes assumptions and evidence before runs.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="screen-pair">
+          <article class="screen">
+            <div class="mock-topbar">
+              <div class="kpi"><span>Portfolio</span><strong>$128,420</strong></div>
+              <div class="kpi"><span>Yield estimate</span><strong>2.9%</strong></div>
+              <div class="kpi"><span>Coverage</span><strong class="amber">Mixed</strong></div>
+              <div class="kpi"><span>Market</span><strong>US open</strong></div>
+            </div>
+            <div class="tabs"><span class="tab active">Portfolio View</span><span class="tab">Bot Control</span></div>
+            <div class="tri">
+              <aside class="pane">
+                <p class="eyebrow">Dossiers</p>
+                <div class="list"><div class="row"><span><strong>Income</strong><small>Dividend focus</small></span><span>9</span></div><div class="row"><span><strong>Growth</strong><small>High beta</small></span><span>12</span></div><div class="row"><span><strong>Defensive</strong><small>ETFs, gold</small></span><span>8</span></div><div class="row"><span><strong>Crypto</strong><small>Separate risk</small></span><span>4</span></div></div>
+              </aside>
+              <section class="pane">
+                <div class="module feature">
+                  <div class="asset-head"><span><strong>VGS.ASX dossier</strong><small>Global shares ETF, aggregated instrument row</small></span><span class="chip">ETF</span></div>
+                  <div class="chart"><svg viewBox="0 0 520 148"><polyline fill="none" stroke="#7a4f7d" stroke-width="4" points="10,110 80,102 145,84 220,88 300,70 380,60 510,42"/></svg></div>
+                </div>
+                <div class="stat-grid" style="margin-top:10px"><div class="stat"><span>Dividend</span><strong>Quarterly</strong><small>Estimate only</small></div><div class="stat"><span>Weight</span><strong>18.4%</strong><small>Portfolio</small></div><div class="stat"><span>Risk</span><strong>Broad market</strong><small>Context</small></div></div>
+                <div class="table-shell" style="margin-top:10px"><table><thead><tr><th>Tab</th><th>Primary question</th><th>Coverage</th></tr></thead><tbody><tr><td>Fundamentals</td><td>Issuer factsheet</td><td>Available</td></tr><tr><td>Risk</td><td>Market concentration</td><td>Available</td></tr><tr><td>Valuation</td><td>NAV premium</td><td>Needs source</td></tr></tbody></table></div>
+              </section>
+              <aside class="pane">
+                <p class="eyebrow">Research receipts</p>
+                <div class="actions"><div class="action"><strong>ETF holdings</strong><small>Issuer factsheet linked</small></div><div class="action"><strong>Market news</strong><small>Context only</small></div><div class="action"><strong>Dividend calendar</strong><small>Expected, not guaranteed</small></div></div>
+              </aside>
+            </div>
+          </article>
+          <article class="screen">
+            <div class="mock-topbar">
+              <div class="kpi"><span>Bot evidence</span><strong>Fixture only</strong></div>
+              <div class="kpi"><span>Data quality</span><strong class="amber">Partial</strong></div>
+              <div class="kpi"><span>Decision</span><strong>No trade</strong></div>
+              <div class="kpi"><span>Safety</span><strong class="green">Pass</strong></div>
+            </div>
+            <div class="tabs"><span class="tab">Portfolio View</span><span class="tab active">Bot Control</span></div>
+            <div class="bot-layout">
+              <aside class="pane"><p class="eyebrow">Hypotheses</p><div class="actions"><div class="action"><strong>DCA reserve</strong><small>Baseline strategy</small></div><div class="action"><strong>Drawdown guard</strong><small>Strict stop</small></div><div class="action"><strong>ETF preference</strong><small>Low turnover</small></div></div></aside>
+              <section class="pane"><p class="eyebrow">Backtest lab</p><div class="stat-grid"><div class="stat"><span>SPY</span><strong>6 bars</strong></div><div class="stat"><span>GLD</span><strong>6 bars</strong></div><div class="stat"><span>Output</span><strong>Diagnostics</strong></div></div><div class="bot-card" style="margin-top:10px"><strong>Prediction posture</strong><small>Scenario diagnostics only. No performance promise, no recommendation copy.</small></div><div class="chart" style="margin-top:10px"><svg viewBox="0 0 520 148"><polyline fill="none" stroke="#7a4f7d" stroke-width="4" points="12,118 120,112 210,94 300,98 390,72 510,66"/></svg></div></section>
+              <aside class="pane"><p class="eyebrow">Review queue</p><div class="timeline"><div class="event"><strong>Data freshness</strong><small>Check before live portfolio reads</small></div><div class="event"><strong>Risk contract</strong><small>Matches Money-maker</small></div><div class="event"><strong>Execution review</strong><small>Not approved</small></div></div></aside>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="option option-5" id="option-5">
+        <div class="option-header">
+          <div>
+            <p class="eyebrow">Option 5</p>
+            <h2>Bot Operations Bay</h2>
+            <p>A future-leaning layout where portfolio data is still clear, but the product center of gravity is Money-maker supervision, controls, and safety posture.</p>
+          </div>
+          <div class="notes">
+            <ul>
+              <li>Best once paper trading becomes the daily workflow.</li>
+              <li>Portfolio View acts as bot input review and exposure monitor.</li>
+              <li>Bot Control is the most complete and control-heavy option.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="screen-pair">
+          <article class="screen">
+            <div class="mock-topbar">
+              <div class="kpi"><span>Portfolio value</span><strong>$128,420</strong></div>
+              <div class="kpi"><span>Bot eligible</span><strong>18 assets</strong></div>
+              <div class="kpi"><span>Excluded</span><strong class="amber">Crypto, CFD</strong></div>
+              <div class="kpi"><span>Execution</span><strong class="red">Off</strong></div>
+            </div>
+            <div class="tabs"><span class="tab active">Portfolio View</span><span class="tab">Bot Control</span></div>
+            <div class="tri">
+              <aside class="pane"><p class="eyebrow">Universe</p><div class="list"><div class="row"><span><strong>Eligible</strong><small>Equity, ETF</small></span><span>18</span></div><div class="row"><span><strong>Manual only</strong><small>Crypto, CFD</small></span><span>6</span></div><div class="row"><span><strong>Dividend</strong><small>Income model</small></span><span>9</span></div><div class="row"><span><strong>Watchlist</strong><small>Research only</small></span><span>15</span></div></div></aside>
+              <section class="pane"><div class="asset-head"><span><strong>Eligible portfolio workspace</strong><small>Aggregated instruments with bot eligibility overlay</small></span><span class="chip">Review only</span></div><div class="table-shell"><table><thead><tr><th>Asset</th><th>Class</th><th>Weight</th><th>1m</th><th>Bot status</th></tr></thead><tbody><tr><td>SPY</td><td>ETF</td><td>12.2%</td><td class="green">+2.4%</td><td>Eligible</td></tr><tr><td>VGS.ASX</td><td>ETF</td><td>18.4%</td><td class="green">+1.2%</td><td>Eligible</td></tr><tr><td>BTC</td><td>Crypto</td><td>8.4%</td><td class="red">-3.1%</td><td>Excluded</td></tr><tr><td>EURUSD</td><td>FX</td><td>3.0%</td><td class="amber">+0.2%</td><td>Excluded</td></tr></tbody></table></div><div class="stat-grid" style="margin-top:10px"><div class="stat"><span>Dividend expected</span><strong>$1,820</strong><small>Synthetic estimate</small></div><div class="stat"><span>Risk cap</span><strong>5 positions</strong><small>Bot side</small></div><div class="stat"><span>Cash reserve</span><strong>$18,250</strong><small>Read only</small></div></div></section>
+              <aside class="pane"><p class="eyebrow">Bot-adjacent context</p><div class="actions"><div class="action"><strong>Rebalance drift</strong><small>Show threshold only</small></div><div class="action"><strong>Excluded assets</strong><small>Manual review</small></div><div class="action"><strong>Data missing</strong><small>Block bot evaluation</small></div></div></aside>
+            </div>
+          </article>
+          <article class="screen">
+            <div class="mock-topbar">
+              <div class="kpi"><span>Money-maker 3000</span><strong>Paper mode</strong></div>
+              <div class="kpi"><span>Run queue</span><strong>0 live</strong></div>
+              <div class="kpi"><span>Risk gates</span><strong class="green">Closed</strong></div>
+              <div class="kpi"><span>Provider writes</span><strong class="red">Absent</strong></div>
+            </div>
+            <div class="tabs"><span class="tab">Portfolio View</span><span class="tab active">Bot Control</span></div>
+            <div class="bot-layout">
+              <aside class="pane"><p class="eyebrow">Control rail</p><div class="actions"><div class="action"><strong>Kill switch</strong><small class="green">Armed</small></div><div class="action"><strong>Simulation config</strong><small>Local file outside repo</small></div><div class="action"><strong>Fixture batch</strong><small>SPY, GLD ready</small></div><div class="action"><strong>Execution</strong><small class="red">Locked</small></div></div></aside>
+              <section class="pane"><p class="eyebrow">Capability controls</p><div class="control-grid"><div class="bot-card"><strong>Strategy</strong><div class="tabs-row"><span class="chip">DCA reserve</span><span class="chip">Low frequency</span><span class="chip">No HFT</span></div></div><div class="bot-card"><strong>Budget and stops</strong><div class="stat-grid"><div class="stat"><span>Budget</span><strong>$1,000</strong></div><div class="stat"><span>Daily stop</span><strong>$50</strong></div><div class="stat"><span>Weekly stop</span><strong>$140</strong></div></div></div><div class="bot-card"><strong>Allowed universe</strong><div class="tabs-row"><span class="chip">US equity</span><span class="chip">AU equity</span><span class="chip">ETF</span><span class="chip">No crypto</span></div></div><div class="bot-card"><strong>Run history</strong><div class="chart"><svg viewBox="0 0 520 148"><polyline fill="none" stroke="#4d6b34" stroke-width="4" points="10,110 90,104 160,96 230,78 310,84 410,70 510,52"/></svg></div></div></div></section>
+              <aside class="pane"><p class="eyebrow">Audit and alerts</p><div class="timeline"><div class="event"><strong>Config persisted</strong><small>Server-side local store</small></div><div class="event"><strong>Provider calls blocked</strong><small>Offline diagnostics</small></div><div class="event"><strong>Reconciliation missing</strong><small>Risk gate blocks</small></div><div class="event"><strong>No order preview</strong><small>Expected state</small></div></div></aside>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -5,6 +5,7 @@ const formatter = new Intl.NumberFormat("en-US", {
   style: "currency",
 });
 const overviewTabId = "overview-view";
+const botConfigCsrfResponseHeader = "x-etoro-dashboard-config-token";
 const loadedTabIds = new Set([overviewTabId]);
 let botConfigMutationProtection = null;
 let botConfigOptionsPayload = null;
@@ -75,6 +76,21 @@ async function getJson(path) {
     throw error;
   }
 
+  if (payload?.mutationProtection?.csrfHeader) {
+    const csrfToken = response.headers.get(botConfigCsrfResponseHeader);
+    payload.mutationProtection = {
+      ...payload.mutationProtection,
+      ...(csrfToken ? { csrfToken } : {}),
+    };
+  }
+  if (payload?.config?.mutationProtection?.csrfHeader) {
+    const csrfToken = response.headers.get(botConfigCsrfResponseHeader);
+    payload.config.mutationProtection = {
+      ...payload.config.mutationProtection,
+      ...(csrfToken ? { csrfToken } : {}),
+    };
+  }
+
   return payload;
 }
 
@@ -123,15 +139,15 @@ function renderStatus(payload) {
     "provider-status",
     configured ? "ok" : "warn",
     configured ? "Provider configured" : "Provider offline",
-    configured ? `${status.baseUrl}` : "Using synthetic fixtures",
+    configured ? "Server-side provider boundary" : "Using synthetic fixtures",
   );
   text(
     "source-detail",
     configured
-      ? `${status.credentialSource}; ${formatCacheDuration(cacheTtlMs)}`
+      ? `Server configured; ${formatCacheDuration(cacheTtlMs)}`
       : `No server credentials; ${formatCacheDuration(cacheTtlMs)}`,
   );
-  text("chart-provider", configured ? `Provider: ${status.baseUrl}` : "Provider timestamp: unavailable");
+  text("chart-provider", configured ? "Provider boundary: server-side only" : "Provider timestamp: unavailable");
 }
 
 function renderIdentity(payload) {
@@ -921,15 +937,7 @@ async function refreshRiskStatus() {
 
 async function refreshBotStatus() {
   try {
-    const [status, strategies, config, runs, audit, events, tradeLog] = await Promise.all([
-      getJson("/api/etoro/bot/status"),
-      getJson("/api/etoro/bot/strategies"),
-      getJson("/api/etoro/bot/config"),
-      getJson("/api/etoro/bot/runs"),
-      getJson("/api/etoro/bot/audit"),
-      getJson("/api/etoro/bot/events"),
-      getJson("/api/etoro/bot/trade-log"),
-    ]);
+    const { status, strategies, config, runs, audit, events, tradeLog } = await getJson("/api/etoro/bot/snapshot");
     renderBotStatus(status);
     renderBotControlSelects(status, strategies, config);
     renderBotStrategies(strategies);

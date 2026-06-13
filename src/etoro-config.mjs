@@ -3,8 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export const DEFAULT_ETORO_BASE_URL = "https://public-api.etoro.com";
-export const ALLOWED_ETORO_HOSTS = new Set(["public-api.etoro.com"]);
-export const DEFAULT_CREDENTIALS_FILE = join(homedir(), ".config", "etoro", "credentials.json");
+const ALLOWED_ETORO_HOSTS = new Set(["public-api.etoro.com"]);
+const DEFAULT_CREDENTIALS_FILE = join(homedir(), ".config", "etoro", "credentials.json");
 export const DEFAULT_READ_CACHE_TTL_MS = 15_000;
 
 export class EtoroConfigError extends Error {
@@ -162,12 +162,12 @@ export async function loadEtoroConfig(options = {}) {
 
 export function publicCredentialStatus(config) {
   return {
-    baseUrl: config.baseUrl,
     configured: config.configured,
     demoTradePreviewEnabled: Boolean(config.demoTradePreviewEnabled),
     readCacheTtlMs: config.readCacheTtlMs,
-    credentialFileLoaded: config.credentialFileLoaded,
-    credentialSource: config.credentialSource,
+    credentialPosture: config.configured ? "server-configured" : "missing",
+    providerHostPolicy: "official-host-allow-list",
+    providerEndpointDetails: "server-only",
     missing: [...config.missing],
   };
 }
