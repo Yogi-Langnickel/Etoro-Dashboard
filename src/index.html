@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>eToro Dashboard Mock Cockpit</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23171b22'/%3E%3Cpath d='M8 17h4l3-7 4 13 3-6h2' fill='none' stroke='%2368a8ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="./styles.css">
     <script src="./app.js" defer></script>
   </head>
@@ -48,14 +49,12 @@
       </header>
 
       <nav class="tabbar" aria-label="Dashboard sections" role="tablist">
-        <button class="tab-button active" id="overview-tab" type="button" role="tab" aria-controls="overview-view" aria-selected="true" data-tab-target="overview-view">Overview</button>
-        <button class="tab-button" id="trading-tab" type="button" role="tab" aria-controls="trading-view" aria-selected="false" data-tab-target="trading-view">Demo Trading</button>
-        <button class="tab-button" id="bot-tab" type="button" role="tab" aria-controls="bot-view" aria-selected="false" data-tab-target="bot-view">Bot Monitor</button>
-        <button class="tab-button" id="risk-tab" type="button" role="tab" aria-controls="risk-view" aria-selected="false" data-tab-target="risk-view">Risk Radar</button>
-        <button class="tab-button" id="research-tab" type="button" role="tab" aria-controls="research-view" aria-selected="false" data-tab-target="research-view">Research Desk</button>
+        <button class="tab-button active" id="portfolio-tab" type="button" role="tab" aria-controls="portfolio-view" aria-selected="true" data-tab-target="portfolio-view">Portfolio View</button>
+        <button class="tab-button" id="watchlist-tab" type="button" role="tab" aria-controls="watchlist-view" aria-selected="false" data-tab-target="watchlist-view">Watchlist Items</button>
+        <button class="tab-button" id="bot-tab" type="button" role="tab" aria-controls="bot-view" aria-selected="false" data-tab-target="bot-view">Bot Control</button>
       </nav>
 
-      <section class="kpi-grid tab-view" id="overview-view" role="tabpanel" aria-labelledby="overview-tab" data-tab-panel="overview-view" aria-label="Portfolio KPI summary">
+      <section class="kpi-grid tab-view" id="portfolio-view" role="tabpanel" aria-labelledby="portfolio-tab" data-tab-panel="portfolio-view" aria-label="Portfolio KPI summary">
         <article class="metric">
           <span id="mock-equity-label">Mock equity</span>
           <strong id="mock-equity">$124,580.00</strong>
@@ -88,149 +87,174 @@
         </article>
       </section>
 
-      <div class="workspace tab-view" data-tab-panel="overview-view">
+      <div class="workspace tab-view" data-tab-panel="portfolio-view">
         <section class="panel positions-panel" aria-labelledby="positions-title">
           <div class="panel-header">
             <div>
               <p class="eyebrow">Portfolio</p>
-              <h2 id="positions-title">Positions</h2>
+              <h2 id="positions-title">Instrument summary</h2>
             </div>
+            <span class="pill lock">Aggregated by asset</span>
             <button class="icon-button" id="refresh-etoro" type="button">Refresh</button>
           </div>
+          <div class="period-controls" aria-label="Portfolio performance period">
+            <button class="period-button active" type="button" data-period="24h" aria-pressed="true">24h</button>
+            <button class="period-button" type="button" data-period="1w" aria-pressed="false">1w</button>
+            <button class="period-button" type="button" data-period="1m" aria-pressed="false">1m</button>
+            <button class="period-button" type="button" data-period="1y" aria-pressed="false">1y</button>
+            <button class="period-button" type="button" data-period="5y" aria-pressed="false">5y</button>
+            <button class="period-button" type="button" data-period="max" aria-pressed="false">Max</button>
+          </div>
           <div class="table-wrap">
-            <table>
+            <table class="instrument-table">
               <thead>
                 <tr>
-                  <th>Instrument</th>
-                  <th>Side</th>
+                  <th>Asset</th>
+                  <th>Price</th>
+                  <th>Period</th>
                   <th>Units</th>
-                  <th>Open</th>
-                  <th>Value</th>
+                  <th>Avg open</th>
                   <th>P/L</th>
-                  <th>Risk flags</th>
+                  <th>P/L %</th>
+                  <th>Invested</th>
+                  <th>Net value</th>
+                  <th>Chart</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
+                <tr class="instrument-row active" data-instrument-row tabindex="0" data-symbol="SPY" data-name="SPDR S&P 500 ETF" data-period-change="+0.8%" data-chart-title="SPY selected-period chart">
                   <td>
                     <strong>SPY</strong>
-                    <span>US ETF</span>
+                    <span>US ETF · 3 open positions</span>
                   </td>
-                  <td>Buy</td>
+                  <td>$518.34</td>
+                  <td class="good-text" data-period-value>+0.8%</td>
                   <td>48.20</td>
                   <td>$482.10</td>
+                  <td class="good-text">+$1,746</td>
+                  <td class="good-text">+7.52%</td>
+                  <td>$23,238</td>
                   <td>$24,984</td>
-                  <td class="good-text">+$812</td>
-                  <td><span class="pill ok">No stop exposed</span></td>
+                  <td><span class="sparkline" aria-label="SPY 24h performance sparkline"></span></td>
                 </tr>
-                <tr>
+                <tr class="instrument-row" data-instrument-row tabindex="0" data-symbol="NVDA" data-name="NVIDIA Corporation" data-period-change="+1.9%" data-chart-title="NVDA selected-period chart">
                   <td>
                     <strong>NVDA</strong>
-                    <span>Equity CFD</span>
+                    <span>US equity · 2 open positions</span>
                   </td>
-                  <td>Buy</td>
+                  <td>$956.83</td>
+                  <td class="good-text" data-period-value>+1.9%</td>
                   <td>12.00</td>
                   <td>$873.40</td>
-                  <td>$11,482</td>
                   <td class="good-text">+$1,006</td>
-                  <td><span class="pill warn">2x leverage</span></td>
+                  <td class="good-text">+9.60%</td>
+                  <td>$10,481</td>
+                  <td>$11,482</td>
+                  <td><span class="sparkline up" aria-label="NVDA 24h performance sparkline"></span></td>
                 </tr>
-                <tr>
-                  <td>
-                    <strong>EURUSD</strong>
-                    <span>FX</span>
-                  </td>
-                  <td>Sell</td>
-                  <td>18,000</td>
-                  <td>1.0812</td>
-                  <td>$19,462</td>
-                  <td class="bad-text">-$226</td>
-                  <td><span class="pill danger">Stale quote</span></td>
-                </tr>
-                <tr>
+                <tr class="instrument-row" data-instrument-row tabindex="0" data-symbol="BTC" data-name="Bitcoin" data-period-change="-0.6%" data-chart-title="BTC selected-period chart">
                   <td>
                     <strong>BTC</strong>
-                    <span>Crypto</span>
+                    <span>Crypto · 1 open position</span>
                   </td>
-                  <td>Buy</td>
+                  <td>$65,028.57</td>
+                  <td class="bad-text" data-period-value>-0.6%</td>
                   <td>0.42</td>
-                  <td>$61,840</td>
-                  <td>$27,312</td>
+                  <td>$61,840.00</td>
                   <td class="good-text">+$592</td>
-                  <td><span class="pill warn">High volatility</span></td>
+                  <td class="good-text">+2.22%</td>
+                  <td>$25,973</td>
+                  <td>$27,312</td>
+                  <td><span class="sparkline volatile" aria-label="BTC 24h performance sparkline"></span></td>
+                </tr>
+                <tr class="instrument-row" data-instrument-row tabindex="0" data-symbol="EURUSD" data-name="Euro / US Dollar" data-period-change="-0.2%" data-chart-title="EURUSD selected-period chart">
+                  <td>
+                    <strong>EURUSD</strong>
+                    <span>FX CFD · 2 open positions</span>
+                  </td>
+                  <td>1.0686</td>
+                  <td class="bad-text" data-period-value>-0.2%</td>
+                  <td>18,000</td>
+                  <td>1.0812</td>
+                  <td class="bad-text">-$226</td>
+                  <td class="bad-text">-1.15%</td>
+                  <td>$19,688</td>
+                  <td>$19,462</td>
+                  <td><span class="sparkline down" aria-label="EURUSD 24h performance sparkline"></span></td>
                 </tr>
               </tbody>
             </table>
           </div>
         </section>
 
-        <aside class="panel watchlist-panel" aria-labelledby="watchlist-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Monitor</p>
-              <h2 id="watchlist-title">Watchlist</h2>
-            </div>
-            <span class="pill lock">No write actions</span>
-          </div>
-          <ul class="watchlist">
-            <li>
-              <span>
-                <strong>AAPL</strong>
-                <small>Equity</small>
-              </span>
-              <span class="quote">$192.30</span>
-              <span class="good-text">+0.8%</span>
-            </li>
-            <li>
-              <span>
-                <strong>GLD</strong>
-                <small>ETF</small>
-              </span>
-              <span class="quote">$214.19</span>
-              <span class="neutral-text">0.0%</span>
-            </li>
-            <li>
-              <span>
-                <strong>USOIL</strong>
-                <small>Commodity CFD</small>
-              </span>
-              <span class="quote">$79.46</span>
-              <span class="bad-text">-1.1%</span>
-            </li>
-            <li>
-              <span>
-                <strong>QQQ</strong>
-                <small>ETF</small>
-              </span>
-              <span class="quote stale">Stale</span>
-              <span class="warn-text">Stale</span>
-            </li>
-          </ul>
-        </aside>
-
         <section class="panel chart-panel" aria-labelledby="chart-title">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Market data</p>
-              <h2 id="chart-title">SPY synthetic chart</h2>
+              <p class="eyebrow">Selected instrument</p>
+              <h2 id="chart-title">SPY selected-period chart</h2>
             </div>
-            <span class="pill warn">Placeholder</span>
+            <span class="pill warn" id="selected-period-pill">24h</span>
           </div>
-          <div class="chart-shell" role="img" aria-label="Placeholder line chart using synthetic values">
+          <div class="chart-shell" role="img" aria-label="Selected-period performance chart using synthetic values">
             <div class="chart-grid" aria-hidden="true"></div>
-            <svg viewBox="0 0 640 260" preserveAspectRatio="none" aria-hidden="true">
-              <polyline points="0,205 64,190 128,198 192,154 256,168 320,118 384,132 448,86 512,102 576,62 640,78"></polyline>
-              <path d="M0 205 L64 190 L128 198 L192 154 L256 168 L320 118 L384 132 L448 86 L512 102 L576 62 L640 78 L640 260 L0 260 Z"></path>
+            <svg viewBox="0 0 640 260" preserveAspectRatio="none" aria-hidden="true" data-performance-svg>
+              <polyline id="performance-line" points="0,205 64,190 128,198 192,154 256,168 320,118 384,132 448,86 512,102 576,62 640,78"></polyline>
+              <path id="performance-area" d="M0 205 L64 190 L128 198 L192 154 L256 168 L320 118 L384 132 L448 86 L512 102 L576 62 L640 78 L640 260 L0 260 Z"></path>
             </svg>
           </div>
           <div class="chart-meta">
             <span id="chart-provider">Provider timestamp: unavailable</span>
-            <span>Fixture window: 30 days</span>
+            <span id="chart-period-label">Selected period: 24h</span>
             <span id="source-detail">No server credentials</span>
             <span id="chart-request">Request ID: mock-read-7f3a</span>
             <span id="chart-cache">Cache: fixture</span>
           </div>
+          <div class="instrument-context" aria-label="Selected instrument context-only enrichment receipts">
+            <article>
+              <span>Financials</span>
+              <strong id="portfolio-financial-title">Holdings, fees, distribution</strong>
+              <small id="portfolio-financial-detail">Issuer factsheet and ETF datasets are context-only receipts, not advice.</small>
+            </article>
+            <article>
+              <span>News</span>
+              <strong id="portfolio-news-title">Broad market headlines</strong>
+              <small id="portfolio-news-detail">Read-only market context; no bot signal or trade trigger.</small>
+            </article>
+            <article>
+              <span>Insiders</span>
+              <strong id="portfolio-insider-title">Fund ownership context</strong>
+              <small id="portfolio-insider-detail">Ownership activity is a neutral enrichment record only.</small>
+            </article>
+          </div>
         </section>
+
+        <aside class="panel portfolio-context-panel" aria-labelledby="portfolio-context-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Context</p>
+              <h2 id="portfolio-context-title">Statistics and income</h2>
+            </div>
+            <span class="pill ok">Read only</span>
+          </div>
+          <ul class="readiness-list">
+            <li>
+              <span>Performance breakdown</span>
+              <strong>Equity +8.4%, ETF +7.5%, Crypto +2.2%</strong>
+            </li>
+            <li>
+              <span>Portfolio risk</span>
+              <strong>Largest asset 23%; stale quote review pending</strong>
+            </li>
+            <li>
+              <span>Dividend expectations</span>
+              <strong>ETF monthly/quarterly receipts need source coverage</strong>
+            </li>
+            <li>
+              <span>Dividend context</span>
+              <strong>Market, frequency, weight, yield, income, source, confidence</strong>
+            </li>
+          </ul>
+        </aside>
 
         <section class="panel audit-panel" aria-labelledby="audit-title">
           <div class="panel-header">
@@ -273,7 +297,7 @@
         </section>
       </div>
 
-      <section class="trading-layout tab-view" id="trading-view" role="tabpanel" aria-labelledby="trading-tab" data-tab-panel="trading-view" hidden>
+      <section class="trading-layout tab-view" id="trading-view" aria-label="Demo trading posture" data-tab-panel="bot-view" hidden>
         <section class="panel trading-ticket-panel" aria-labelledby="trading-title">
           <div class="panel-header">
             <div>
@@ -619,12 +643,12 @@
         </section>
       </section>
 
-      <section class="risk-layout tab-view" id="risk-view" role="tabpanel" aria-labelledby="risk-tab" data-tab-panel="risk-view" hidden>
+      <section class="risk-layout tab-view" id="risk-view" aria-label="Portfolio risk and statistics" data-tab-panel="portfolio-view">
         <section class="panel risk-status-panel" aria-labelledby="risk-status-title">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Risk posture</p>
-              <h2 id="risk-status-title">Risk radar</h2>
+              <p class="eyebrow">Statistics</p>
+              <h2 id="risk-status-title">Risk and exposure</h2>
             </div>
             <span class="pill lock" id="risk-watermark-state">Synthetic fixture</span>
             <span class="pill lock" id="risk-mode-pill">Synthetic only</span>
@@ -716,161 +740,159 @@
         </section>
       </section>
 
-      <section class="research-layout tab-view" id="research-view" role="tabpanel" aria-labelledby="research-tab" data-tab-panel="research-view" hidden>
-        <section class="panel research-status-panel" aria-labelledby="research-status-title">
+      <section class="watchlist-layout tab-view" id="watchlist-view" role="tabpanel" aria-labelledby="watchlist-tab" data-tab-panel="watchlist-view" hidden>
+        <section class="panel watchlist-table-panel" aria-labelledby="watchlist-table-title">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Research posture</p>
-              <h2 id="research-status-title">Research desk</h2>
+              <p class="eyebrow">Read-only watchlist</p>
+              <h2 id="watchlist-table-title">Watchlist items</h2>
             </div>
             <span class="pill lock" id="research-watermark-state">Synthetic fixture</span>
             <span class="pill lock">Read only</span>
           </div>
-          <div class="research-hero">
-            <div>
-              <span>Watchlists</span>
-              <strong id="research-watchlists-state">Synthetic placeholder</strong>
-              <small>No watchlist writes are enabled.</small>
-            </div>
-            <div>
-              <span>Instruments</span>
-              <strong id="research-instruments-state">Synthetic placeholder</strong>
-              <small>Provider lookup stays server-side when connected.</small>
-            </div>
-            <div>
-              <span>Market news</span>
-              <strong id="research-news-state">Planned server side</strong>
-              <small>News can add context but cannot trigger trades.</small>
-            </div>
-            <div>
-              <span>Financial records</span>
-              <strong id="research-records-state">Official API first</strong>
-              <small>SEC and issuer data before scraping.</small>
-            </div>
-            <div>
-              <span>Insider activity</span>
-              <strong id="research-insider-state">SEC planned</strong>
-              <small>Forms 3/4/5 before Finviz fallback.</small>
-            </div>
-            <div>
-              <span>Social feed</span>
-              <strong id="research-feed-state">Disabled</strong>
-              <small>Posting and feed reads are out of scope.</small>
-            </div>
+          <div class="period-controls" aria-label="Watchlist performance period">
+            <button class="period-button active" type="button" data-watchlist-period="24h" aria-pressed="true">24h</button>
+            <button class="period-button" type="button" data-watchlist-period="1w" aria-pressed="false">1w</button>
+            <button class="period-button" type="button" data-watchlist-period="1m" aria-pressed="false">1m</button>
+            <button class="period-button" type="button" data-watchlist-period="1y" aria-pressed="false">1y</button>
+            <button class="period-button" type="button" data-watchlist-period="5y" aria-pressed="false">5y</button>
+            <button class="period-button" type="button" data-watchlist-period="max" aria-pressed="false">Max</button>
+          </div>
+          <div class="table-wrap">
+            <table class="watchlist-table">
+              <thead>
+                <tr>
+                  <th>Symbol</th>
+                  <th>Name</th>
+                  <th>Price</th>
+                  <th>Period</th>
+                  <th>Freshness</th>
+                  <th>Source state</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="watchlist-row active" data-watchlist-row tabindex="0" data-watchlist-symbol="AAPL">
+                  <td><strong>AAPL</strong></td>
+                  <td>Apple Inc.</td>
+                  <td>$192.30</td>
+                  <td class="good-text" data-watchlist-period-value>+0.8%</td>
+                  <td><span class="pill ok">Fresh synthetic</span></td>
+                  <td>Nasdaq quote fixture</td>
+                </tr>
+                <tr class="watchlist-row" data-watchlist-row tabindex="0" data-watchlist-symbol="GLD">
+                  <td><strong>GLD</strong></td>
+                  <td>SPDR Gold Shares</td>
+                  <td>$214.19</td>
+                  <td class="neutral-text" data-watchlist-period-value>0.0%</td>
+                  <td><span class="pill ok">Fresh synthetic</span></td>
+                  <td>Issuer factsheet fixture</td>
+                </tr>
+                <tr class="watchlist-row" data-watchlist-row tabindex="0" data-watchlist-symbol="QQQ">
+                  <td><strong>QQQ</strong></td>
+                  <td>Invesco QQQ Trust</td>
+                  <td>$446.72</td>
+                  <td class="good-text" data-watchlist-period-value>+1.1%</td>
+                  <td><span class="pill warn">Stale synthetic</span></td>
+                  <td>Delayed quote fixture</td>
+                </tr>
+                <tr class="watchlist-row" data-watchlist-row tabindex="0" data-watchlist-symbol="USOIL">
+                  <td><strong>USOIL</strong></td>
+                  <td>Crude Oil CFD</td>
+                  <td>$79.46</td>
+                  <td class="bad-text" data-watchlist-period-value>-1.1%</td>
+                  <td><span class="pill ok">Fresh synthetic</span></td>
+                  <td>Commodity fixture</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 
-        <aside class="panel research-safeguards-panel" aria-labelledby="research-safeguards-title">
+        <section class="panel watchlist-selected-panel" aria-labelledby="watchlist-chart-title">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Controls</p>
-              <h2 id="research-safeguards-title">Safeguards</h2>
+              <p class="eyebrow">Selected watchlist item</p>
+              <h2 id="watchlist-chart-title">AAPL watchlist chart</h2>
             </div>
-            <span class="pill ok">No writes</span>
+            <span class="pill warn" id="watchlist-selected-period-pill">24h</span>
+          </div>
+          <div class="chart-shell" role="img" aria-label="Selected watchlist chart using synthetic values">
+            <div class="chart-grid" aria-hidden="true"></div>
+            <svg viewBox="0 0 640 260" preserveAspectRatio="none" aria-hidden="true">
+              <polyline id="watchlist-performance-line" points="0,204 64,190 128,198 192,166 256,174 320,140 384,128 448,102 512,112 576,84 640,74"></polyline>
+              <path id="watchlist-performance-area" d="M0 204 L64 190 L128 198 L192 166 L256 174 L320 140 L384 128 L448 102 L512 112 L576 84 L640 74 L640 260 L0 260 Z"></path>
+            </svg>
+          </div>
+          <div class="chart-meta">
+            <span id="watchlist-chart-period-label">Selected period: 24h</span>
+            <span>Source: synthetic fixture</span>
+            <span>No browser credentials</span>
+            <span>No account identifiers</span>
+          </div>
+        </section>
+
+        <aside class="panel watchlist-context-panel" aria-labelledby="watchlist-context-heading">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Context</p>
+              <h2 id="watchlist-context-heading">Source and enrichment state</h2>
+            </div>
+            <span class="pill ok">Context only</span>
           </div>
           <ul class="readiness-list">
             <li>
-              <span>Lookup route</span>
-              <strong id="research-lookup-state">Disabled</strong>
+              <span>Selected item</span>
+              <strong id="watchlist-context-title">Equity watch</strong>
             </li>
             <li>
-              <span>Exact symbol lookup</span>
-              <strong id="research-symbol-state">Planned server only</strong>
+              <span>Source state</span>
+              <strong id="watchlist-context-source">Nasdaq quote fixture</strong>
+            </li>
+            <li>
+              <span>Freshness</span>
+              <strong id="watchlist-context-freshness">Fresh synthetic</strong>
+            </li>
+            <li>
+              <span>Enrichment receipt</span>
+              <strong id="watchlist-context-detail">Companyfacts and news receipts are context only.</strong>
+            </li>
+            <li>
+              <span>Mutation and execution</span>
+              <strong>No writes, no orders, no recommendations</strong>
+            </li>
+          </ul>
+        </aside>
+
+        <section class="panel watchlist-source-panel" aria-labelledby="watchlist-source-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Research context</p>
+              <h2 id="watchlist-source-title">Source policy</h2>
+            </div>
+            <span class="pill lock">No live fetch</span>
+          </div>
+          <ul class="readiness-list">
+            <li>
+              <span>Financial records</span>
+              <strong id="research-records-state">Official API first</strong>
+            </li>
+            <li>
+              <span>Market news</span>
+              <strong id="research-news-state">Context only; no trade triggers</strong>
+            </li>
+            <li>
+              <span>Insider activity</span>
+              <strong id="research-insider-state">SEC Forms 3/4/5 first where applicable</strong>
             </li>
             <li>
               <span>Watchlist mutation</span>
               <strong id="research-watchlist-write-state">Blocked</strong>
             </li>
             <li>
-              <span>Feed posting</span>
-              <strong id="research-feed-write-state">Blocked</strong>
-            </li>
-            <li>
               <span>Account identifiers</span>
               <strong id="research-account-state">Redacted</strong>
             </li>
           </ul>
-        </aside>
-
-        <section class="panel research-sources-panel" aria-labelledby="research-sources-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Source priority</p>
-              <h2 id="research-sources-title">Official APIs first</h2>
-            </div>
-            <span class="pill ok">Free first</span>
-          </div>
-          <ul class="research-list" id="research-sources"></ul>
-        </section>
-
-        <section class="panel research-providers-panel" aria-labelledby="research-providers-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Fallback metadata</p>
-              <h2 id="research-providers-title">Provider readiness</h2>
-            </div>
-            <span class="pill lock">No live fetch</span>
-          </div>
-          <ul class="research-list" id="research-provider-readiness"></ul>
-        </section>
-
-        <section class="panel research-financial-panel" aria-labelledby="research-financial-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Financial records</p>
-              <h2 id="research-financial-title">Coverage states</h2>
-            </div>
-            <span class="pill lock">Not advice</span>
-          </div>
-          <ul class="research-list" id="research-financial-records"></ul>
-        </section>
-
-        <section class="panel research-insider-panel" aria-labelledby="research-insider-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Insiders</p>
-              <h2 id="research-insider-title">SEC ownership filings</h2>
-            </div>
-            <span class="pill lock">No Finviz API</span>
-          </div>
-          <ul class="research-list" id="research-insider-activity"></ul>
-        </section>
-
-        <section class="panel research-watchlist-panel" aria-labelledby="research-watchlist-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Fixtures</p>
-              <h2 id="research-watchlist-title">Watchlist preview</h2>
-            </div>
-            <span class="pill warn">Synthetic</span>
-          </div>
-          <ul class="research-list" id="research-watchlist"></ul>
-          <div class="research-fields">
-            <span>Lookup fields</span>
-            <code id="research-fields">instrumentId, internalSymbolFull, displayname, marketId</code>
-          </div>
-        </section>
-
-        <section class="panel research-news-panel" aria-labelledby="research-news-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Portfolio context</p>
-              <h2 id="research-news-title">Market news preview</h2>
-            </div>
-            <span class="pill lock">No live scraping</span>
-          </div>
-          <ul class="research-list" id="research-news"></ul>
-        </section>
-
-        <section class="panel research-position-news-panel" aria-labelledby="research-position-news-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Position context</p>
-              <h2 id="research-position-news-title">Market news by position</h2>
-            </div>
-            <span class="pill lock">Context only</span>
-          </div>
-          <ul class="research-list" id="research-position-news"></ul>
         </section>
 
         <section class="panel research-audit-panel" aria-labelledby="research-audit-title">

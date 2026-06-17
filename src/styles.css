@@ -221,10 +221,10 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(310px, 0.55fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(420px, 1.2fr) minmax(280px, 0.75fr);
   grid-template-areas:
-    "positions watchlist"
-    "chart audit";
+    "positions chart context"
+    "positions chart audit";
   gap: 18px;
 }
 
@@ -239,6 +239,7 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
   padding: 16px 18px;
   border-bottom: 1px solid var(--line);
   background: rgba(32, 39, 51, 0.72);
@@ -258,6 +259,10 @@ h2 {
 
 .audit-panel {
   grid-area: audit;
+}
+
+.portfolio-context-panel {
+  grid-area: context;
 }
 
 .pill {
@@ -316,6 +321,35 @@ h2 {
   outline-offset: 2px;
 }
 
+.period-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.period-button {
+  min-width: 48px;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #111820;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.period-button.active,
+.period-button:focus-visible {
+  color: var(--text);
+  border-color: rgba(104, 168, 255, 0.62);
+  background: var(--accent-bg);
+  outline: none;
+}
+
 .danger-button {
   border-color: rgba(242, 107, 107, 0.48);
   background: var(--bad-bg);
@@ -366,6 +400,15 @@ h2 {
     "watchlist news"
     "position-news position-news"
     "audit audit";
+  gap: 18px;
+}
+
+.watchlist-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(420px, 1.2fr) minmax(300px, 0.85fr);
+  grid-template-areas:
+    "watchlist selected context"
+    "sources selected audit";
   gap: 18px;
 }
 
@@ -471,6 +514,22 @@ h2 {
 
 .research-audit-panel {
   grid-area: audit;
+}
+
+.watchlist-table-panel {
+  grid-area: watchlist;
+}
+
+.watchlist-selected-panel {
+  grid-area: selected;
+}
+
+.watchlist-context-panel {
+  grid-area: context;
+}
+
+.watchlist-source-panel {
+  grid-area: sources;
 }
 
 .bot-hero,
@@ -770,6 +829,14 @@ table {
   border-collapse: collapse;
 }
 
+.instrument-table {
+  min-width: 1080px;
+}
+
+.watchlist-table {
+  min-width: 720px;
+}
+
 th,
 td {
   padding: 15px 18px;
@@ -794,6 +861,53 @@ td span {
   margin-top: 3px;
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.instrument-row {
+  cursor: pointer;
+}
+
+.instrument-row.active,
+.watchlist-row.active {
+  background: rgba(104, 168, 255, 0.08);
+}
+
+.instrument-row:hover,
+.watchlist-row:hover {
+  background: rgba(104, 168, 255, 0.05);
+}
+
+.instrument-row:focus-visible,
+.watchlist-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.watchlist-row {
+  cursor: pointer;
+}
+
+.sparkline {
+  position: relative;
+  width: 72px;
+  height: 28px;
+  margin-top: 0;
+  border-radius: 6px;
+  background:
+    linear-gradient(135deg, transparent 12%, rgba(69, 196, 134, 0.34) 13% 18%, transparent 19% 42%, rgba(69, 196, 134, 0.75) 43% 50%, transparent 51%),
+    var(--good-bg);
+}
+
+.sparkline.down {
+  background:
+    linear-gradient(45deg, transparent 12%, rgba(242, 107, 107, 0.34) 13% 18%, transparent 19% 42%, rgba(242, 107, 107, 0.75) 43% 50%, transparent 51%),
+    var(--bad-bg);
+}
+
+.sparkline.volatile {
+  background:
+    linear-gradient(135deg, transparent 8%, rgba(240, 184, 76, 0.62) 9% 16%, transparent 17% 34%, rgba(242, 107, 107, 0.62) 35% 42%, transparent 43% 58%, rgba(69, 196, 134, 0.72) 59% 66%, transparent 67%),
+    var(--warn-bg);
 }
 
 .watchlist,
@@ -824,7 +938,7 @@ td span {
 
 .chart-shell {
   position: relative;
-  min-height: 324px;
+  min-height: 330px;
   margin: 18px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -866,6 +980,40 @@ td span {
   gap: 10px 18px;
   padding: 0 18px 18px;
   font-size: 0.82rem;
+}
+
+.instrument-context {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+
+.instrument-context article {
+  min-height: 132px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111820;
+}
+
+.instrument-context span {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.instrument-context strong,
+.instrument-context small {
+  display: block;
+}
+
+.instrument-context small {
+  margin-top: 8px;
+  line-height: 1.35;
 }
 
 .audit-list {
@@ -911,15 +1059,16 @@ td span {
   .trading-layout,
   .bot-layout,
   .risk-layout,
-  .research-layout {
+  .research-layout,
+  .watchlist-layout {
     grid-template-columns: 1fr;
   }
 
   .workspace {
     grid-template-areas:
       "positions"
-      "watchlist"
       "chart"
+      "context"
       "audit";
   }
 
@@ -961,6 +1110,15 @@ td span {
       "watchlist"
       "news"
       "position-news"
+      "audit";
+  }
+
+  .watchlist-layout {
+    grid-template-areas:
+      "watchlist"
+      "selected"
+      "context"
+      "sources"
       "audit";
   }
 
@@ -1018,6 +1176,11 @@ td span {
   }
 
   .chart-meta {
+    padding: 0 12px 14px;
+  }
+
+  .instrument-context {
+    grid-template-columns: 1fr;
     padding: 0 12px 14px;
   }
 }

@@ -4,11 +4,169 @@ const formatter = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   style: "currency",
 });
-const overviewTabId = "overview-view";
+const portfolioTabId = "portfolio-view";
 const botConfigCsrfResponseHeader = "x-etoro-dashboard-config-token";
-const loadedTabIds = new Set([overviewTabId]);
+const loadedTabIds = new Set();
 let botConfigMutationProtection = null;
 let botConfigOptionsPayload = null;
+let selectedPortfolioSymbol = "SPY";
+let selectedPortfolioPeriod = "24h";
+let selectedWatchlistSymbol = "AAPL";
+let selectedWatchlistPeriod = "24h";
+
+const portfolioPeriodChanges = {
+  BTC: {
+    "1m": "+8.8%",
+    "1w": "+4.1%",
+    "1y": "+42.0%",
+    "5y": "+338.0%",
+    "24h": "-0.6%",
+    max: "+516.0%",
+  },
+  EURUSD: {
+    "1m": "-0.8%",
+    "1w": "-0.4%",
+    "1y": "-2.6%",
+    "5y": "+1.8%",
+    "24h": "-0.2%",
+    max: "+3.4%",
+  },
+  NVDA: {
+    "1m": "+12.2%",
+    "1w": "+5.3%",
+    "1y": "+86.0%",
+    "5y": "+1,041.0%",
+    "24h": "+1.9%",
+    max: "+2,240.0%",
+  },
+  SPY: {
+    "1m": "+3.7%",
+    "1w": "+1.4%",
+    "1y": "+14.8%",
+    "5y": "+82.0%",
+    "24h": "+0.8%",
+    max: "+344.0%",
+  },
+};
+
+const portfolioChartPoints = {
+  BTC: {
+    "1m": "0,196 64,178 128,206 192,148 256,170 320,98 384,126 448,86 512,118 576,64 640,78",
+    "1w": "0,214 64,198 128,172 192,186 256,132 320,104 384,136 448,92 512,66 576,74 640,52",
+    "1y": "0,230 64,216 128,188 192,204 256,154 320,118 384,96 448,70 512,82 576,48 640,40",
+    "5y": "0,246 64,228 128,214 192,186 256,156 320,166 384,108 448,92 512,62 576,46 640,24",
+    "24h": "0,184 64,202 128,168 192,178 256,142 320,164 384,112 448,132 512,96 576,120 640,104",
+    max: "0,248 64,232 128,222 192,206 256,172 320,148 384,118 448,94 512,58 576,42 640,26",
+  },
+  EURUSD: {
+    "1m": "0,146 64,156 128,150 192,162 256,170 320,166 384,178 448,172 512,186 576,182 640,194",
+    "1w": "0,142 64,148 128,158 192,152 256,164 320,170 384,166 448,176 512,184 576,180 640,188",
+    "1y": "0,114 64,122 128,136 192,128 256,148 320,158 384,168 448,176 512,184 576,192 640,204",
+    "5y": "0,188 64,176 128,162 192,170 256,156 320,144 384,152 448,136 512,128 576,118 640,126",
+    "24h": "0,132 64,140 128,136 192,148 256,152 320,146 384,158 448,164 512,160 576,172 640,176",
+    max: "0,176 64,164 128,172 192,152 256,158 320,142 384,134 448,128 512,120 576,112 640,106",
+  },
+  NVDA: {
+    "1m": "0,218 64,202 128,182 192,192 256,144 320,132 384,108 448,86 512,92 576,58 640,42",
+    "1w": "0,204 64,180 128,188 192,150 256,126 320,136 384,98 448,82 512,54 576,62 640,38",
+    "1y": "0,238 64,222 128,206 192,178 256,148 320,128 384,92 448,78 512,56 576,36 640,22",
+    "5y": "0,248 64,238 128,220 192,196 256,164 320,132 384,102 448,78 512,54 576,34 640,18",
+    "24h": "0,214 64,196 128,184 192,164 256,170 320,128 384,110 448,92 512,76 576,66 640,48",
+    max: "0,250 64,242 128,226 192,210 256,176 320,142 384,104 448,78 512,48 576,28 640,16",
+  },
+  SPY: {
+    "1m": "0,214 64,204 128,188 192,194 256,162 320,150 384,128 448,104 512,112 576,78 640,68",
+    "1w": "0,192 64,176 128,184 192,148 256,154 320,126 384,104 448,118 512,86 576,72 640,82",
+    "1y": "0,220 64,208 128,196 192,164 256,174 320,138 384,110 448,96 512,76 576,54 640,44",
+    "5y": "0,238 64,224 128,206 192,188 256,146 320,160 384,116 448,92 512,70 576,48 640,30",
+    "24h": "0,205 64,190 128,198 192,154 256,168 320,118 384,132 448,86 512,102 576,62 640,78",
+    max: "0,242 64,226 128,218 192,198 256,184 320,142 384,130 448,94 512,76 576,42 640,28",
+  },
+};
+
+const portfolioEnrichmentReceipts = {
+  BTC: {
+    financial: ["Protocol and liquidity context", "Market cap, volume, and custody notes are neutral context only."],
+    insider: ["Issuer ownership unavailable", "Crypto assets use source coverage receipts instead of insider filings."],
+    news: ["Digital asset market context", "Read-only headlines remain detached from bot signals and trade triggers."],
+  },
+  EURUSD: {
+    financial: ["Macro record context", "Rate, inflation, and central-bank source receipts are informational only."],
+    insider: ["Issuer filings not applicable", "FX pairs do not expose corporate insider ownership records."],
+    news: ["Currency market context", "Read-only macro headlines cannot trigger orders or bot decisions."],
+  },
+  NVDA: {
+    financial: ["Revenue, margin, inventory", "Official filings and companyfacts coverage stay source receipts only."],
+    insider: ["SEC ownership filings", "Forms 3/4/5 context is neutral and never a trade signal."],
+    news: ["Semiconductor headlines", "News receipts attach context without recommendations or execution."],
+  },
+  SPY: {
+    financial: ["Holdings, fees, distribution", "Issuer factsheet and ETF datasets are context-only receipts, not advice."],
+    insider: ["Fund ownership context", "ETF ownership records are neutral coverage notes only."],
+    news: ["Broad market headlines", "Read-only market context; no bot signal or trade trigger."],
+  },
+};
+
+const watchlistPeriodChanges = {
+  AAPL: { "1m": "+4.6%", "1w": "+1.6%", "1y": "+18.4%", "5y": "+312.0%", "24h": "+0.8%", max: "+988.0%" },
+  GLD: { "1m": "+2.1%", "1w": "+0.4%", "1y": "+12.8%", "5y": "+68.0%", "24h": "0.0%", max: "+248.0%" },
+  QQQ: { "1m": "+5.8%", "1w": "+2.2%", "1y": "+21.6%", "5y": "+118.0%", "24h": "+1.1%", max: "+624.0%" },
+  USOIL: { "1m": "-6.4%", "1w": "-2.9%", "1y": "-10.2%", "5y": "+36.0%", "24h": "-1.1%", max: "+52.0%" },
+};
+
+const watchlistChartPoints = {
+  AAPL: {
+    "1m": "0,210 64,196 128,182 192,190 256,154 320,138 384,126 448,96 512,104 576,74 640,62",
+    "1w": "0,198 64,184 128,176 192,154 256,162 320,132 384,120 448,104 512,86 576,78 640,70",
+    "1y": "0,226 64,210 128,198 192,176 256,148 320,130 384,108 448,92 512,74 576,58 640,46",
+    "5y": "0,240 64,226 128,212 192,186 256,158 320,130 384,102 448,80 512,58 576,38 640,24",
+    "24h": "0,204 64,190 128,198 192,166 256,174 320,140 384,128 448,102 512,112 576,84 640,74",
+    max: "0,246 64,232 128,218 192,198 256,162 320,132 384,96 448,72 512,52 576,32 640,20",
+  },
+  GLD: {
+    "1m": "0,176 64,168 128,172 192,160 256,154 320,148 384,142 448,136 512,130 576,126 640,120",
+    "1w": "0,154 64,156 128,150 192,152 256,148 320,146 384,148 448,144 512,142 576,140 640,138",
+    "1y": "0,198 64,188 128,180 192,170 256,158 320,146 384,136 448,126 512,116 576,104 640,94",
+    "5y": "0,230 64,218 128,204 192,190 256,176 320,162 384,146 448,128 512,112 576,96 640,80",
+    "24h": "0,152 64,150 128,154 192,152 256,150 320,151 384,149 448,150 512,148 576,150 640,149",
+    max: "0,238 64,226 128,210 192,196 256,178 320,160 384,142 448,124 512,104 576,88 640,70",
+  },
+  QQQ: {
+    "1m": "0,220 64,206 128,188 192,170 256,156 320,132 384,114 448,96 512,82 576,62 640,48",
+    "1w": "0,206 64,192 128,180 192,158 256,146 320,126 384,106 448,92 512,72 576,64 640,50",
+    "1y": "0,232 64,216 128,204 192,180 256,154 320,130 384,104 448,88 512,66 576,46 640,34",
+    "5y": "0,244 64,230 128,216 192,194 256,164 320,134 384,104 448,78 512,54 576,36 640,22",
+    "24h": "0,214 64,202 128,188 192,174 256,160 320,146 384,122 448,108 512,92 576,76 640,60",
+    max: "0,248 64,234 128,220 192,202 256,172 320,138 384,102 448,78 512,50 576,30 640,18",
+  },
+  USOIL: {
+    "1m": "0,102 64,112 128,128 192,120 256,146 320,158 384,170 448,182 512,174 576,198 640,210",
+    "1w": "0,118 64,130 128,126 192,146 256,154 320,166 384,158 448,178 512,186 576,194 640,202",
+    "1y": "0,92 64,110 128,104 192,126 256,142 320,136 384,158 448,176 512,168 576,190 640,214",
+    "5y": "0,210 64,190 128,202 192,174 256,160 320,142 384,154 448,132 512,118 576,102 640,94",
+    "24h": "0,106 64,118 128,112 192,132 256,144 320,138 384,160 448,170 512,164 576,186 640,196",
+    max: "0,198 64,184 128,174 192,162 256,146 320,136 384,122 448,112 512,104 576,94 640,86",
+  },
+};
+
+const watchlistContextReceipts = {
+  AAPL: ["Equity watch", "Nasdaq quote fixture", "Fresh synthetic", "Companyfacts and news receipts are context only."],
+  GLD: ["ETF watch", "Issuer factsheet fixture", "Fresh synthetic", "ETF holdings and distribution context are read-only."],
+  QQQ: ["ETF watch", "Delayed quote fixture", "Stale synthetic", "Technology exposure context is informational only."],
+  USOIL: ["Commodity CFD watch", "Market data fixture", "Fresh synthetic", "Commodity headlines cannot trigger trades."],
+};
+
+function chartPointsFor(pointsBySymbol, symbol, period, fallbackSymbol) {
+  return pointsBySymbol[symbol]?.[period] ?? pointsBySymbol[fallbackSymbol]?.[period] ?? "";
+}
+
+function portfolioChartFor(symbol, period) {
+  return chartPointsFor(portfolioChartPoints, symbol, period, "SPY");
+}
+
+function watchlistChartFor(symbol, period) {
+  return chartPointsFor(watchlistChartPoints, symbol, period, "AAPL");
+}
 
 function text(id, value) {
   const element = document.getElementById(id);
@@ -260,6 +418,165 @@ function labelize(value) {
     .filter(Boolean)
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ");
+}
+
+function periodLabel(value) {
+  return value === "max" ? "Max" : value;
+}
+
+function signedClass(value) {
+  if (String(value).startsWith("+")) {
+    return "good-text";
+  }
+
+  if (String(value).startsWith("-")) {
+    return "bad-text";
+  }
+
+  return "neutral-text";
+}
+
+function setPerformanceChart(points) {
+  const line = document.getElementById("performance-line");
+  const area = document.getElementById("performance-area");
+
+  if (!points) {
+    return;
+  }
+
+  line?.setAttribute("points", points);
+  area?.setAttribute("d", `M${points.replaceAll(" ", " L")} L640 260 L0 260 Z`);
+}
+
+function setChartPath(lineId, areaId, points) {
+  const line = document.getElementById(lineId);
+  const area = document.getElementById(areaId);
+
+  if (!points) {
+    return;
+  }
+
+  line?.setAttribute("points", points);
+  area?.setAttribute("d", `M${points.replaceAll(" ", " L")} L640 260 L0 260 Z`);
+}
+
+function renderSelectedPortfolioInstrument() {
+  const receipts = portfolioEnrichmentReceipts[selectedPortfolioSymbol] ?? portfolioEnrichmentReceipts.SPY;
+
+  text("chart-title", `${selectedPortfolioSymbol} selected-period chart`);
+  text("selected-period-pill", periodLabel(selectedPortfolioPeriod));
+  text("chart-period-label", `Selected period: ${periodLabel(selectedPortfolioPeriod)}`);
+  text("portfolio-financial-title", receipts.financial[0]);
+  text("portfolio-financial-detail", receipts.financial[1]);
+  text("portfolio-news-title", receipts.news[0]);
+  text("portfolio-news-detail", receipts.news[1]);
+  text("portfolio-insider-title", receipts.insider[0]);
+  text("portfolio-insider-detail", receipts.insider[1]);
+  setPerformanceChart(portfolioChartFor(selectedPortfolioSymbol, selectedPortfolioPeriod));
+}
+
+function updatePortfolioPeriod(period) {
+  selectedPortfolioPeriod = period;
+
+  document.querySelectorAll("[data-period]").forEach((button) => {
+    const active = button.dataset.period === period;
+
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+
+  document.querySelectorAll("[data-instrument-row]").forEach((row) => {
+    const symbol = row.dataset.symbol;
+    const value = portfolioPeriodChanges[symbol]?.[period] ?? "0.0%";
+    const target = row.querySelector("[data-period-value]");
+
+    if (target) {
+      target.textContent = value;
+      target.classList.remove("good-text", "bad-text", "neutral-text");
+      target.classList.add(signedClass(value));
+    }
+  });
+
+  renderSelectedPortfolioInstrument();
+}
+
+function selectPortfolioInstrument(row) {
+  if (!row) {
+    return;
+  }
+
+  selectedPortfolioSymbol = row.dataset.symbol ?? selectedPortfolioSymbol;
+
+  document.querySelectorAll("[data-instrument-row]").forEach((candidate) => {
+    candidate.classList.toggle("active", candidate === row);
+  });
+
+  renderSelectedPortfolioInstrument();
+  renderAudit(
+    `${selectedPortfolioSymbol} selected`,
+    "Instrument summary row selected locally; enrichment receipts remain context-only",
+  );
+}
+
+function renderSelectedWatchlistInstrument() {
+  const context = watchlistContextReceipts[selectedWatchlistSymbol] ?? watchlistContextReceipts.AAPL;
+
+  text("watchlist-chart-title", `${selectedWatchlistSymbol} watchlist chart`);
+  text("watchlist-selected-period-pill", periodLabel(selectedWatchlistPeriod));
+  text("watchlist-chart-period-label", `Selected period: ${periodLabel(selectedWatchlistPeriod)}`);
+  text("watchlist-context-title", context[0]);
+  text("watchlist-context-source", context[1]);
+  text("watchlist-context-freshness", context[2]);
+  text("watchlist-context-detail", context[3]);
+  setChartPath(
+    "watchlist-performance-line",
+    "watchlist-performance-area",
+    watchlistChartFor(selectedWatchlistSymbol, selectedWatchlistPeriod),
+  );
+}
+
+function updateWatchlistPeriod(period) {
+  selectedWatchlistPeriod = period;
+
+  document.querySelectorAll("[data-watchlist-period]").forEach((button) => {
+    const active = button.dataset.watchlistPeriod === period;
+
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+
+  document.querySelectorAll("[data-watchlist-row]").forEach((row) => {
+    const symbol = row.dataset.watchlistSymbol;
+    const value = watchlistPeriodChanges[symbol]?.[period] ?? "0.0%";
+    const target = row.querySelector("[data-watchlist-period-value]");
+
+    if (target) {
+      target.textContent = value;
+      target.classList.remove("good-text", "bad-text", "neutral-text");
+      target.classList.add(signedClass(value));
+    }
+  });
+
+  renderSelectedWatchlistInstrument();
+}
+
+function selectWatchlistInstrument(row) {
+  if (!row) {
+    return;
+  }
+
+  selectedWatchlistSymbol = row.dataset.watchlistSymbol ?? selectedWatchlistSymbol;
+
+  document.querySelectorAll("[data-watchlist-row]").forEach((candidate) => {
+    candidate.classList.toggle("active", candidate === row);
+  });
+
+  renderSelectedWatchlistInstrument();
+  renderAudit(
+    `${selectedWatchlistSymbol} watchlist item selected`,
+    "Watchlist row selected locally; context remains read-only and non-advisory",
+    "research-audit-list",
+  );
 }
 
 function renderFixtureWatermark(id, watermark) {
@@ -963,7 +1280,7 @@ async function refreshTradingStatus() {
 }
 
 async function refreshTabStatus(targetId, { force = false } = {}) {
-  if (!targetId || targetId === overviewTabId) {
+  if (!targetId) {
     return;
   }
 
@@ -972,10 +1289,12 @@ async function refreshTabStatus(targetId, { force = false } = {}) {
   }
 
   const refreshers = {
-    "bot-view": refreshBotStatus,
-    "research-view": refreshResearchStatus,
-    "risk-view": refreshRiskStatus,
-    "trading-view": refreshTradingStatus,
+    "bot-view": async () => {
+      await refreshBotStatus();
+      await refreshTradingStatus();
+    },
+    "portfolio-view": refreshRiskStatus,
+    "watchlist-view": refreshResearchStatus,
   };
   const refresher = refreshers[targetId];
 
@@ -988,7 +1307,7 @@ async function refreshTabStatus(targetId, { force = false } = {}) {
 }
 
 function activeTabId() {
-  return document.querySelector("[data-tab-target].active")?.dataset.tabTarget ?? overviewTabId;
+  return document.querySelector("[data-tab-target].active")?.dataset.tabTarget ?? portfolioTabId;
 }
 
 function activateTab(targetId) {
@@ -1018,18 +1337,12 @@ async function refreshEtoro() {
     const status = await getJson("/api/etoro/status");
     renderStatus(status);
     await refreshTabStatus(activeTabId(), { force: true });
-
-    if (!status.credentialStatus.configured) {
-      renderAudit("Credential check incomplete", "No credential values present in browser context");
-      return;
-    }
-
-    const identity = await getJson("/api/etoro/identity");
-    renderIdentity(identity);
-
-    const pnl = await getJson("/api/etoro/demo/pnl");
-    renderPnl(pnl);
-    renderAudit("Demo PnL summary loaded", "Provider response normalized and raw payload hidden");
+    renderAudit(
+      "Portfolio aggregate retained",
+      status.credentialStatus.configured
+        ? "Server credentials are configured, but this Stage 1 view does not request provider-backed portfolio reads"
+        : "No credential values present in browser context; synthetic instrument aggregation remains active",
+    );
   } catch (error) {
     setTile("provider-status", "warn", "Provider offline", "Using synthetic fixtures");
     await refreshTabStatus(activeTabId(), { force: true });
@@ -1120,4 +1433,30 @@ document.getElementById("bot-config-form")?.addEventListener("submit", async (ev
 document.querySelectorAll("[data-tab-target]").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.tabTarget));
 });
+document.querySelectorAll("[data-period]").forEach((button) => {
+  button.addEventListener("click", () => updatePortfolioPeriod(button.dataset.period));
+});
+document.querySelectorAll("[data-watchlist-period]").forEach((button) => {
+  button.addEventListener("click", () => updateWatchlistPeriod(button.dataset.watchlistPeriod));
+});
+document.querySelectorAll("[data-instrument-row]").forEach((row) => {
+  row.addEventListener("click", () => selectPortfolioInstrument(row));
+  row.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectPortfolioInstrument(row);
+    }
+  });
+});
+document.querySelectorAll("[data-watchlist-row]").forEach((row) => {
+  row.addEventListener("click", () => selectWatchlistInstrument(row));
+  row.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectWatchlistInstrument(row);
+    }
+  });
+});
+updatePortfolioPeriod("24h");
+updateWatchlistPeriod("24h");
 refreshEtoro();

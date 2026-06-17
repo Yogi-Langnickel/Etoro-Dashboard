@@ -73,6 +73,21 @@ async function readMoneyMakerContractSnapshot() {
   );
 }
 
+async function readBrowserChartContracts() {
+  const appJs = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
+  const setupSource = appJs.slice(0, appJs.indexOf("function text("));
+
+  return Function(`
+    ${setupSource}
+    return {
+      portfolioChartFor,
+      portfolioPeriodChanges,
+      watchlistChartFor,
+      watchlistPeriodChanges
+    };
+  `)();
+}
+
 async function readBotConfigMutationProtection(handler) {
   const response = await callHandler(handler, {
     url: "/api/etoro/bot/config",
@@ -307,6 +322,137 @@ test("bot snapshot batches monitor routes without execution data", async () => {
   assert.equal(response.text.includes("server-user-secret"), false);
   assert.equal(response.text.includes('"accountId"'), false);
   assert.equal(response.text.includes('"positionId"'), false);
+});
+
+test("dashboard shell exposes the active three-tab workspace", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/",
+  });
+
+  assert.equal(response.status, 200);
+  assert.match(response.text, /Portfolio View/);
+  assert.match(response.text, /Watchlist Items/);
+  assert.match(response.text, /Bot Control/);
+  assert.equal(response.text.includes(">Overview<"), false);
+  assert.equal(response.text.includes(">Demo Trading<"), false);
+  assert.equal(response.text.includes(">Bot Monitor<"), false);
+  assert.equal(response.text.includes(">Risk Radar<"), false);
+  assert.equal(response.text.includes(">Research Desk<"), false);
+  assert.match(response.text, /data-tab-target="portfolio-view"/);
+  assert.match(response.text, /data-tab-target="watchlist-view"/);
+  assert.match(response.text, /data-tab-target="bot-view"/);
+  assert.match(response.text, /data-tab-panel="portfolio-view"/);
+  assert.match(response.text, /data-tab-panel="watchlist-view"/);
+  assert.match(response.text, /data-tab-panel="bot-view"/);
+  assert.match(response.text, /rel="icon" href="data:image\/svg\+xml/);
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes('"accountId"'), false);
+});
+
+test("portfolio view summarizes one row per instrument with period controls", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/",
+  });
+  const symbols = [...response.text.matchAll(/data-instrument-row[^>]*data-symbol="([^"]+)"/g)].map(
+    ([, symbol]) => symbol,
+  );
+  const periods = [...response.text.matchAll(/data-period="([^"]+)"/g)].map(([, period]) => period);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(symbols, ["SPY", "NVDA", "BTC", "EURUSD"]);
+  assert.equal(new Set(symbols).size, symbols.length);
+  assert.deepEqual(periods, ["24h", "1w", "1m", "1y", "5y", "max"]);
+  assert.match(response.text, /Aggregated by asset/);
+  assert.match(response.text, /Instrument summary/);
+  assert.match(response.text, /Avg open/);
+  assert.match(response.text, /P\/L %/);
+  assert.match(response.text, /Invested/);
+  assert.match(response.text, /Net value/);
+  assert.match(response.text, /Selected instrument/);
+  assert.match(response.text, /Selected period: 24h/);
+});
+
+test("portfolio interaction contract uses instrument-specific period chart data", async () => {
+  const { portfolioChartFor, portfolioPeriodChanges } = await readBrowserChartContracts();
+
+  assert.notEqual(portfolioChartFor("SPY", "24h"), portfolioChartFor("NVDA", "24h"));
+  assert.notEqual(portfolioChartFor("SPY", "24h"), portfolioChartFor("SPY", "1w"));
+  assert.notEqual(portfolioChartFor("BTC", "24h"), portfolioChartFor("BTC", "1m"));
+  assert.equal(portfolioChartFor("UNKNOWN", "24h"), portfolioChartFor("SPY", "24h"));
+  assert.equal(portfolioPeriodChanges.NVDA["5y"], "+1,041.0%");
+  assert.equal(portfolioPeriodChanges.EURUSD["24h"], "-0.2%");
+});
+
+test("portfolio view keeps enrichment and risk context read-only and redacted", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/",
+  });
+
+  assert.equal(response.status, 200);
+  assert.match(response.text, /context-only enrichment receipts/);
+  assert.match(response.text, /not advice/);
+  assert.match(response.text, /no bot signal or trade trigger/i);
+  assert.match(response.text, /Ownership activity is a neutral enrichment record only/);
+  assert.match(response.text, /Performance breakdown/);
+  assert.match(response.text, /Portfolio risk/);
+  assert.match(response.text, /Dividend expectations/);
+  assert.match(response.text, /Market, frequency, weight, yield, income, source, confidence/);
+  assert.match(response.text, /No write actions|No writes|No orders|Read only/);
+  assert.match(response.text, /Submit disabled/);
+  assert.equal(response.text.includes("server-api-secret"), false);
+  assert.equal(response.text.includes("server-user-secret"), false);
+  assert.equal(response.text.includes('"accountId"'), false);
+  assert.equal(response.text.includes("private portfolio export"), false);
+});
+
+test("watchlist tab exposes compact read-only rows and selected context", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/",
+  });
+  const symbols = [...response.text.matchAll(/data-watchlist-row[^>]*data-watchlist-symbol="([^"]+)"/g)].map(
+    ([, symbol]) => symbol,
+  );
+  const periods = [...response.text.matchAll(/data-watchlist-period="([^"]+)"/g)].map(([, period]) => period);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(symbols, ["AAPL", "GLD", "QQQ", "USOIL"]);
+  assert.equal(new Set(symbols).size, symbols.length);
+  assert.deepEqual(periods, ["24h", "1w", "1m", "1y", "5y", "max"]);
+  assert.match(response.text, /Symbol/);
+  assert.match(response.text, /Name/);
+  assert.match(response.text, /Price/);
+  assert.match(response.text, /Freshness/);
+  assert.match(response.text, /Source state/);
+  assert.match(response.text, /Selected watchlist item/);
+  assert.match(response.text, /No browser credentials/);
+  assert.match(response.text, /No account identifiers/);
+  assert.match(response.text, /No writes, no orders, no recommendations/);
+  assert.equal(response.text.includes('"accountId"'), false);
+  assert.equal(response.text.includes('"positionId"'), false);
+  assert.equal(response.text.includes('"orderId"'), false);
+});
+
+test("watchlist interaction contract uses symbol-specific period chart data", async () => {
+  const { watchlistChartFor, watchlistPeriodChanges } = await readBrowserChartContracts();
+
+  assert.notEqual(watchlistChartFor("AAPL", "24h"), watchlistChartFor("GLD", "24h"));
+  assert.notEqual(watchlistChartFor("AAPL", "24h"), watchlistChartFor("AAPL", "1w"));
+  assert.notEqual(watchlistChartFor("USOIL", "24h"), watchlistChartFor("USOIL", "1m"));
+  assert.equal(watchlistChartFor("UNKNOWN", "24h"), watchlistChartFor("AAPL", "24h"));
+  assert.equal(watchlistPeriodChanges.USOIL["24h"], "-1.1%");
+  assert.equal(watchlistPeriodChanges.QQQ["1y"], "+21.6%");
+});
+
+test("stage one browser bundle does not request provider-backed portfolio reads", async () => {
+  const response = await callHandler(configuredHandler(), {
+    url: "/app.js",
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.text.includes("/api/etoro/identity"), false);
+  assert.equal(response.text.includes("/api/etoro/demo/pnl"), false);
+  assert.match(response.text, /does not request provider-backed portfolio reads/);
 });
 
 test("bot config returns default server-side simulation controls without secrets", async () => {
