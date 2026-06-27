@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 const SENSITIVE_HEADER_NAMES = new Set(["x-api-key", "x-user-key", "authorization"]);
 const DEFAULT_TIMEOUT_MS = 10_000;
+const ALLOWED_ETORO_PROVIDER_ORIGIN = "https://public-api.etoro.com";
 
 export class EtoroApiError extends Error {
   constructor(message, options = {}) {
@@ -295,6 +296,31 @@ function assertNoSensitiveHeaders(headers) {
   }
 }
 
+function assertAllowedProviderBaseUrl(baseUrl) {
+  let parsed;
+
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new EtoroApiError("Invalid eToro API base URL", {
+      code: "ETORO_INVALID_BASE_URL",
+    });
+  }
+
+  if (
+    parsed.origin !== ALLOWED_ETORO_PROVIDER_ORIGIN ||
+    parsed.username ||
+    parsed.password ||
+    (parsed.pathname && parsed.pathname !== "/") ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new EtoroApiError("Invalid eToro API base URL", {
+      code: "ETORO_INVALID_BASE_URL",
+    });
+  }
+}
+
 export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
   const endpoint = READ_ONLY_ENDPOINTS[endpointName];
 
@@ -308,6 +334,7 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
   const requestId = options.requestId ?? randomUUID();
   const headers = buildEtoroHeaders(credentials, requestId);
   assertNoSensitiveHeaders(headers);
+  assertAllowedProviderBaseUrl(credentials.baseUrl);
 
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
