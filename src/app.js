@@ -596,6 +596,7 @@ function renderBotStatus(payload) {
   const telemetry = payload.telemetry ?? {};
   const safeguards = payload.safeguards ?? {};
 
+  renderFixtureWatermark("bot-watermark-state", payload.fixtureWatermark);
   text("bot-enabled-state", payload.botEnabled ? "Enabled" : "Disabled");
   text("bot-freshness-state", labelize(telemetry.freshness));
   text("bot-telemetry-source", labelize(telemetry.source));

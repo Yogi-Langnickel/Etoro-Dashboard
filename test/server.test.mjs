@@ -180,6 +180,18 @@ test("bot monitoring status is read-only, disabled, and redacted", async () => {
   assert.equal(response.json.botEnabled, false);
   assert.equal(response.json.simulatedTelemetryOnly, true);
   assert.equal(response.json.mutationRoutesEnabled, false);
+  assert.equal(response.json.fixtureWatermark.kind, "synthetic-fixture");
+  assert.equal(response.json.fixtureWatermark.surface, "bot-monitor");
+  assert.equal(response.json.fixtureWatermark.liveProviderConnected, false);
+  assert.equal(response.json.fixtureWatermark.containsPrivateAccountData, false);
+  assert.equal(response.json.fixtureWatermark.containsRawProviderPayloads, false);
+  assert.equal(response.json.fixtureWatermark.safeForPublicDemo, true);
+  assert.deepEqual(response.json.fixtureWatermark.sourceLineage, {
+    providerResponses: "absent",
+    accountLinkedData: "absent",
+    persistence: "not-persisted",
+    generatedFrom: "repo-local synthetic status DTO",
+  });
   assert.equal(response.json.telemetry.source, "synthetic-disabled");
   assert.equal(response.json.telemetry.pendingExecutionCount, 0);
   assert.equal(response.json.safeguards.executionRoutes, "absent");

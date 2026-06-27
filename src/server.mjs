@@ -599,6 +599,7 @@ function botMonitoringStatus(config) {
     simulatedTelemetryOnly: true,
     mutationRoutesEnabled: false,
     credentialStatus: publicCredentialStatus(config),
+    fixtureWatermark: syntheticFixtureWatermark("bot-monitor"),
     telemetry: {
       source: "synthetic-disabled",
       freshness: "not-connected",
