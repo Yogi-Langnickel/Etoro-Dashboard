@@ -206,16 +206,35 @@ function parseOriginHeader(origin) {
 }
 
 function validateBotConfigMutationRequest(request) {
+  const baseValidation = validateLocalJsonMutationRequest(request, "Bot config updates");
+
+  if (!baseValidation.ok) {
+    return baseValidation;
+  }
+
+  const csrfToken = getRequestHeader(request, BOT_CONFIG_CSRF_HEADER);
+
+  if (csrfToken !== botConfigCsrfToken) {
+    return {
+      ok: false,
+      status: 403,
+      message: "Bot config update token is missing or invalid.",
+    };
+  }
+
+  return { ok: true };
+}
+
+function validateLocalJsonMutationRequest(request, label) {
   const contentType = String(getRequestHeader(request, "content-type") ?? "").toLowerCase();
   const origin = getRequestHeader(request, "origin");
   const host = getRequestHeader(request, "host");
-  const csrfToken = getRequestHeader(request, BOT_CONFIG_CSRF_HEADER);
 
   if (!contentType.startsWith("application/json")) {
     return {
       ok: false,
       status: 415,
-      message: "Bot config updates require application/json.",
+      message: `${label} require application/json.`,
     };
   }
 
@@ -223,7 +242,7 @@ function validateBotConfigMutationRequest(request) {
     return {
       ok: false,
       status: 403,
-      message: "Bot config updates require a local dashboard host.",
+      message: `${label} require a local dashboard host.`,
     };
   }
 
@@ -232,15 +251,7 @@ function validateBotConfigMutationRequest(request) {
     return {
       ok: false,
       status: 403,
-      message: "Bot config updates are restricted to the local dashboard origin.",
-    };
-  }
-
-  if (csrfToken !== botConfigCsrfToken) {
-    return {
-      ok: false,
-      status: 403,
-      message: "Bot config update token is missing or invalid.",
+      message: `${label} are restricted to the local dashboard origin.`,
     };
   }
 
@@ -1261,6 +1272,22 @@ function buildTradePreview(payload) {
 }
 
 async function handleTradePreview(request, response, config) {
+  const mutationRequest = validateLocalJsonMutationRequest(request, "Demo trade previews");
+
+  if (!mutationRequest.ok) {
+    sendJson(response, mutationRequest.status, {
+      ok: false,
+      mode: "demo-trade-preview",
+      mutationRoutesEnabled: false,
+      executionBlocked: true,
+      error: {
+        code: "DEMO_TRADE_PREVIEW_FORBIDDEN",
+        message: mutationRequest.message,
+      },
+    });
+    return;
+  }
+
   if (!config.demoTradePreviewEnabled) {
     sendJson(response, 403, {
       ok: false,

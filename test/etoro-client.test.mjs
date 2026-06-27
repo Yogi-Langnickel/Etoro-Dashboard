@@ -197,3 +197,52 @@ test("read-only endpoint allow-list excludes mutation routes", async () => {
       error instanceof EtoroApiError && error.code === "ETORO_ENDPOINT_NOT_ALLOWED",
   );
 });
+
+test("fetchReadOnlyEndpoint rejects non-eToro provider hosts before fetch", async () => {
+  let fetchCalled = false;
+
+  await assert.rejects(
+    fetchReadOnlyEndpoint("identity", {
+      credentials: {
+        ...credentials,
+        baseUrl: "https://example.test",
+      },
+      fetchImpl: async () => {
+        fetchCalled = true;
+        return new Response("{}");
+      },
+    }),
+    (error) => error instanceof EtoroApiError && error.code === "ETORO_INVALID_BASE_URL",
+  );
+
+  assert.equal(fetchCalled, false);
+});
+
+test("fetchReadOnlyEndpoint rejects credentialed or path-scoped base URLs before fetch", async () => {
+  const rejectedBaseUrls = [
+    "https://public-api.etoro.com.evil.test",
+    "https://public-api.etoro.com/api/v1",
+    "https://user:pass@public-api.etoro.com",
+    "https://public-api.etoro.com?token=test-api-secret",
+  ];
+
+  for (const baseUrl of rejectedBaseUrls) {
+    let fetchCalled = false;
+
+    await assert.rejects(
+      fetchReadOnlyEndpoint("identity", {
+        credentials: {
+          ...credentials,
+          baseUrl,
+        },
+        fetchImpl: async () => {
+          fetchCalled = true;
+          return new Response("{}");
+        },
+      }),
+      (error) => error instanceof EtoroApiError && error.code === "ETORO_INVALID_BASE_URL",
+    );
+
+    assert.equal(fetchCalled, false, baseUrl);
+  }
+});

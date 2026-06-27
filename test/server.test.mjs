@@ -110,6 +110,15 @@ function localBotConfigMutationHeaders(mutationProtection, overrides = {}) {
   };
 }
 
+function localDemoPreviewHeaders(overrides = {}) {
+  return {
+    host: "localhost:4173",
+    origin: "http://localhost:4173",
+    "content-type": "application/json",
+    ...overrides,
+  };
+}
+
 async function configuredConfig() {
   return {
     baseUrl: "https://public-api.etoro.com",
@@ -1139,6 +1148,7 @@ test("demo trade preview is blocked unless explicitly enabled", async () => {
   const response = await callHandler(configuredHandler(), {
     method: "POST",
     url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders(),
     body: JSON.stringify({
       orderType: "marketOpenByAmount",
       instrumentId: "100000",
@@ -1151,6 +1161,59 @@ test("demo trade preview is blocked unless explicitly enabled", async () => {
   assert.equal(response.json.mutationRoutesEnabled, false);
   assert.equal(response.json.executionBlocked, true);
   assert.equal(response.json.error.code, "DEMO_TRADE_PREVIEW_DISABLED");
+});
+
+test("demo trade preview rejects non-local or non-json requests before ticket parsing", async () => {
+  const handler = createRequestHandler({
+    loadConfig: async () => ({
+      baseUrl: "https://public-api.etoro.com",
+      configured: true,
+      credentialFileLoaded: false,
+      credentialSource: "environment",
+      demoTradePreviewEnabled: true,
+      missing: [],
+    }),
+  });
+  const missingOrigin = await callHandler(handler, {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    headers: {
+      host: "localhost:4173",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      orderType: "marketOpenByAmount",
+      instrumentId: "100000",
+      side: "BUY",
+      amount: "150",
+    }),
+  });
+  const crossOrigin = await callHandler(handler, {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders({ origin: "https://example.test" }),
+    body: JSON.stringify({
+      orderType: "marketOpenByAmount",
+      instrumentId: "100000",
+      side: "BUY",
+      amount: "150",
+    }),
+  });
+  const badContentType = await callHandler(handler, {
+    method: "POST",
+    url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders({ "content-type": "text/plain" }),
+    body: "instrumentId=100000",
+  });
+
+  assert.equal(missingOrigin.status, 403);
+  assert.equal(crossOrigin.status, 403);
+  assert.equal(badContentType.status, 415);
+  assert.equal(missingOrigin.json.error.code, "DEMO_TRADE_PREVIEW_FORBIDDEN");
+  assert.equal(crossOrigin.json.error.code, "DEMO_TRADE_PREVIEW_FORBIDDEN");
+  assert.equal(badContentType.json.error.code, "DEMO_TRADE_PREVIEW_FORBIDDEN");
+  assert.equal(missingOrigin.text.includes("100000"), false);
+  assert.equal(crossOrigin.text.includes("100000"), false);
 });
 
 test("enabled demo trade preview returns a redacted non-executing ticket", async () => {
@@ -1168,6 +1231,7 @@ test("enabled demo trade preview returns a redacted non-executing ticket", async
   }), {
     method: "POST",
     url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders(),
     body: JSON.stringify({
       orderType: "marketOpenByAmount",
       instrumentId: "100000",
@@ -1205,6 +1269,7 @@ test("demo trade preview caps amount tickets to the simulation budget ceiling", 
   }), {
     method: "POST",
     url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders(),
     body: JSON.stringify({
       orderType: "marketOpenByAmount",
       instrumentId: "100000",
@@ -1233,6 +1298,7 @@ test("demo trade preview caps unit tickets to the simulation unit ceiling", asyn
   }), {
     method: "POST",
     url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders(),
     body: JSON.stringify({
       orderType: "marketOpenByUnits",
       instrumentId: "100000",
@@ -1261,6 +1327,7 @@ test("demo trade preview blocks close-position tickets until audited close flow 
   }), {
     method: "POST",
     url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders(),
     body: JSON.stringify({
       orderType: "marketClosePosition",
       positionId: "position-123",
@@ -1289,6 +1356,7 @@ test("demo trade preview blocks sell-side and leverage concepts", async () => {
   const sellResponse = await callHandler(handler, {
     method: "POST",
     url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders(),
     body: JSON.stringify({
       orderType: "marketOpenByAmount",
       instrumentId: "100000",
@@ -1300,6 +1368,7 @@ test("demo trade preview blocks sell-side and leverage concepts", async () => {
   const leverageResponse = await callHandler(handler, {
     method: "POST",
     url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders(),
     body: JSON.stringify({
       orderType: "marketOpenByAmount",
       instrumentId: "100000",
@@ -1328,6 +1397,7 @@ test("demo trade preview rejects oversized request bodies", async () => {
   }), {
     method: "POST",
     url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders(),
     body: JSON.stringify({
       orderType: "marketOpenByAmount",
       instrumentId: "100000",
@@ -1354,6 +1424,7 @@ test("demo trade preview validates required ticket fields", async () => {
   }), {
     method: "POST",
     url: "/api/etoro/demo/trading/preview",
+    headers: localDemoPreviewHeaders(),
     body: JSON.stringify({
       orderType: "marketOpenByUnits",
       instrumentId: "100000",
