@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 
 const SENSITIVE_HEADER_NAMES = new Set(["x-api-key", "x-user-key", "authorization"]);
 const DEFAULT_TIMEOUT_MS = 10_000;
+const MAX_RETRY_AFTER_MS = 60_000;
 const ALLOWED_ETORO_PROVIDER_ORIGIN = "https://public-api.etoro.com";
+const SAFE_INSTRUMENT_SYMBOL = /^[A-Z0-9][A-Z0-9._:/-]{0,31}$/;
 
 export class EtoroApiError extends Error {
   constructor(message, options = {}) {
@@ -11,6 +13,7 @@ export class EtoroApiError extends Error {
     this.code = options.code ?? "ETORO_API_ERROR";
     this.status = options.status ?? null;
     this.requestId = options.requestId ?? null;
+    this.retryAfterMs = options.retryAfterMs ?? null;
   }
 }
 
@@ -24,6 +27,11 @@ export const READ_ONLY_ENDPOINTS = Object.freeze({
     method: "GET",
     path: "/api/v1/trading/info/demo/pnl",
     normalize: normalizeDemoPnl,
+  }),
+  demoPortfolio: Object.freeze({
+    method: "GET",
+    path: "/api/v1/trading/info/demo/portfolio",
+    normalize: normalizeDemoPortfolio,
   }),
 });
 
@@ -267,6 +275,115 @@ function normalizeDemoPnl(payload) {
   };
 }
 
+function normalizeDemoPortfolio(payload) {
+  const portfolio = payload?.clientPortfolio;
+
+  if (!portfolio || typeof portfolio !== "object" || Array.isArray(portfolio)) {
+    throw new EtoroApiError("Demo portfolio response did not include clientPortfolio", {
+      code: "ETORO_INVALID_DEMO_PORTFOLIO_RESPONSE",
+    });
+  }
+
+  const rawPositions = portfolio.positions ?? portfolio.openPositions ?? portfolio.instrumentPositions;
+
+  if (!Array.isArray(rawPositions)) {
+    throw new EtoroApiError("Demo portfolio response did not include a positions array", {
+      code: "ETORO_INVALID_DEMO_PORTFOLIO_RESPONSE",
+    });
+  }
+
+  const positions = rawPositions;
+  const instruments = new Map();
+  let omittedPositionCount = 0;
+  let incompleteValuePositionCount = 0;
+
+  for (const position of positions) {
+    const rawSymbol =
+      position?.instrumentSymbol ?? position?.symbol ?? position?.internalSymbolFull;
+    const symbol = typeof rawSymbol === "string" ? rawSymbol.trim().toUpperCase() : "";
+
+    if (!SAFE_INSTRUMENT_SYMBOL.test(symbol)) {
+      omittedPositionCount += 1;
+      continue;
+    }
+
+    const investedUsd = firstNumber(
+      position?.amount,
+      position?.invested,
+      position?.currentInvestment,
+    );
+    const unrealizedPnlUsd = pnlAmount(
+      position?.unrealizedPnL ?? position?.unrealizedPnl ?? position?.pnL,
+    );
+    const hasCompleteValues = investedUsd !== null && investedUsd >= 0 && unrealizedPnlUsd !== null;
+
+    if (!hasCompleteValues) {
+      incompleteValuePositionCount += 1;
+    }
+
+    const current = instruments.get(symbol) ?? {
+      symbol,
+      positionCount: 0,
+      investedUsd: 0,
+      unrealizedPnlUsd: 0,
+      valuesComplete: true,
+    };
+    const nextInvestedUsd = current.investedUsd + (
+      investedUsd !== null && investedUsd >= 0 ? investedUsd : 0
+    );
+    const nextUnrealizedPnlUsd = current.unrealizedPnlUsd + (unrealizedPnlUsd ?? 0);
+    const totalsComplete = Number.isFinite(nextInvestedUsd) && Number.isFinite(nextUnrealizedPnlUsd);
+
+    if (hasCompleteValues && !totalsComplete) {
+      incompleteValuePositionCount += 1;
+    }
+
+    current.positionCount += 1;
+    current.valuesComplete &&= hasCompleteValues && totalsComplete;
+    current.investedUsd = Number.isFinite(nextInvestedUsd) ? nextInvestedUsd : 0;
+    current.unrealizedPnlUsd = Number.isFinite(nextUnrealizedPnlUsd)
+      ? nextUnrealizedPnlUsd
+      : 0;
+    instruments.set(symbol, current);
+  }
+
+  return {
+    currency: "USD",
+    positionCount: positions.length,
+    instrumentCount: instruments.size,
+    omittedPositionCount,
+    incompleteValuePositionCount,
+    instruments: [...instruments.values()]
+      .map(({ valuesComplete, ...instrument }) => ({
+        ...instrument,
+        investedUsd: valuesComplete ? roundCurrency(instrument.investedUsd) : null,
+        unrealizedPnlUsd: valuesComplete ? roundCurrency(instrument.unrealizedPnlUsd) : null,
+        valueStatus: valuesComplete ? "complete" : "incomplete",
+      }))
+      .sort((left, right) => left.symbol.localeCompare(right.symbol)),
+    providerUpdatedAt: normalizeTimestamp(
+      portfolio.updatedAt ?? portfolio.lastUpdatedAt ?? portfolio.serverTime,
+    ),
+  };
+}
+
+function parseRetryAfterMs(value, nowMs = Date.now()) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  const seconds = Number(value);
+  const parsedMs = Number.isFinite(seconds)
+    ? seconds * 1_000
+    : Date.parse(value) - nowMs;
+
+  if (!Number.isFinite(parsedMs) || parsedMs <= 0) {
+    return null;
+  }
+
+  return Math.min(Math.ceil(parsedMs), MAX_RETRY_AFTER_MS);
+}
+
 async function parseProviderJson(response, requestId, secrets) {
   const text = await response.text();
 
@@ -337,12 +454,13 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
   assertAllowedProviderBaseUrl(credentials.baseUrl);
 
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const now = typeof options.now === "function" ? options.now : Date.now;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const url = new URL(endpoint.path, `${credentials.baseUrl}/`);
   const secrets = [credentials.apiKey, credentials.userKey];
-  const startedAtMs = Date.now();
+  const startedAtMs = now();
 
   try {
     const response = await fetchImpl(url, {
@@ -350,16 +468,20 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
       headers,
       signal: controller.signal,
     });
-    const receivedAtMs = Date.now();
-    const payload = await parseProviderJson(response, requestId, secrets);
+    const receivedAtMs = now();
 
     if (!response.ok) {
       throw new EtoroApiError(`eToro request failed with HTTP ${response.status}`, {
         code: "ETORO_PROVIDER_ERROR",
         status: response.status,
         requestId,
+        retryAfterMs: response.status === 429
+          ? parseRetryAfterMs(response.headers.get("retry-after"), receivedAtMs)
+          : null,
       });
     }
+
+    const payload = await parseProviderJson(response, requestId, secrets);
 
     return {
       data: endpoint.normalize(payload),

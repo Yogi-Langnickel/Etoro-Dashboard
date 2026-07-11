@@ -29,6 +29,7 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/status",
   "/api/etoro/identity",
   "/api/etoro/demo/pnl",
+  "/api/etoro/demo/portfolio",
   "/api/etoro/demo/trading/status",
   "/api/etoro/demo/trading/preview",
   "/api/etoro/bot/status",
@@ -50,6 +51,7 @@ const BOT_CONFIG_CSRF_RESPONSE_HEADER = "x-etoro-dashboard-config-token";
 const botConfigCsrfToken = randomBytes(32).toString("base64url");
 const MAX_API_BODY_BYTES = 16 * 1024;
 export const DEFAULT_PROVIDER_FAILURE_BACKOFF_MS = 5_000;
+const MAX_PROVIDER_RETRY_AFTER_MS = 60_000;
 
 const PLANNED_DEMO_TRADING_ENDPOINTS = Object.freeze({
   marketOpenByAmount: Object.freeze({
@@ -489,6 +491,7 @@ function serializeProviderError(error, config) {
     redactedDetail: redactErrorMessage(error?.message, config),
     status: error?.status ?? undefined,
     requestId: error?.requestId ?? undefined,
+    retryAfterMs: Number.isFinite(error?.retryAfterMs) ? error.retryAfterMs : undefined,
   };
 }
 
@@ -523,22 +526,23 @@ function resolveCacheTtlMs(ttlMs, config) {
 export function createReadOnlyProviderCache({
   ttlMs = DEFAULT_READ_CACHE_TTL_MS,
   failureBackoffMs = DEFAULT_PROVIDER_FAILURE_BACKOFF_MS,
+  now = Date.now,
 } = {}) {
   const entries = new Map();
 
   return {
     async fetch(endpointName, config, fetchEndpoint) {
       const key = readOnlyCacheKey(endpointName, config);
-      const now = Date.now();
+      const nowMs = now();
       const resolvedTtlMs = resolveCacheTtlMs(ttlMs, config);
       const resolvedFailureBackoffMs = resolveCacheTtlMs(failureBackoffMs, config);
       const existing = entries.get(key);
 
-      if (existing?.value && existing.expiresAtMs > now) {
+      if (existing?.value && existing.expiresAtMs > nowMs) {
         return withCacheMetadata(existing.value, "hit", existing);
       }
 
-      if (existing?.error && existing.expiresAtMs > now) {
+      if (existing?.error && existing.expiresAtMs > nowMs) {
         throw providerErrorWithCacheMetadata(existing.error, "backoff", existing);
       }
 
@@ -549,17 +553,18 @@ export function createReadOnlyProviderCache({
       }
 
       const entry = {
-        cachedAt: new Date(now).toISOString(),
-        expiresAt: new Date(now + resolvedTtlMs).toISOString(),
-        expiresAtMs: now + resolvedTtlMs,
+        cachedAt: new Date(nowMs).toISOString(),
+        expiresAt: new Date(nowMs + resolvedTtlMs).toISOString(),
+        expiresAtMs: nowMs + resolvedTtlMs,
         ttlMs: resolvedTtlMs,
       };
 
       entry.inflight = fetchEndpoint(endpointName, { credentials: config })
         .then((value) => {
+          const cachedAtMs = now();
           entry.value = cloneJson(value);
-          entry.cachedAt = new Date().toISOString();
-          entry.expiresAtMs = Date.now() + resolvedTtlMs;
+          entry.cachedAt = new Date(cachedAtMs).toISOString();
+          entry.expiresAtMs = cachedAtMs + resolvedTtlMs;
           entry.expiresAt = new Date(entry.expiresAtMs).toISOString();
           delete entry.inflight;
           entries.set(key, entry);
@@ -571,12 +576,16 @@ export function createReadOnlyProviderCache({
             throw publicProviderError(error, config);
           }
 
-          const backoffStartedAt = Date.now();
+          const backoffStartedAt = now();
+          const providerBackoffMs = Number.isFinite(error?.retryAfterMs)
+            ? Math.min(MAX_PROVIDER_RETRY_AFTER_MS, Math.max(0, error.retryAfterMs))
+            : 0;
+          const effectiveBackoffMs = Math.max(resolvedFailureBackoffMs, providerBackoffMs);
           entry.error = serializeProviderError(error, config);
           entry.cachedAt = new Date(backoffStartedAt).toISOString();
-          entry.expiresAtMs = backoffStartedAt + resolvedFailureBackoffMs;
+          entry.expiresAtMs = backoffStartedAt + effectiveBackoffMs;
           entry.expiresAt = new Date(entry.expiresAtMs).toISOString();
-          entry.ttlMs = resolvedFailureBackoffMs;
+          entry.ttlMs = effectiveBackoffMs;
           delete entry.inflight;
           entries.set(key, entry);
           throw providerErrorWithCacheMetadata(entry.error, "error", entry);
@@ -1540,7 +1549,11 @@ async function handleApiRoute(pathname, response, options) {
       return;
     }
 
-    const endpointName = pathname === "/api/etoro/identity" ? "identity" : "demoPnl";
+    const endpointName = {
+      "/api/etoro/identity": "identity",
+      "/api/etoro/demo/pnl": "demoPnl",
+      "/api/etoro/demo/portfolio": "demoPortfolio",
+    }[pathname];
     const result = await providerCache.fetch(endpointName, config, fetchEndpoint);
     sendJson(response, 200, {
       ok: true,

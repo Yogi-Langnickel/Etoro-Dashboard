@@ -49,7 +49,7 @@ test("environment credentials override file credentials when present", async () 
 
 test("public credential status excludes secret values", async () => {
   const config = await loadEtoroConfig({
-    env: { ETORO_API_KEY: "secret-api-key", ETORO_USER_KEY: "secret-user-key" },
+    env: { ETORO_API_KEY: "test-api-key", ETORO_USER_KEY: "test-user-key" },
     readFile: async () => {
       const error = new Error("missing");
       error.code = "ENOENT";
@@ -63,16 +63,16 @@ test("public credential status excludes secret values", async () => {
   assert.equal(status.providerHostPolicy, "official-host-allow-list");
   assert.equal(status.providerEndpointDetails, "server-only");
   assert.equal(status.baseUrl, undefined);
-  assert.equal(serialized.includes("secret-api-key"), false);
-  assert.equal(serialized.includes("secret-user-key"), false);
+  assert.equal(serialized.includes("test-api-key"), false);
+  assert.equal(serialized.includes("test-user-key"), false);
   assert.equal(serialized.includes("public-api.etoro.com"), false);
 });
 
 test("demo trade preview flag is explicit and public", async () => {
   const config = await loadEtoroConfig({
     env: {
-      ETORO_API_KEY: "api-key",
-      ETORO_USER_KEY: "user-key",
+      ETORO_API_KEY: "test-api-key",
+      ETORO_USER_KEY: "test-user-key",
       ENABLE_DEMO_TRADE_PREVIEW: "true",
     },
     readFile: async () => {
@@ -89,8 +89,8 @@ test("demo trade preview flag is explicit and public", async () => {
 test("read cache TTL is configurable without exposing secrets", async () => {
   const config = await loadEtoroConfig({
     env: {
-      ETORO_API_KEY: "api-key",
-      ETORO_USER_KEY: "user-key",
+      ETORO_API_KEY: "test-api-key",
+      ETORO_USER_KEY: "test-user-key",
       ETORO_READ_CACHE_TTL_MS: "30000",
     },
     readFile: async () => {
@@ -108,8 +108,8 @@ test("read cache TTL must be a positive integer", async () => {
   await assert.rejects(
     loadEtoroConfig({
       env: {
-        ETORO_API_KEY: "api-key",
-        ETORO_USER_KEY: "user-key",
+        ETORO_API_KEY: "test-api-key",
+        ETORO_USER_KEY: "test-user-key",
         ETORO_READ_CACHE_TTL_MS: "0",
       },
       readFile: async () => {
@@ -127,8 +127,8 @@ test("rejects non-HTTPS provider base URLs", async () => {
     loadEtoroConfig({
       env: {
         ETORO_API_BASE_URL: "http://public-api.etoro.com",
-        ETORO_API_KEY: "api-key",
-        ETORO_USER_KEY: "user-key",
+        ETORO_API_KEY: "test-api-key",
+        ETORO_USER_KEY: "test-user-key",
       },
       readFile: async () => {
         const error = new Error("missing");
@@ -145,8 +145,8 @@ test("rejects HTTPS provider base URLs outside the official host allow-list", as
     loadEtoroConfig({
       env: {
         ETORO_API_BASE_URL: "https://example.com",
-        ETORO_API_KEY: "api-key",
-        ETORO_USER_KEY: "user-key",
+        ETORO_API_KEY: "test-api-key",
+        ETORO_USER_KEY: "test-user-key",
       },
       readFile: async () => {
         const error = new Error("missing");

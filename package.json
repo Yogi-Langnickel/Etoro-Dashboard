@@ -9,6 +9,7 @@
   "scripts": {
     "check": "npm run lint && npm run typecheck && npm test",
     "lint": "node scripts/check-syntax.mjs",
+    "safety:public": "node scripts/check-public-safety.mjs",
     "start": "node src/server.mjs",
     "test": "node --test",
     "typecheck": "node scripts/check-syntax.mjs"
