@@ -83,6 +83,94 @@ test("demo PnL response is summarized and raw order details are not returned", a
   assert.equal(JSON.stringify(result).includes("instrumentId"), false);
 });
 
+test("demo portfolio response is aggregated by symbol without provider identifiers", async () => {
+  const result = await fetchReadOnlyEndpoint("demoPortfolio", {
+    credentials,
+    fetchImpl: async () => new Response(JSON.stringify({
+      clientPortfolio: {
+        positions: [
+          { instrumentId: 1, positionId: 10, instrumentSymbol: "AAPL", amount: 100, unrealizedPnL: 5 },
+          { instrumentId: 1, positionId: 11, instrumentSymbol: "AAPL", amount: 50, unrealizedPnL: -2 },
+          { instrumentId: 2, positionId: 12, amount: 25 },
+        ],
+      },
+    }), { status: 200 }),
+  });
+
+  assert.deepEqual(result.data.instruments, [{
+    symbol: "AAPL",
+    positionCount: 2,
+    investedUsd: 150,
+    unrealizedPnlUsd: 3,
+    valueStatus: "complete",
+  }]);
+  assert.equal(result.data.positionCount, 3);
+  assert.equal(result.data.omittedPositionCount, 1);
+  assert.equal(JSON.stringify(result).includes("instrumentId"), false);
+  assert.equal(JSON.stringify(result).includes("positionId"), false);
+});
+
+test("demo portfolio omits unsafe symbols and marks incomplete financial values", async () => {
+  const result = await fetchReadOnlyEndpoint("demoPortfolio", {
+    credentials,
+    fetchImpl: async () => new Response(JSON.stringify({
+      clientPortfolio: {
+        positions: [
+          { symbol: "<script>", amount: 50, unrealizedPnL: 1 },
+          { symbol: " msft ", amount: "not-a-number", unrealizedPnL: 2 },
+        ],
+      },
+    }), { status: 200 }),
+  });
+
+  assert.deepEqual(result.data.instruments, [{
+    symbol: "MSFT",
+    positionCount: 1,
+    investedUsd: null,
+    unrealizedPnlUsd: null,
+    valueStatus: "incomplete",
+  }]);
+  assert.equal(result.data.omittedPositionCount, 1);
+  assert.equal(result.data.incompleteValuePositionCount, 1);
+  assert.equal(JSON.stringify(result).includes("<script>"), false);
+});
+
+test("demo portfolio marks overflowing aggregate values as incomplete", async () => {
+  const result = await fetchReadOnlyEndpoint("demoPortfolio", {
+    credentials,
+    fetchImpl: async () => new Response(JSON.stringify({
+      clientPortfolio: {
+        positions: [
+          { symbol: "AAPL", amount: 1e308, unrealizedPnL: 1e308 },
+          { symbol: "AAPL", amount: 1e308, unrealizedPnL: 1e308 },
+        ],
+      },
+    }), { status: 200 }),
+  });
+
+  assert.deepEqual(result.data.instruments, [{
+    symbol: "AAPL",
+    positionCount: 2,
+    investedUsd: null,
+    unrealizedPnlUsd: null,
+    valueStatus: "incomplete",
+  }]);
+  assert.equal(result.data.incompleteValuePositionCount, 1);
+});
+
+test("demo portfolio rejects malformed position collections", async () => {
+  await assert.rejects(
+    fetchReadOnlyEndpoint("demoPortfolio", {
+      credentials,
+      fetchImpl: async () => new Response(JSON.stringify({
+        clientPortfolio: { positions: {} },
+      }), { status: 200 }),
+    }),
+    (error) => error instanceof EtoroApiError
+      && error.code === "ETORO_INVALID_DEMO_PORTFOLIO_RESPONSE",
+  );
+});
+
 test("demo PnL response supports the documented clientPortfolio wrapper", async () => {
   const result = await fetchReadOnlyEndpoint("demoPnl", {
     credentials,
@@ -187,7 +275,7 @@ test("read-only endpoint allow-list excludes mutation routes", async () => {
   const summary = readOnlyEndpointSummary();
   const serialized = JSON.stringify(summary).toLowerCase();
 
-  assert.deepEqual(Object.keys(READ_ONLY_ENDPOINTS).sort(), ["demoPnl", "identity"]);
+  assert.deepEqual(Object.keys(READ_ONLY_ENDPOINTS).sort(), ["demoPnl", "demoPortfolio", "identity"]);
   assert.equal(serialized.includes("order"), false);
   assert.equal(serialized.includes("trade"), false);
 
@@ -195,6 +283,50 @@ test("read-only endpoint allow-list excludes mutation routes", async () => {
     fetchReadOnlyEndpoint("placeOrder", { credentials, fetchImpl: async () => new Response("{}") }),
     (error) =>
       error instanceof EtoroApiError && error.code === "ETORO_ENDPOINT_NOT_ALLOWED",
+  );
+});
+
+test("429 responses carry a bounded Retry-After duration without exposing the header", async () => {
+  await assert.rejects(
+    fetchReadOnlyEndpoint("identity", {
+      credentials,
+      fetchImpl: async () => new Response("{}", {
+        status: 429,
+        headers: { "retry-after": "120" },
+      }),
+    }),
+    (error) => error instanceof EtoroApiError && error.retryAfterMs === 60_000,
+  );
+});
+
+test("429 Retry-After is honored even when the provider error body is not JSON", async () => {
+  await assert.rejects(
+    fetchReadOnlyEndpoint("identity", {
+      credentials,
+      fetchImpl: async () => new Response("rate limited", {
+        status: 429,
+        headers: { "retry-after": "7" },
+      }),
+    }),
+    (error) => error instanceof EtoroApiError
+      && error.code === "ETORO_PROVIDER_ERROR"
+      && error.retryAfterMs === 7_000
+      && !error.message.includes("rate limited"),
+  );
+});
+
+test("HTTP-date Retry-After uses the injected request clock", async () => {
+  const nowMs = Date.parse("2026-07-11T00:00:00.000Z");
+  await assert.rejects(
+    fetchReadOnlyEndpoint("identity", {
+      credentials,
+      now: () => nowMs,
+      fetchImpl: async () => new Response("rate limited", {
+        status: 429,
+        headers: { "retry-after": new Date(nowMs + 9_000).toUTCString() },
+      }),
+    }),
+    (error) => error instanceof EtoroApiError && error.retryAfterMs === 9_000,
   );
 });
 

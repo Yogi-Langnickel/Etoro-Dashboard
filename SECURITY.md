@@ -25,6 +25,10 @@ Do not file public issues with eToro API credentials, user keys, OAuth tokens, a
 ## Before Public Push Or Release
 
 - Run `npm audit --audit-level=moderate`.
+- Run `npm run safety:public` to reject tracked and untracked non-ignored
+  environment/credential files, private account artifacts, unreviewed binary
+  files, private keys, and high-confidence credential literals while allowing
+  explicit synthetic test fixtures and reviewed public design assets.
 - Run `npm run check`.
 - Review `git diff` for secrets, private financial data, screenshots, reports, and private fixtures.
 - Confirm `.env.local`, private exports, private reports, and screenshots are not staged.

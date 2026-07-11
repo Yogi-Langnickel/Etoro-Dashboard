@@ -151,6 +151,7 @@ test("server exposes only internal API routes and no execution routes", () => {
     "/api/etoro/status",
     "/api/etoro/identity",
     "/api/etoro/demo/pnl",
+    "/api/etoro/demo/portfolio",
     "/api/etoro/demo/trading/status",
     "/api/etoro/demo/trading/preview",
     "/api/etoro/bot/status",
@@ -1603,6 +1604,99 @@ test("read-only provider rate-limit failures use short backoff without exposing 
   assert.equal(second.json.cache.ttlMs, 2_000);
   assert.equal(second.text.includes("server-api-secret"), false);
   assert.equal(second.text.includes("server-user-secret"), false);
+});
+
+test("read-only provider honors a longer bounded provider backoff", async () => {
+  const config = await configuredConfig();
+  let nowMs = Date.parse("2026-07-11T00:00:00.000Z");
+  let fetchCount = 0;
+  const cache = createReadOnlyProviderCache({
+    ttlMs: 60_000,
+    failureBackoffMs: 2_000,
+    now: () => nowMs,
+  });
+
+  await assert.rejects(
+    cache.fetch("identity", config, async () => {
+      fetchCount += 1;
+      throw providerError("rate limited", {
+        code: "ETORO_PROVIDER_ERROR",
+        status: 429,
+        retryAfterMs: 12_000,
+      });
+    }),
+    (error) => error.cache?.ttlMs === 12_000,
+  );
+
+  nowMs += 11_999;
+  await assert.rejects(
+    cache.fetch("identity", config, async () => {
+      fetchCount += 1;
+    }),
+    (error) => error.cache?.state === "backoff",
+  );
+  assert.equal(fetchCount, 1);
+
+  nowMs += 1;
+  const recovered = await cache.fetch("identity", config, async () => {
+    fetchCount += 1;
+    return {
+      data: { authenticated: true },
+      provider: { endpoint: "identity" },
+    };
+  });
+  assert.equal(fetchCount, 2);
+  assert.equal(recovered.cache.state, "miss");
+
+  const boundedCache = createReadOnlyProviderCache({ ttlMs: 60_000, failureBackoffMs: 2_000 });
+  await assert.rejects(
+    boundedCache.fetch("identity", config, async () => {
+      throw providerError("rate limited", {
+        code: "ETORO_PROVIDER_ERROR",
+        status: 429,
+        retryAfterMs: 120_000,
+      });
+    }),
+    (error) => error.cache?.ttlMs === 60_000,
+  );
+});
+
+test("demo portfolio route dispatches only the read-only portfolio endpoint", async () => {
+  const requestedEndpoints = [];
+  const handler = createRequestHandler({
+    loadConfig: configuredConfig,
+    fetchEndpoint: async (endpointName) => {
+      requestedEndpoints.push(endpointName);
+      return {
+        data: {
+          currency: "USD",
+          positionCount: 0,
+          instrumentCount: 0,
+          omittedPositionCount: 0,
+          incompleteValuePositionCount: 0,
+          instruments: [],
+          providerUpdatedAt: null,
+        },
+        provider: {
+          endpoint: endpointName,
+          method: "GET",
+          path: "/api/v1/trading/info/demo/portfolio",
+          baseUrl: "https://public-api.etoro.com",
+          status: 200,
+          requestId: "synthetic-request",
+          receivedAt: new Date().toISOString(),
+        },
+      };
+    },
+  });
+
+  const response = await callHandler(handler, { url: "/api/etoro/demo/portfolio" });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(requestedEndpoints, ["demoPortfolio"]);
+  assert.equal(response.json.mode, "read-only");
+  assert.equal(response.json.provider.path, undefined);
+  assert.equal(response.text.includes("/api/v1/"), false);
 });
 
 test("read-only provider backoff errors never expose provider secrets or header names", async () => {
