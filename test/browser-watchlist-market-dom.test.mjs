@@ -70,9 +70,10 @@ class FakeDocument {
 }
 
 async function watchlistRenderer(document) {
+  const contractSource = await readFile(new URL("../src/browser-contracts.js", import.meta.url), "utf8");
   const appSource = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
   const source = appSource.slice(0, appSource.indexOf("function renderFixtureWatermark"));
-  return Function("document", `${source}; return {
+  return Function("document", `${contractSource}\n${source}; return {
     normalizeWatchlistViewPayload,
     normalizeMarketChartPayload,
     renderProviderWatchlist,

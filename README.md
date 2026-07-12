@@ -26,6 +26,19 @@ companyfacts normalizer. It exposes normalized coverage fields only and keeps
 live SEC fetching blocked until a server-side cache/rate-limit policy and SEC
 User-Agent contact value are configured.
 
+## Contract Boundaries
+
+- `src/server.mjs` owns HTTP dispatch, static allowlisting, and local mutation
+  controls; `src/market-views.mjs` composes exact-symbol watchlist, rate, and
+  chart DTOs behind that boundary.
+- `src/provider-read-cache.mjs` owns credential-separated in-memory caching,
+  request coalescing, bounded provider backoff, and public error redaction.
+- `src/browser-contracts.js` validates and derives portfolio, watchlist, and
+  chart values before `src/app.js` renders them. It contains no provider
+  requests or credentials and must load before the renderer.
+- `src/synthetic-fixture.mjs` owns the explicit fixture watermark shared by
+  planning-only server DTOs. Server modules are never statically served.
+
 ## Local Demo Credentials
 
 Do not paste eToro keys into chat or commit them to the repo. Store your demo/read credentials at `${HOME}/.config/etoro/credentials.json`:

@@ -80,10 +80,12 @@ async function readMoneyMakerContractSnapshot() {
 }
 
 async function readBrowserChartContracts() {
+  const contractJs = await readFile(new URL("../src/browser-contracts.js", import.meta.url), "utf8");
   const appJs = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
   const setupSource = appJs.slice(0, appJs.indexOf("function text("));
 
   return Function(`
+    ${contractJs}
     ${setupSource}
     return {
       portfolioChartFor,
@@ -502,6 +504,21 @@ test("browser bundle requests only normalized read-only portfolio, watchlist, an
   assert.equal(response.text.includes("instrumentIds="), false);
   assert.match(response.text, /Partial provider read/);
   assert.match(response.text, /existing rows are retained in memory only/);
+});
+
+test("browser contract bundle loads before rendering and contains no provider requests", async () => {
+  const [shell, contracts] = await Promise.all([
+    callHandler(configuredHandler(), { url: "/index.html" }),
+    callHandler(configuredHandler(), { url: "/browser-contracts.js" }),
+  ]);
+
+  assert.equal(shell.status, 200);
+  assert.ok(shell.text.indexOf("browser-contracts.js") < shell.text.indexOf("app.js"));
+  assert.equal(contracts.status, 200);
+  assert.equal(contracts.headers["content-type"], "text/javascript; charset=utf-8");
+  assert.match(contracts.text, /EtoroBrowserContracts/);
+  assert.equal(contracts.text.includes("/api/"), false);
+  assert.equal(contracts.text.includes("instrumentIds="), false);
 });
 
 test("offline browser launcher denies provider capability despite ambient credentials", async () => {
@@ -2289,8 +2306,9 @@ test("malformed URL paths return a controlled not-found response", async () => {
 });
 
 test("server-side modules are not served as static browser assets", async () => {
-  const response = await callHandler(createRequestHandler(), { url: "/server.mjs" });
-
-  assert.equal(response.status, 404);
-  assert.equal(response.json.error.code, "NOT_FOUND");
+  for (const url of ["/server.mjs", "/provider-read-cache.mjs", "/market-views.mjs", "/synthetic-fixture.mjs"]) {
+    const response = await callHandler(createRequestHandler(), { url });
+    assert.equal(response.status, 404, url);
+    assert.equal(response.json.error.code, "NOT_FOUND", url);
+  }
 });
