@@ -7,7 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "check": "npm run lint && npm run typecheck && npm test",
+    "check": "npm run lint && npm run typecheck && npm run contract:check && npm test",
+    "contract:check": "node scripts/check-money-maker-contract.mjs",
     "lint": "node scripts/check-syntax.mjs",
     "safety:public": "node scripts/check-public-safety.mjs",
     "start": "node src/server.mjs",
