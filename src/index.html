@@ -754,7 +754,7 @@
               <p class="eyebrow">Read-only watchlist</p>
               <h2 id="watchlist-table-title">Watchlist items</h2>
             </div>
-            <span class="pill lock" id="research-watermark-state">Synthetic fixture</span>
+            <span class="pill lock" id="watchlist-provider-state">Synthetic fixture</span>
             <span class="pill lock">Read only</span>
           </div>
           <div class="period-controls" aria-label="Watchlist performance period">
@@ -777,7 +777,7 @@
                   <th>Source state</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="watchlist-table-body">
                 <tr class="watchlist-row active" data-watchlist-row tabindex="0" data-watchlist-symbol="AAPL">
                   <td><strong>AAPL</strong></td>
                   <td>Apple Inc.</td>
@@ -823,7 +823,7 @@
             </div>
             <span class="pill warn" id="watchlist-selected-period-pill">24h</span>
           </div>
-          <div class="chart-shell" role="img" aria-label="Selected watchlist chart using synthetic values">
+          <div class="chart-shell" id="watchlist-chart-shell" role="img" aria-label="Selected watchlist chart using synthetic values">
             <div class="chart-grid" aria-hidden="true"></div>
             <svg viewBox="0 0 640 260" preserveAspectRatio="none" aria-hidden="true">
               <polyline id="watchlist-performance-line" points="0,204 64,190 128,198 192,166 256,174 320,140 384,128 448,102 512,112 576,84 640,74"></polyline>
@@ -832,9 +832,10 @@
           </div>
           <div class="chart-meta">
             <span id="watchlist-chart-period-label">Selected period: 24h</span>
-            <span>Source: synthetic fixture</span>
+            <span id="watchlist-chart-source">Source: synthetic fixture</span>
+            <span id="watchlist-chart-freshness">Freshness: synthetic</span>
             <span>No browser credentials</span>
-            <span>No account identifiers</span>
+            <span>No account identifiers or provider identifiers</span>
           </div>
         </section>
 
@@ -876,7 +877,7 @@
               <p class="eyebrow">Research context</p>
               <h2 id="watchlist-source-title">Source policy</h2>
             </div>
-            <span class="pill lock">No live fetch</span>
+            <span class="pill lock" id="watchlist-source-policy">Provider disconnected</span>
           </div>
           <ul class="readiness-list">
             <li>

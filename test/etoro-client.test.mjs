@@ -135,6 +135,102 @@ test("demo portfolio omits unsafe symbols and marks incomplete financial values"
   assert.equal(JSON.stringify(result).includes("<script>"), false);
 });
 
+test("default watchlist normalizes instrument items while keeping provider ids internal", async () => {
+  const result = await fetchReadOnlyEndpoint("defaultWatchlist", {
+    credentials,
+    fetchImpl: async (url) => {
+      assert.equal(url.pathname, "/api/v1/watchlists/default-watchlists/items");
+      assert.equal(url.searchParams.get("itemsLimit"), "100");
+      return new Response(JSON.stringify([
+        { itemId: 101, itemType: "Instrument", itemRank: 2, market: { symbolName: " aapl ", displayName: "Apple Inc." } },
+        { itemId: 202, itemType: "Person", itemRank: 1, market: { symbolName: "PERSON" } },
+        { itemId: 303, itemType: "Instrument", itemRank: 3, market: { symbolName: "<script>" } },
+      ]), { status: 200 });
+    },
+  });
+
+  assert.deepEqual(result.data, {
+    items: [{ instrumentId: 101, symbol: "AAPL", displayName: "Apple Inc.", rank: 2 }],
+    omittedItemCount: 2,
+  });
+});
+
+test("instrument search uses an exact symbol filter and rejects partial-only matches", async () => {
+  let requestUrl;
+  const exact = await fetchReadOnlyEndpoint("instrumentSearch", {
+    credentials,
+    params: { symbol: "AAPL" },
+    fetchImpl: async (url) => {
+      requestUrl = url;
+      return new Response(JSON.stringify({ items: [
+        { instrumentId: 101, internalSymbolFull: "AAPL.L", displayname: "Partial" },
+        { instrumentId: 102, internalSymbolFull: "AAPL", displayname: "Apple Inc." },
+      ] }), { status: 200 });
+    },
+  });
+  assert.equal(requestUrl.searchParams.get("internalSymbolFull"), "AAPL");
+  assert.equal(requestUrl.searchParams.get("fields"), "instrumentId,internalSymbolFull,displayname,marketId");
+  assert.deepEqual(exact.data, { instrumentId: 102, symbol: "AAPL", displayName: "Apple Inc." });
+
+  await assert.rejects(() => fetchReadOnlyEndpoint("instrumentSearch", {
+    credentials,
+    params: { symbol: "AAPL" },
+    fetchImpl: async () => new Response(JSON.stringify({ items: [
+      { instrumentId: 101, internalSymbolFull: "AAPL.L" },
+    ] }), { status: 200 }),
+  }), (error) => error.code === "ETORO_SYMBOL_NOT_FOUND" && error.status === 404);
+});
+
+test("market rates batch ids and normalize only finite timestamped rows", async () => {
+  let requestUrl;
+  const result = await fetchReadOnlyEndpoint("marketRates", {
+    credentials,
+    params: { instrumentIds: [101, 202] },
+    fetchImpl: async (url) => {
+      requestUrl = url;
+      return new Response(JSON.stringify({ rates: [
+        { instrumentID: 101, bid: 190, ask: 191, lastExecution: 190.5, date: "2026-07-12T01:00:00Z", priceRateID: 999 },
+        { instrumentID: 202, bid: "bad", ask: 5, date: "2026-07-12T01:00:00Z" },
+      ] }), { status: 200 });
+    },
+  });
+  assert.equal(requestUrl.searchParams.get("instrumentIds"), "101,202");
+  assert.deepEqual(result.data.rates, [{
+    instrumentId: 101,
+    bid: 190,
+    ask: 191,
+    lastExecution: 190.5,
+    updatedAt: "2026-07-12T01:00:00.000Z",
+  }]);
+  assert.equal(JSON.stringify(result.data).includes("priceRateID"), false);
+});
+
+test("market candles normalize ordered close-only chart points", async () => {
+  const result = await fetchReadOnlyEndpoint("marketCandles", {
+    credentials,
+    params: { instrumentId: 101, direction: "asc", interval: "OneHour", candlesCount: 24 },
+    fetchImpl: async (url) => {
+      assert.equal(url.pathname, "/api/v1/market-data/instruments/101/history/candles/asc/OneHour/24");
+      return new Response(JSON.stringify({ interval: "OneHour", candles: [{
+        instrumentId: 101,
+        candles: [
+          { instrumentID: 101, fromDate: "2026-07-12T00:00:00Z", open: 9, high: 12, low: 8, close: 10, volume: 5 },
+          { instrumentID: 101, fromDate: "2026-07-12T01:00:00Z", open: 10, high: 13, low: 9, close: 11, volume: 6 },
+        ],
+      }] }), { status: 200 });
+    },
+  });
+  assert.deepEqual(result.data, {
+    interval: "OneHour",
+    points: [
+      { at: "2026-07-12T00:00:00.000Z", close: 10 },
+      { at: "2026-07-12T01:00:00.000Z", close: 11 },
+    ],
+  });
+  assert.equal(JSON.stringify(result.data).includes("instrumentId"), false);
+  assert.equal(JSON.stringify(result.data).includes("volume"), false);
+});
+
 test("demo portfolio marks overflowing aggregate values as incomplete", async () => {
   const result = await fetchReadOnlyEndpoint("demoPortfolio", {
     credentials,
@@ -275,7 +371,16 @@ test("read-only endpoint allow-list excludes mutation routes", async () => {
   const summary = readOnlyEndpointSummary();
   const serialized = JSON.stringify(summary).toLowerCase();
 
-  assert.deepEqual(Object.keys(READ_ONLY_ENDPOINTS).sort(), ["demoPnl", "demoPortfolio", "identity"]);
+  assert.deepEqual(Object.keys(READ_ONLY_ENDPOINTS).sort(), [
+    "defaultWatchlist",
+    "demoPnl",
+    "demoPortfolio",
+    "identity",
+    "instrumentSearch",
+    "marketCandles",
+    "marketRates",
+  ]);
+  assert.equal(Object.values(READ_ONLY_ENDPOINTS).every(({ method }) => method === "GET"), true);
   assert.equal(serialized.includes("order"), false);
   assert.equal(serialized.includes("trade"), false);
 

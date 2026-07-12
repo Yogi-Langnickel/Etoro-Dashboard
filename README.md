@@ -4,7 +4,17 @@ Security-first dashboard for viewing and interacting with eToro API data.
 
 ## Status
 
-First local integration slice is in progress. The dashboard can run through a local Node server that keeps eToro credentials server-side, exposes normalized demo/account summaries to the browser, includes a gated demo trading tab with no execution routes yet, caches read-only provider responses briefly, applies short backoff metadata for 429, timeout, and 5xx provider failures, and lazy-loads inactive tab status data to avoid duplicate refresh calls.
+The local read-only dashboard keeps eToro credentials server-side, exposes
+normalized demo portfolio and default-watchlist views to the browser, resolves
+market symbols by verified exact match, batches current-rate reads, and loads
+selected-period close-price charts. It includes a gated demo trading tab with
+no execution routes, briefly caches provider responses, applies short backoff
+metadata for provider failures, and lazy-loads inactive tabs.
+
+Browser watchlist and market DTOs never include provider instrument, watchlist,
+price-rate, account, position, or order identifiers. Partial rate failures and
+failed chart reads remain explicit; the browser does not silently substitute
+fixture charts for failed provider market data.
 
 The dashboard does not durably store account-linked provider data. Short
 in-memory cache/backoff metadata is allowed for freshness and rate-limit
@@ -73,9 +83,9 @@ Simulation bot controls are stored server-side at `${HOME}/.config/etoro-dashboa
 Start with a read-only dashboard:
 
 1. API health and credential validation.
-1. Watchlists and instrument lookup.
 1. Portfolio snapshot and P/L views.
-1. Market data charts.
+1. Read-only default watchlist, exact instrument lookup, and batched rates.
+1. Selected-period market charts.
 1. Audit-safe export/reporting.
 1. Trading actions only after read-only flows, security checks, and confirmation UX are stable.
 

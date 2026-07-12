@@ -14,6 +14,9 @@ let selectedPortfolioPeriod = "24h";
 let portfolioDataSource = "fixture";
 let selectedWatchlistSymbol = "AAPL";
 let selectedWatchlistPeriod = "24h";
+let watchlistDataSource = "fixture";
+let watchlistChartRequestSequence = 0;
+const watchlistItemsBySymbol = new Map();
 
 const portfolioPeriodChanges = {
   BTC: {
@@ -312,6 +315,97 @@ function normalizePortfolioViewPayload(payload) {
       ttlMs: cache.ttlMs,
     },
   };
+}
+
+const watchlistForbiddenKeys = /^(?:account|position|order|instrument|cid|gcId|item|priceRate|rawPayload|providerPayload)(?:Id|Ids|ID|IDs)?$/i;
+
+function containsForbiddenWatchlistKey(value) {
+  if (Array.isArray(value)) return value.some(containsForbiddenWatchlistKey);
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, child]) =>
+    watchlistForbiddenKeys.test(key) || containsForbiddenWatchlistKey(child));
+}
+
+function normalizeReadCache(cache, message) {
+  if (!cache || !hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs"]) ||
+    !portfolioCacheStates.has(cache.state) || !isIsoInstant(cache.cachedAt) || !isIsoInstant(cache.expiresAt) ||
+    !Number.isInteger(cache.ttlMs) || cache.ttlMs <= 0 || cache.ttlMs > 300_000 ||
+    Date.parse(cache.expiresAt) - Date.parse(cache.cachedAt) !== cache.ttlMs) {
+    throw new Error(message);
+  }
+  return { state: cache.state, cachedAt: cache.cachedAt, expiresAt: cache.expiresAt, ttlMs: cache.ttlMs };
+}
+
+function normalizeWatchlistViewPayload(payload) {
+  const data = payload?.data;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) || containsForbiddenWatchlistKey(payload) ||
+    !data || !hasExactKeys(data, [
+      "source", "itemCount", "omittedItemCount", "unavailableRateCount", "providerState", "partialFailure", "items",
+    ]) || data.source !== "provider-default-watchlist" || !["complete", "partial"].includes(data.providerState) ||
+    !Array.isArray(data.items) || data.items.length > 100 || !Number.isInteger(data.itemCount) || data.itemCount < 0 ||
+    !Number.isInteger(data.omittedItemCount) || data.omittedItemCount < 0 ||
+    !Number.isInteger(data.unavailableRateCount) || data.unavailableRateCount < 0 ||
+    (data.partialFailure !== null && (!hasExactKeys(data.partialFailure, ["component", "state"]) ||
+      data.partialFailure.component !== "rates" || data.partialFailure.state !== "unavailable"))) {
+    throw new Error("Watchlist data is unavailable.");
+  }
+
+  const symbols = new Set();
+  const items = data.items.map((item) => {
+    if (!item || !hasExactKeys(item, [
+      "symbol", "displayName", "rank", "bid", "ask", "lastExecution", "rateUpdatedAt", "rateStatus",
+    ]) || typeof item.symbol !== "string" || !/^[A-Z0-9][A-Z0-9._:/-]{0,31}$/.test(item.symbol) ||
+      symbols.has(item.symbol) || typeof item.displayName !== "string" || !item.displayName.trim() ||
+      item.displayName.length > 120 || !Number.isInteger(item.rank) || item.rank < 0 ||
+      !["available", "unavailable"].includes(item.rateStatus)) {
+      throw new Error("Watchlist data is unavailable.");
+    }
+    symbols.add(item.symbol);
+    const available = item.rateStatus === "available";
+    const numericValues = [item.bid, item.ask];
+    if ((available && (!numericValues.every((value) => Number.isFinite(value) && value >= 0) ||
+      (item.lastExecution !== null && (!Number.isFinite(item.lastExecution) || item.lastExecution < 0)) ||
+      !isIsoInstant(item.rateUpdatedAt))) ||
+      (!available && (item.bid !== null || item.ask !== null || item.lastExecution !== null || item.rateUpdatedAt !== null))) {
+      throw new Error("Watchlist data is unavailable.");
+    }
+    return { ...item, displayName: item.displayName.trim() };
+  });
+  const unavailable = items.filter(({ rateStatus }) => rateStatus === "unavailable").length;
+  if (items.length !== data.itemCount || unavailable !== data.unavailableRateCount ||
+    (data.providerState === "complete" && (unavailable > 0 || data.partialFailure !== null))) {
+    throw new Error("Watchlist data is unavailable.");
+  }
+  return {
+    items,
+    omittedItemCount: data.omittedItemCount,
+    unavailableRateCount: data.unavailableRateCount,
+    providerState: data.providerState,
+    partialFailure: data.partialFailure,
+    cache: normalizeReadCache(payload.cache, "Watchlist data is unavailable."),
+  };
+}
+
+function normalizeMarketChartPayload(payload, expectedSymbol, expectedPeriod) {
+  const data = payload?.data;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) || containsForbiddenWatchlistKey(payload) ||
+    !data || !hasExactKeys(data, [
+      "symbol", "displayName", "resolution", "period", "interval", "pointCount", "changePercent", "providerUpdatedAt", "points",
+    ]) || data.symbol !== expectedSymbol || data.period !== expectedPeriod || data.resolution !== "exact" ||
+    typeof data.displayName !== "string" || !data.displayName.trim() || data.displayName.length > 120 ||
+    typeof data.interval !== "string" || !Array.isArray(data.points) || data.points.length < 1 || data.points.length > 1000 ||
+    data.pointCount !== data.points.length || (data.changePercent !== null && !Number.isFinite(data.changePercent)) ||
+    !isIsoInstant(data.providerUpdatedAt)) {
+    throw new Error("Market chart data is unavailable.");
+  }
+  const points = data.points.map((point, index) => {
+    if (!point || !hasExactKeys(point, ["at", "close"]) || !isIsoInstant(point.at) ||
+      !Number.isFinite(point.close) || point.close < 0 || (index > 0 && point.at <= data.points[index - 1].at)) {
+      throw new Error("Market chart data is unavailable.");
+    }
+    return { at: point.at, close: point.close };
+  });
+  return { ...data, displayName: data.displayName.trim(), points, cache: normalizeReadCache(payload.cache, "Market chart data is unavailable.") };
 }
 
 function portfolioTotalsFor(instruments) {
@@ -845,7 +939,193 @@ function bindPortfolioRow(row) {
   });
 }
 
+function bindWatchlistRow(row) {
+  row.addEventListener("click", () => selectWatchlistInstrument(row));
+  row.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectWatchlistInstrument(row);
+    }
+  });
+}
+
+function watchlistPrice(item) {
+  if (item.rateStatus !== "available") return "Unavailable";
+  const value = item.lastExecution ?? ((item.bid + item.ask) / 2);
+  return money(value);
+}
+
+function appendWatchlistCell(row, value, className) {
+  const cell = document.createElement("td");
+  cell.textContent = value;
+  if (className) cell.className = className;
+  row.append(cell);
+  return cell;
+}
+
+function marketChartSvgPoints(points) {
+  const values = points.map(({ close }) => close);
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const range = high - low;
+  return points.map(({ close }, index) => {
+    const x = points.length === 1 ? 320 : (index / (points.length - 1)) * 640;
+    const y = range === 0 ? 130 : 20 + ((high - close) / range) * 220;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(" ");
+}
+
+function renderProviderWatchlist(payload, { refreshChart = true } = {}) {
+  const view = normalizeWatchlistViewPayload(payload);
+  const body = document.getElementById("watchlist-table-body");
+  if (!body) return view;
+
+  watchlistDataSource = "provider-normalized";
+  watchlistItemsBySymbol.clear();
+  body.replaceChildren();
+  for (const item of view.items) {
+    watchlistItemsBySymbol.set(item.symbol, item);
+    const row = document.createElement("tr");
+    row.className = "watchlist-row";
+    row.tabIndex = 0;
+    row.dataset.watchlistRow = "";
+    row.dataset.watchlistSymbol = item.symbol;
+
+    const symbolCell = document.createElement("td");
+    const symbol = document.createElement("strong");
+    symbol.textContent = item.symbol;
+    symbolCell.append(symbol);
+    row.append(symbolCell);
+    appendWatchlistCell(row, item.displayName);
+    appendWatchlistCell(row, watchlistPrice(item));
+    const periodCell = appendWatchlistCell(row, "Unavailable", "neutral-text");
+    periodCell.dataset.watchlistPeriodValue = "";
+    const freshnessCell = document.createElement("td");
+    const freshness = document.createElement("span");
+    freshness.className = item.rateStatus === "available" ? "pill ok" : "pill warn";
+    freshness.textContent = item.rateUpdatedAt ?? "Rate unavailable";
+    freshnessCell.append(freshness);
+    row.append(freshnessCell);
+    appendWatchlistCell(row, item.rateStatus === "available" ? "Provider normalized" : "Partial provider read");
+    bindWatchlistRow(row);
+    body.append(row);
+  }
+
+  if (view.items.length === 0) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.setAttribute("colspan", "6");
+    cell.textContent = "No instrument items were returned by the default watchlist.";
+    row.append(cell);
+    body.append(row);
+  }
+
+  const rows = [...body.querySelectorAll("[data-watchlist-row]")];
+  const selected = rows.find((row) => row.dataset.watchlistSymbol === selectedWatchlistSymbol) ?? rows[0];
+  if (selected) {
+    selectedWatchlistSymbol = selected.dataset.watchlistSymbol;
+    selected.classList.add("active");
+  }
+  const state = document.getElementById("watchlist-provider-state");
+  if (state) {
+    state.textContent = view.providerState === "complete" ? "Provider complete" : "Provider partial";
+    state.classList.toggle("lock", false);
+    state.classList.toggle("warn", view.providerState === "partial");
+    state.classList.toggle("ok", view.providerState === "complete");
+  }
+  text("watchlist-chart-source", `Source: provider ${labelize(view.cache.state)}`);
+  text("watchlist-chart-freshness", `Cached: ${view.cache.cachedAt}`);
+  text("research-watchlists-state", "Provider default watchlist");
+  text("research-instruments-state", "Exact-symbol provider lookup");
+  text("watchlist-source-policy", "Read-only provider fetch");
+  renderAudit(
+    "Default watchlist loaded",
+    `${view.items.length} normalized instruments; ${view.omittedItemCount} omitted; ${view.unavailableRateCount} rates unavailable`,
+    "research-audit-list",
+  );
+  if (refreshChart) updateWatchlistPeriod(selectedWatchlistPeriod);
+  return view;
+}
+
+function renderWatchlistReadFailure() {
+  const retained = watchlistDataSource === "provider-normalized";
+  const state = document.getElementById("watchlist-provider-state");
+  if (state) {
+    state.textContent = retained ? "Provider rows stale" : "Watchlist unavailable";
+    state.classList.add("warn");
+    state.classList.remove("ok");
+  }
+  text("watchlist-chart-freshness", retained ? "Freshness: stale; in-memory rows retained" : "Freshness: unavailable");
+  text("watchlist-source-policy", retained ? "Provider read stale" : "Provider unavailable");
+  renderAudit(
+    "Watchlist read unavailable",
+    retained ? "Existing normalized rows remain in memory only" : "No account-linked watchlist data was retained",
+    "research-audit-list",
+  );
+}
+
+function renderMarketChart(payload, expectedSymbol, expectedPeriod) {
+  const chart = normalizeMarketChartPayload(payload, expectedSymbol, expectedPeriod);
+  const svgPoints = marketChartSvgPoints(chart.points);
+  setChartPath("watchlist-performance-line", "watchlist-performance-area", svgPoints);
+  text("watchlist-chart-title", `${chart.symbol} selected-period market chart`);
+  text("watchlist-chart-period-label", `${periodLabel(chart.period)} · ${chart.interval} · ${chart.pointCount} points`);
+  text("watchlist-chart-source", `Source: provider normalized · ${signedPercent(chart.changePercent)}`);
+  text("watchlist-chart-freshness", `Provider updated: ${chart.providerUpdatedAt}`);
+  text("watchlist-context-title", chart.displayName);
+  text("watchlist-context-source", "Exact-symbol eToro market data");
+  text("watchlist-context-freshness", chart.providerUpdatedAt);
+  text("watchlist-context-detail", "Selected-period close prices are informational only and cannot trigger orders.");
+  document.getElementById("watchlist-chart-shell")?.setAttribute(
+    "aria-label",
+    `${chart.symbol} ${periodLabel(chart.period)} normalized provider close-price chart`,
+  );
+  const selectedRow = [...document.querySelectorAll("[data-watchlist-row]")]
+    .find((row) => row.dataset.watchlistSymbol === chart.symbol);
+  const periodCell = selectedRow?.querySelector("[data-watchlist-period-value]");
+  if (periodCell) {
+    const value = signedPercent(chart.changePercent);
+    periodCell.textContent = value;
+    periodCell.classList.remove("good-text", "bad-text", "neutral-text");
+    periodCell.classList.add(signedClass(value));
+  }
+  return chart;
+}
+
+async function refreshSelectedWatchlistMarket() {
+  const requestSequence = ++watchlistChartRequestSequence;
+  const symbol = selectedWatchlistSymbol;
+  const period = selectedWatchlistPeriod;
+  text("watchlist-chart-title", `${symbol} market chart loading`);
+  text("watchlist-chart-period-label", `Selected period: ${periodLabel(period)} · loading`);
+  document.getElementById("watchlist-performance-line")?.setAttribute("points", "");
+  document.getElementById("watchlist-performance-area")?.setAttribute("d", "");
+  try {
+    const payload = await getJson(`/api/etoro/market/chart?symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(period)}`);
+    if (requestSequence !== watchlistChartRequestSequence || symbol !== selectedWatchlistSymbol || period !== selectedWatchlistPeriod) return;
+    renderMarketChart(payload, symbol, period);
+  } catch {
+    if (requestSequence !== watchlistChartRequestSequence) return;
+    text("watchlist-chart-title", `${symbol} market chart unavailable`);
+    text("watchlist-chart-period-label", `Selected period: ${periodLabel(period)} · unavailable`);
+    text("watchlist-chart-freshness", "Freshness: unavailable; no fixture substitution");
+    text("watchlist-context-source", "Provider market read unavailable");
+  }
+}
+
 function renderSelectedWatchlistInstrument() {
+  if (watchlistDataSource === "provider-normalized") {
+    if (!watchlistItemsBySymbol.has(selectedWatchlistSymbol)) {
+      watchlistChartRequestSequence += 1;
+      text("watchlist-chart-title", "No watchlist instrument selected");
+      text("watchlist-chart-period-label", "Selected-period market data unavailable");
+      document.getElementById("watchlist-performance-line")?.setAttribute("points", "");
+      document.getElementById("watchlist-performance-area")?.setAttribute("d", "");
+      return;
+    }
+    void refreshSelectedWatchlistMarket();
+    return;
+  }
   const context = watchlistContextReceipts[selectedWatchlistSymbol] ?? watchlistContextReceipts.AAPL;
 
   text("watchlist-chart-title", `${selectedWatchlistSymbol} watchlist chart`);
@@ -874,7 +1154,9 @@ function updateWatchlistPeriod(period) {
 
   document.querySelectorAll("[data-watchlist-row]").forEach((row) => {
     const symbol = row.dataset.watchlistSymbol;
-    const value = watchlistPeriodChanges[symbol]?.[period] ?? "0.0%";
+    const value = watchlistDataSource === "provider-normalized"
+      ? "Unavailable"
+      : watchlistPeriodChanges[symbol]?.[period] ?? "0.0%";
     const target = row.querySelector("[data-watchlist-period-value]");
 
     if (target) {
@@ -1386,7 +1668,6 @@ function renderResearchStatus(payload) {
   const fieldsTarget = document.getElementById("research-fields");
   const providerTarget = document.getElementById("research-provider-readiness");
 
-  renderFixtureWatermark("research-watermark-state", payload.fixtureWatermark);
   text("research-watchlists-state", labelize(sources.watchlists));
   text("research-instruments-state", labelize(sources.instruments));
   text("research-news-state", labelize(sources.marketNews));
@@ -1559,13 +1840,25 @@ function renderResearchStatus(payload) {
 }
 
 async function refreshResearchStatus() {
-  try {
-    const status = await getJson("/api/etoro/research/status");
-    renderResearchStatus(status);
-  } catch (error) {
+  const [researchResult, watchlistResult] = await Promise.allSettled([
+    getJson("/api/etoro/research/status"),
+    getJson("/api/etoro/watchlist/default"),
+  ]);
+  if (researchResult.status === "fulfilled") {
+    renderResearchStatus(researchResult.value);
+  } else {
     text("research-watchlists-state", "Unavailable");
     text("research-instruments-state", "Unavailable");
-    renderAudit("Research desk failed", error.message, "research-audit-list");
+    renderAudit("Research desk failed", "Research status is unavailable", "research-audit-list");
+  }
+  if (watchlistResult.status === "fulfilled") {
+    try {
+      renderProviderWatchlist(watchlistResult.value);
+    } catch {
+      renderWatchlistReadFailure();
+    }
+  } else {
+    renderWatchlistReadFailure();
   }
 }
 
@@ -1802,13 +2095,7 @@ document.querySelectorAll("[data-instrument-row]").forEach((row) => {
   bindPortfolioRow(row);
 });
 document.querySelectorAll("[data-watchlist-row]").forEach((row) => {
-  row.addEventListener("click", () => selectWatchlistInstrument(row));
-  row.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      selectWatchlistInstrument(row);
-    }
-  });
+  bindWatchlistRow(row);
 });
 updatePortfolioPeriod("24h");
 updateWatchlistPeriod("24h");
