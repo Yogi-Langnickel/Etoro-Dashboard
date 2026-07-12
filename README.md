@@ -62,6 +62,10 @@ npm run start:offline
 
 Then open `http://localhost:4173`. The app also accepts `ETORO_CREDENTIALS_FILE` if you want a different credential path.
 
+The server is intentionally loopback-only. Setting `HOST` to a LAN or public
+address fails closed because account-linked portfolio and watchlist reads do
+not yet have an authentication or secure-session boundary.
+
 Set `ENABLE_DEMO_TRADE_PREVIEW=true` only when you want the local server to validate and preview demo tickets. Preview responses are redacted and still do not place orders.
 
 Set `ETORO_READ_CACHE_TTL_MS` if local read-only provider calls need a different short success-cache window. The default is `15000` milliseconds and the maximum is `300000` milliseconds. Provider 429, timeout, and 5xx failures are negative-cached for a short server-memory backoff so repeated local refreshes do not storm the provider.

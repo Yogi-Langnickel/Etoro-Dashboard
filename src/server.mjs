@@ -67,6 +67,16 @@ const MARKET_PERIODS = Object.freeze({
   max: Object.freeze({ interval: "OneWeek", candlesCount: 1000 }),
 });
 
+export function resolveDashboardHost(value) {
+  const host = typeof value === "string" && value.trim() ? value.trim().toLowerCase() : "127.0.0.1";
+  if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(host)) {
+    const error = new Error("Dashboard host must remain loopback-only until authentication and secure sessions are implemented.");
+    error.code = "ETORO_NON_LOOPBACK_HOST_BLOCKED";
+    throw error;
+  }
+  return host === "[::1]" ? "::1" : host;
+}
+
 const PLANNED_DEMO_TRADING_ENDPOINTS = Object.freeze({
   marketOpenByAmount: Object.freeze({
     method: "POST",
@@ -1880,7 +1890,7 @@ export function createServer(options = {}) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT) || DEFAULT_PORT;
-  const host = process.env.HOST || "127.0.0.1";
+  const host = resolveDashboardHost(process.env.HOST);
   const server = createServer();
 
   server.listen(port, host, () => {

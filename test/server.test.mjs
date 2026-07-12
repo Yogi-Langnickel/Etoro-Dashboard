@@ -26,6 +26,7 @@ import {
   INTERNAL_API_ROUTES,
   createReadOnlyProviderCache,
   createRequestHandler,
+  resolveDashboardHost,
 } from "../src/server.mjs";
 import {
   denyOfflineProviderFetch,
@@ -180,6 +181,14 @@ test("server exposes only internal API routes and no execution routes", () => {
   assert.equal(serialized.includes("execution"), false);
   assert.equal(serialized.includes("market-open"), false);
   assert.equal(serialized.includes("market-close"), false);
+});
+
+test("dashboard host remains loopback-only until authentication exists", () => {
+  assert.equal(resolveDashboardHost(undefined), "127.0.0.1");
+  assert.equal(resolveDashboardHost(" localhost "), "localhost");
+  assert.equal(resolveDashboardHost("[::1]"), "::1");
+  assert.throws(() => resolveDashboardHost("0.0.0.0"), /loopback-only/);
+  assert.throws(() => resolveDashboardHost("192.168.1.20"), /loopback-only/);
 });
 
 test("bot monitoring status is read-only, disabled, and redacted", async () => {
