@@ -181,6 +181,7 @@ test("selected-period market chart renders normalized close points without ident
   assert.equal(chart.resolution, "exact");
   assert.match(document.getElementById("watchlist-performance-line").attributes.points, /^0\.00,240\.00/);
   assert.match(document.getElementById("watchlist-chart-period-label").textContent, /FourHours · 3 points/);
+  assert.equal(document.getElementById("watchlist-selected-period-pill").textContent, "1w");
   assert.equal(document.querySelectorAll("[data-watchlist-row]")[0].children[3].textContent, "+5.00%");
   assert.equal([...document.elements.values()].map(renderedText).join(" ").includes("hidden-request"), false);
 });

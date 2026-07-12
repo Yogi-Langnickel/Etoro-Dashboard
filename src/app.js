@@ -1087,6 +1087,7 @@ function renderMarketChart(payload, expectedSymbol, expectedPeriod) {
   const svgPoints = marketChartSvgPoints(chart.points);
   setChartPath("watchlist-performance-line", "watchlist-performance-area", svgPoints);
   text("watchlist-chart-title", `${chart.symbol} selected-period market chart`);
+  text("watchlist-selected-period-pill", periodLabel(chart.period));
   text("watchlist-chart-period-label", `${periodLabel(chart.period)} · ${chart.interval} · ${chart.pointCount} points`);
   text("watchlist-chart-source", `Source: provider normalized · ${signedPercent(chart.changePercent)}`);
   text("watchlist-chart-freshness", `Provider updated: ${chart.providerUpdatedAt}`);
@@ -1114,6 +1115,7 @@ async function refreshSelectedWatchlistMarket() {
   const requestSequence = ++watchlistChartRequestSequence;
   const symbol = selectedWatchlistSymbol;
   const period = selectedWatchlistPeriod;
+  text("watchlist-selected-period-pill", periodLabel(period));
   text("watchlist-chart-title", `${symbol} market chart loading`);
   text("watchlist-chart-period-label", `Selected period: ${periodLabel(period)} · loading`);
   document.getElementById("watchlist-performance-line")?.setAttribute("points", "");
