@@ -34,10 +34,16 @@ User-Agent contact value are configured.
 - `src/provider-read-cache.mjs` owns credential-separated in-memory caching,
   request coalescing, bounded provider backoff, and public error redaction.
 - `src/browser-contracts.js` validates and derives portfolio, watchlist, and
-  chart values before `src/app.js` renders them. It contains no provider
-  requests or credentials and must load before the renderer.
+  chart values before `src/app.js` renders them. `src/browser-fixtures.js`
+  separately owns synthetic tab data. Neither bundle contains provider
+  requests or credentials, and both load before the renderer.
 - `src/synthetic-fixture.mjs` owns the explicit fixture watermark shared by
-  planning-only server DTOs. Server modules are never statically served.
+  planning-only server DTOs. `src/planning-status.mjs` owns the synthetic bot,
+  risk, and research status composition. Server modules are never statically
+  served.
+- `src/trade-preview.mjs` owns non-executing ticket validation and preview
+  policy; `src/server.mjs` retains local request checks, bounded body parsing,
+  and response dispatch. No provider mutation is introduced by this split.
 
 ## Local Demo Credentials
 

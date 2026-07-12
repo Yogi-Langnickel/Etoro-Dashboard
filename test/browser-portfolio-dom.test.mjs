@@ -125,10 +125,11 @@ class FakeDocument {
 }
 
 async function portfolioRenderer(document) {
+  const fixtureSource = await readFile(new URL("../src/browser-fixtures.js", import.meta.url), "utf8");
   const contractSource = await readFile(new URL("../src/browser-contracts.js", import.meta.url), "utf8");
   const appSource = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
   const source = appSource.slice(0, appSource.indexOf("function renderSelectedWatchlistInstrument"));
-  return Function("document", `${contractSource}\n${source}; return { renderProviderPortfolio, renderPortfolioReadFailure, renderFulfilledProviderPortfolio };`)(document);
+  return Function("document", `${fixtureSource}\n${contractSource}\n${source}; return { renderProviderPortfolio, renderPortfolioReadFailure, renderFulfilledProviderPortfolio };`)(document);
 }
 
 function renderedText(element) {
