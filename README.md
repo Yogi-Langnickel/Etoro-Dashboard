@@ -42,11 +42,19 @@ Run locally:
 npm run start
 ```
 
+For fixture-only browser or Playwright checks, use the capability-denying
+offline launcher. It ignores ambient eToro credentials and traps provider
+fetches:
+
+```sh
+npm run start:offline
+```
+
 Then open `http://localhost:4173`. The app also accepts `ETORO_CREDENTIALS_FILE` if you want a different credential path.
 
 Set `ENABLE_DEMO_TRADE_PREVIEW=true` only when you want the local server to validate and preview demo tickets. Preview responses are redacted and still do not place orders.
 
-Set `ETORO_READ_CACHE_TTL_MS` if local read-only provider calls need a different short success-cache window. The default is `15000` milliseconds. Provider 429, timeout, and 5xx failures are negative-cached for a short server-memory backoff so repeated local refreshes do not storm the provider.
+Set `ETORO_READ_CACHE_TTL_MS` if local read-only provider calls need a different short success-cache window. The default is `15000` milliseconds and the maximum is `300000` milliseconds. Provider 429, timeout, and 5xx failures are negative-cached for a short server-memory backoff so repeated local refreshes do not storm the provider.
 
 Simulation bot controls are stored server-side at `${HOME}/.config/etoro-dashboard/bot-config.json` by default. The saved config contains only predefined strategy, budget, market-group, instrument-class, and low-frequency cadence choices; it does not contain credentials or enable trading. Config updates are local-dashboard only: the server requires JSON, local Host/Origin headers, and the mutation-protection token delivered in the `x-etoro-dashboard-config-token` response header from `GET /api/etoro/bot/config`; the JSON body names the required request header but does not contain the token. Writes use a serialized temp-file-and-rename path with fsync where the local filesystem supports it. Strategy, market-group, instrument-class, and cadence combinations mirror the Money-maker Python contract at `Money-maker-3000/src/money_maker_3000/contracts.py`; the repo-local snapshot in `test/fixtures/money-maker-simulation-contract.snapshot.json` makes intentional mirror updates explicit. Dashboard-selectable run modes are backtest-only; disabled execute policy metadata is visible but cannot be selected.
 
