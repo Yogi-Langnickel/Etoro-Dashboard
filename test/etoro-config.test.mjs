@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   DEFAULT_ETORO_BASE_URL,
   DEFAULT_READ_CACHE_TTL_MS,
+  MAX_READ_CACHE_TTL_MS,
   EtoroConfigError,
   loadEtoroConfig,
   publicCredentialStatus,
@@ -119,6 +120,22 @@ test("read cache TTL must be a positive integer", async () => {
       },
     }),
     (error) => error instanceof EtoroConfigError && error.code === "ETORO_INVALID_CACHE_TTL",
+  );
+});
+
+test("read cache TTL cannot exceed the browser contract maximum", async () => {
+  await assert.rejects(
+    loadEtoroConfig({
+      env: {
+        ETORO_READ_CACHE_TTL_MS: String(MAX_READ_CACHE_TTL_MS + 1),
+      },
+      readFile: async () => {
+        const error = new Error("missing");
+        error.code = "ENOENT";
+        throw error;
+      },
+    }),
+    (error) => error.code === "ETORO_INVALID_CACHE_TTL",
   );
 });
 

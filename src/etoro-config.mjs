@@ -6,6 +6,7 @@ export const DEFAULT_ETORO_BASE_URL = "https://public-api.etoro.com";
 const ALLOWED_ETORO_HOSTS = new Set(["public-api.etoro.com"]);
 const DEFAULT_CREDENTIALS_FILE = join(homedir(), ".config", "etoro", "credentials.json");
 export const DEFAULT_READ_CACHE_TTL_MS = 15_000;
+export const MAX_READ_CACHE_TTL_MS = 300_000;
 
 export class EtoroConfigError extends Error {
   constructor(message, options = {}) {
@@ -96,7 +97,7 @@ function parseBooleanFlag(value) {
   return String(value ?? "").trim().toLowerCase() === "true";
 }
 
-function parsePositiveInteger(value, fallback, fieldName) {
+function parsePositiveInteger(value, fallback, fieldName, maximum = Number.MAX_SAFE_INTEGER) {
   const trimmed = optionalTrim(value);
 
   if (!trimmed) {
@@ -105,8 +106,8 @@ function parsePositiveInteger(value, fallback, fieldName) {
 
   const parsed = Number(trimmed);
 
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new EtoroConfigError(`${fieldName} must be a positive integer`, {
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > maximum) {
+    throw new EtoroConfigError(`${fieldName} must be a positive integer no greater than ${maximum}`, {
       code: "ETORO_INVALID_CACHE_TTL",
     });
   }
@@ -149,6 +150,7 @@ export async function loadEtoroConfig(options = {}) {
       env.ETORO_READ_CACHE_TTL_MS ?? fileConfig.readCacheTtlMs,
       DEFAULT_READ_CACHE_TTL_MS,
       "Read cache TTL",
+      MAX_READ_CACHE_TTL_MS,
     ),
     demoTradePreviewEnabled: parseBooleanFlag(
       env.ENABLE_DEMO_TRADE_PREVIEW ?? fileConfig.enableDemoTradePreview,

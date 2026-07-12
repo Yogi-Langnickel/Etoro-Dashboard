@@ -27,6 +27,11 @@ import {
   createReadOnlyProviderCache,
   createRequestHandler,
 } from "../src/server.mjs";
+import {
+  denyOfflineProviderFetch,
+  loadOfflineEtoroConfig,
+  offlineEtoroConfig,
+} from "../src/offline-config.mjs";
 
 const BOT_CONFIG_CSRF_RESPONSE_HEADER = "x-etoro-dashboard-config-token";
 
@@ -82,6 +87,9 @@ async function readBrowserChartContracts() {
     return {
       portfolioChartFor,
       portfolioPeriodChanges,
+      portfolioPeriodValue,
+      portfolioTotalsFor,
+      normalizePortfolioViewPayload,
       watchlistChartFor,
       watchlistPeriodChanges
     };
@@ -466,7 +474,7 @@ test("watchlist interaction contract uses symbol-specific period chart data", as
   assert.equal(watchlistPeriodChanges.QQQ["1y"], "+21.6%");
 });
 
-test("stage one browser bundle does not request provider-backed portfolio reads", async () => {
+test("browser bundle requests only the normalized read-only portfolio route", async () => {
   const response = await callHandler(configuredHandler(), {
     url: "/app.js",
   });
@@ -474,7 +482,147 @@ test("stage one browser bundle does not request provider-backed portfolio reads"
   assert.equal(response.status, 200);
   assert.equal(response.text.includes("/api/etoro/identity"), false);
   assert.equal(response.text.includes("/api/etoro/demo/pnl"), false);
-  assert.match(response.text, /does not request provider-backed portfolio reads/);
+  assert.match(response.text, /getJson\("\/api\/etoro\/demo\/portfolio"\)/);
+  assert.match(response.text, /Partial provider read/);
+  assert.match(response.text, /existing rows are retained in memory only/);
+});
+
+test("offline browser launcher denies provider capability despite ambient credentials", async () => {
+  let fetchCount = 0;
+  const handler = createRequestHandler({
+    loadConfig: loadOfflineEtoroConfig,
+    fetchEndpoint: async () => {
+      fetchCount += 1;
+      return denyOfflineProviderFetch();
+    },
+  });
+
+  assert.equal(Object.isFrozen(offlineEtoroConfig), true);
+  assert.equal(offlineEtoroConfig.configured, false);
+  assert.equal(offlineEtoroConfig.apiKey, null);
+  assert.equal(offlineEtoroConfig.userKey, null);
+
+  const status = await callHandler(handler, { url: "/api/etoro/status" });
+  const portfolio = await callHandler(handler, { url: "/api/etoro/demo/portfolio" });
+  assert.equal(status.status, 200);
+  assert.equal(status.json.credentialStatus.configured, false);
+  assert.equal(portfolio.status, 503);
+  assert.equal(fetchCount, 0);
+});
+
+test("browser portfolio contract exposes freshness, omissions, and incomplete values without ids", async () => {
+  const { normalizePortfolioViewPayload, portfolioPeriodValue, portfolioTotalsFor } = await readBrowserChartContracts();
+  const view = normalizePortfolioViewPayload({
+    data: {
+      currency: "USD",
+      positionCount: 3,
+      instrumentCount: 2,
+      omittedPositionCount: 1,
+      incompleteValuePositionCount: 1,
+      providerUpdatedAt: "2026-07-12T00:00:00.000Z",
+      instruments: [
+        { symbol: "AAPL", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: 5, valueStatus: "complete" },
+        { symbol: "BTC", positionCount: 1, investedUsd: null, unrealizedPnlUsd: null, valueStatus: "incomplete" },
+      ],
+    },
+    cache: { state: "hit", cachedAt: "2026-07-12T00:00:01.000Z", expiresAt: "2026-07-12T00:00:16.000Z", ttlMs: 15000 },
+    provider: { requestId: "public-request-id" },
+  });
+
+  assert.equal(view.omittedPositionCount, 1);
+  assert.equal(view.incompleteValuePositionCount, 1);
+  assert.equal(view.instruments[0].netValueUsd, 105);
+  assert.equal(view.instruments[0].pnlPercent, 5);
+  assert.equal(view.instruments[1].netValueUsd, null);
+  assert.equal(view.provider, undefined);
+  assert.equal(view.cache.state, "hit");
+  assert.deepEqual(portfolioTotalsFor(view.instruments), {
+    investedUsd: 100,
+    unrealizedPnlUsd: 5,
+    netValueUsd: 105,
+  });
+  assert.equal(portfolioPeriodValue("provider-normalized", "BTC", "24h"), "Unavailable");
+  assert.equal(portfolioPeriodValue("fixture", "BTC", "24h"), "-0.6%");
+  assert.equal(JSON.stringify(view).includes("positionId"), false);
+  assert.equal(JSON.stringify(view).includes("accountId"), false);
+});
+
+test("all-incomplete portfolio totals stay unavailable instead of fabricating zero", async () => {
+  const { normalizePortfolioViewPayload, portfolioTotalsFor } = await readBrowserChartContracts();
+  const view = normalizePortfolioViewPayload({
+    data: {
+      currency: "USD",
+      positionCount: 1,
+      instrumentCount: 1,
+      omittedPositionCount: 0,
+      incompleteValuePositionCount: 1,
+      providerUpdatedAt: null,
+      instruments: [
+        { symbol: "BTC", positionCount: 1, investedUsd: null, unrealizedPnlUsd: null, valueStatus: "incomplete" },
+      ],
+    },
+    cache: { state: "miss", cachedAt: "2026-07-12T00:00:00.000Z", expiresAt: "2026-07-12T00:00:15.000Z", ttlMs: 15000 },
+  });
+
+  assert.deepEqual(portfolioTotalsFor(view.instruments), {
+    investedUsd: null,
+    unrealizedPnlUsd: null,
+    netValueUsd: null,
+  });
+});
+
+test("browser portfolio contract rejects malformed or identifier-shaped data", async () => {
+  const { normalizePortfolioViewPayload } = await readBrowserChartContracts();
+  const base = {
+    currency: "USD",
+    positionCount: 1,
+    instrumentCount: 1,
+    omittedPositionCount: 0,
+    incompleteValuePositionCount: 0,
+    providerUpdatedAt: null,
+  };
+
+  assert.throws(() => normalizePortfolioViewPayload({
+    data: {
+      ...base,
+      instruments: [{ symbol: "AAPL/<id>", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: 1, valueStatus: "complete" }],
+    },
+  }), /Portfolio data is unavailable/);
+  assert.throws(() => normalizePortfolioViewPayload({
+    data: {
+      ...base,
+      instruments: [{ symbol: "AAPL", positionCount: 1, investedUsd: null, unrealizedPnlUsd: 1, valueStatus: "complete" }],
+    },
+  }), /Portfolio data is unavailable/);
+  assert.throws(() => normalizePortfolioViewPayload({
+    data: {
+      ...base,
+      positionCount: -1,
+      instruments: [{ symbol: "AAPL", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: 1, valueStatus: "complete" }],
+    },
+    cache: { state: "hit", cachedAt: "2026-07-12T00:00:00.000Z", expiresAt: "2026-07-12T00:00:15.000Z", ttlMs: 15000 },
+  }), /Portfolio data is unavailable/);
+  assert.throws(() => normalizePortfolioViewPayload({
+    data: {
+      ...base,
+      instruments: [{ symbol: "AAPL", positionCount: 1, investedUsd: -100, unrealizedPnlUsd: 1, valueStatus: "complete" }],
+    },
+    cache: { state: "hit", cachedAt: "2026-07-12T00:00:00.000Z", expiresAt: "2026-07-12T00:00:15.000Z", ttlMs: 15000 },
+  }), /Portfolio data is unavailable/);
+  assert.throws(() => normalizePortfolioViewPayload({
+    data: {
+      ...base,
+      instruments: [{ symbol: "AAPL", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: 1, valueStatus: "complete" }],
+    },
+    cache: { state: "unexpected", cachedAt: "bad", expiresAt: "also-bad", ttlMs: -1 },
+  }), /Portfolio data is unavailable/);
+  assert.throws(() => normalizePortfolioViewPayload({
+    data: {
+      ...base,
+      instruments: [{ symbol: "AAPL", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: 1, valueStatus: "complete", positionId: "private" }],
+    },
+    cache: { state: "hit", cachedAt: "2026-07-12T00:00:00.000Z", expiresAt: "2026-07-12T00:00:15.000Z", ttlMs: 15000 },
+  }), /Portfolio data is unavailable/);
 });
 
 test("bot config returns default server-side simulation controls without secrets", async () => {

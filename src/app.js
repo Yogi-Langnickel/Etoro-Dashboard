@@ -11,6 +11,7 @@ let botConfigMutationProtection = null;
 let botConfigOptionsPayload = null;
 let selectedPortfolioSymbol = "SPY";
 let selectedPortfolioPeriod = "24h";
+let portfolioDataSource = "fixture";
 let selectedWatchlistSymbol = "AAPL";
 let selectedWatchlistPeriod = "24h";
 
@@ -164,6 +165,173 @@ function portfolioChartFor(symbol, period) {
   return chartPointsFor(portfolioChartPoints, symbol, period, "SPY");
 }
 
+const portfolioForbiddenKeys = /^(?:account|position|order|instrument|cid|gcId|rawPayload|providerPayload)(?:Id|Ids|ID|IDs)?$/i;
+const portfolioCacheStates = new Set(["miss", "hit", "coalesced"]);
+
+function hasExactKeys(value, expectedKeys) {
+  const actual = Object.keys(value).sort();
+  return actual.length === expectedKeys.length && actual.every((key, index) => key === [...expectedKeys].sort()[index]);
+}
+
+function containsForbiddenPortfolioKey(value) {
+  if (Array.isArray(value)) return value.some(containsForbiddenPortfolioKey);
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, child]) =>
+    portfolioForbiddenKeys.test(key) || containsForbiddenPortfolioKey(child));
+}
+
+function isIsoInstant(value) {
+  if (typeof value !== "string" || value.length > 40) return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value;
+}
+
+function normalizePortfolioViewPayload(payload) {
+  const data = payload?.data;
+
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload) ||
+    containsForbiddenPortfolioKey(payload) ||
+    !data ||
+    !hasExactKeys(data, [
+      "currency",
+      "positionCount",
+      "instrumentCount",
+      "omittedPositionCount",
+      "incompleteValuePositionCount",
+      "instruments",
+      "providerUpdatedAt",
+    ]) ||
+    data.currency !== "USD" ||
+    !Array.isArray(data.instruments) ||
+    data.instruments.length > 500 ||
+    !Number.isInteger(data.positionCount) ||
+    data.positionCount < 0 ||
+    !Number.isInteger(data.instrumentCount) ||
+    data.instrumentCount < 0 ||
+    !Number.isInteger(data.omittedPositionCount) ||
+    data.omittedPositionCount < 0 ||
+    !Number.isInteger(data.incompleteValuePositionCount)
+    || data.incompleteValuePositionCount < 0
+    || (data.providerUpdatedAt !== null && !isIsoInstant(data.providerUpdatedAt))
+  ) {
+    throw new Error("Portfolio data is unavailable.");
+  }
+
+  const symbols = new Set();
+  const instruments = data.instruments.map((instrument) => {
+    if (
+      !instrument ||
+      !hasExactKeys(instrument, [
+        "symbol",
+        "positionCount",
+        "investedUsd",
+        "unrealizedPnlUsd",
+        "valueStatus",
+      ]) ||
+      typeof instrument.symbol !== "string" ||
+      !/^[A-Z0-9._-]{1,24}$/.test(instrument.symbol) ||
+      symbols.has(instrument.symbol) ||
+      !Number.isInteger(instrument.positionCount) ||
+      instrument.positionCount < 1 ||
+      !["complete", "incomplete"].includes(instrument.valueStatus)
+    ) {
+      throw new Error("Portfolio data is unavailable.");
+    }
+    symbols.add(instrument.symbol);
+
+    const complete = instrument.valueStatus === "complete";
+    if (
+      (complete && (
+        !Number.isFinite(instrument.investedUsd) ||
+        instrument.investedUsd < 0 ||
+        !Number.isFinite(instrument.unrealizedPnlUsd)
+      )) ||
+      (!complete && (instrument.investedUsd !== null || instrument.unrealizedPnlUsd !== null))
+    ) {
+      throw new Error("Portfolio data is unavailable.");
+    }
+
+    const netValueUsd = complete ? instrument.investedUsd + instrument.unrealizedPnlUsd : null;
+    const pnlPercent = complete && instrument.investedUsd > 0
+      ? (instrument.unrealizedPnlUsd / instrument.investedUsd) * 100
+      : null;
+    if ((netValueUsd !== null && !Number.isFinite(netValueUsd)) || (pnlPercent !== null && !Number.isFinite(pnlPercent))) {
+      throw new Error("Portfolio data is unavailable.");
+    }
+
+    return {
+      symbol: instrument.symbol,
+      positionCount: instrument.positionCount,
+      investedUsd: instrument.investedUsd,
+      unrealizedPnlUsd: instrument.unrealizedPnlUsd,
+      netValueUsd,
+      pnlPercent,
+      valueStatus: instrument.valueStatus,
+    };
+  });
+
+  const includedPositionCount = instruments.reduce((total, instrument) => total + instrument.positionCount, 0);
+  const incompleteInstrumentCount = instruments.filter(({ valueStatus }) => valueStatus === "incomplete").length;
+  if (
+    instruments.length !== data.instrumentCount ||
+    includedPositionCount + data.omittedPositionCount !== data.positionCount ||
+    data.incompleteValuePositionCount < incompleteInstrumentCount ||
+    data.incompleteValuePositionCount > includedPositionCount
+  ) {
+    throw new Error("Portfolio data is unavailable.");
+  }
+
+  const cache = payload.cache;
+  if (
+    !cache ||
+    !hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs"]) ||
+    !portfolioCacheStates.has(cache.state) ||
+    !isIsoInstant(cache.cachedAt) ||
+    !isIsoInstant(cache.expiresAt) ||
+    !Number.isInteger(cache.ttlMs) ||
+    cache.ttlMs <= 0 ||
+    cache.ttlMs > 300_000 ||
+    Date.parse(cache.expiresAt) - Date.parse(cache.cachedAt) !== cache.ttlMs
+  ) {
+    throw new Error("Portfolio data is unavailable.");
+  }
+
+  return {
+    instruments,
+    positionCount: data.positionCount,
+    omittedPositionCount: data.omittedPositionCount,
+    incompleteValuePositionCount: data.incompleteValuePositionCount,
+    providerUpdatedAt: data.providerUpdatedAt,
+    cache: {
+      state: cache.state,
+      cachedAt: cache.cachedAt,
+      expiresAt: cache.expiresAt,
+      ttlMs: cache.ttlMs,
+    },
+  };
+}
+
+function portfolioTotalsFor(instruments) {
+  const complete = instruments.filter(({ valueStatus }) => valueStatus === "complete");
+  if (complete.length === 0) return { investedUsd: null, unrealizedPnlUsd: null, netValueUsd: null };
+  const investedUsd = complete.reduce((total, instrument) => total + instrument.investedUsd, 0);
+  const unrealizedPnlUsd = complete.reduce((total, instrument) => total + instrument.unrealizedPnlUsd, 0);
+  const netValueUsd = investedUsd + unrealizedPnlUsd;
+  if (![investedUsd, unrealizedPnlUsd, netValueUsd].every(Number.isFinite)) {
+    throw new Error("Portfolio data is unavailable.");
+  }
+  return { investedUsd, unrealizedPnlUsd, netValueUsd };
+}
+
+function portfolioPeriodValue(source, symbol, period) {
+  return source === "provider-normalized"
+    ? "Unavailable"
+    : portfolioPeriodChanges[symbol]?.[period] ?? "Unavailable";
+}
+
 function watchlistChartFor(symbol, period) {
   return chartPointsFor(watchlistChartPoints, symbol, period, "AAPL");
 }
@@ -199,6 +367,14 @@ function signedMoney(value) {
   }
 
   return `${value >= 0 ? "+" : "-"}${formatter.format(Math.abs(value))}`;
+}
+
+function signedPercent(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "Unavailable";
+  }
+
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
 
 function formatCacheDuration(milliseconds) {
@@ -460,7 +636,148 @@ function setChartPath(lineId, areaId, points) {
   area?.setAttribute("d", `M${points.replaceAll(" ", " L")} L640 260 L0 260 Z`);
 }
 
+function appendPortfolioCell(row, value, className) {
+  const cell = document.createElement("td");
+  cell.textContent = value;
+  if (className) cell.className = className;
+  row.append(cell);
+  return cell;
+}
+
+function renderProviderPortfolio(payload) {
+  const view = normalizePortfolioViewPayload(payload);
+  const body = document.getElementById("portfolio-table-body");
+
+  if (!body) return view;
+
+  portfolioDataSource = "provider-normalized";
+  body.replaceChildren();
+  for (const instrument of view.instruments) {
+    const row = document.createElement("tr");
+    row.className = "instrument-row";
+    row.tabIndex = 0;
+    row.dataset.instrumentRow = "";
+    row.dataset.symbol = instrument.symbol;
+    row.dataset.source = "provider-normalized";
+
+    const assetCell = document.createElement("td");
+    const symbol = document.createElement("strong");
+    const detail = document.createElement("span");
+    symbol.textContent = instrument.symbol;
+    detail.textContent = `${instrument.positionCount} aggregated position${instrument.positionCount === 1 ? "" : "s"}`;
+    assetCell.append(symbol, detail);
+    row.append(assetCell);
+
+    appendPortfolioCell(row, "Unavailable");
+    const periodCell = appendPortfolioCell(row, "Unavailable", "neutral-text");
+    periodCell.dataset.periodValue = "";
+    appendPortfolioCell(row, "Unavailable");
+    appendPortfolioCell(row, "Unavailable");
+    appendPortfolioCell(row, signedMoney(instrument.unrealizedPnlUsd), signedClass(signedMoney(instrument.unrealizedPnlUsd)));
+    appendPortfolioCell(row, signedPercent(instrument.pnlPercent), signedClass(signedPercent(instrument.pnlPercent)));
+    appendPortfolioCell(row, money(instrument.investedUsd));
+    appendPortfolioCell(row, money(instrument.netValueUsd));
+    appendPortfolioCell(row, instrument.valueStatus === "complete" ? "Normalized" : "Incomplete", instrument.valueStatus === "complete" ? "good-text" : "warn-text");
+    bindPortfolioRow(row);
+    body.append(row);
+  }
+
+  const rows = [...body.querySelectorAll("[data-instrument-row]")];
+  const selected = rows.find((row) => row.dataset.symbol === selectedPortfolioSymbol) ?? rows[0];
+  if (selected) {
+    selectedPortfolioSymbol = selected.dataset.symbol;
+    selected.classList.add("active");
+  }
+
+  const completeRows = view.instruments.filter((instrument) => instrument.valueStatus === "complete");
+  const totals = portfolioTotalsFor(view.instruments);
+  text("mock-equity-label", "Normalized demo net value");
+  text("mock-equity", money(totals.netValueUsd));
+  text("equity-detail", completeRows.length > 0 ? "Complete normalized instrument values only" : "No complete instrument values");
+  text("cash-buffer", "Unavailable");
+  text("cash-buffer-detail", "Not included in the portfolio aggregate");
+  text("unrealized-pnl", signedMoney(totals.unrealizedPnlUsd));
+  text("unrealized-pnl-detail", completeRows.length > 0 ? "Complete normalized rows only" : "No complete instrument values");
+  text("exposure", "Unavailable");
+  text("exposure-detail", "Not included in the portfolio aggregate");
+  text("stale-data-label", "Provider timestamp");
+  text("stale-data", view.providerUpdatedAt ? "Available" : "Unavailable");
+  text("stale-data-detail", view.providerUpdatedAt ? "Exact time shown in portfolio freshness" : "Provider timestamp missing");
+  text("portfolio-source-watermark", "Provider normalized");
+  text("portfolio-source-detail", "Read-only aggregate; no account, position, or order identifiers");
+
+  const cacheState = view.cache?.state ?? "unknown";
+  const cacheAge = view.cache?.cachedAt ? ` · cached ${view.cache.cachedAt}` : "";
+  text("portfolio-read-state", `Portfolio: provider ${labelize(cacheState)}${cacheAge}`);
+  text("portfolio-freshness", `Provider updated: ${view.providerUpdatedAt ?? "unavailable"}`);
+  text("portfolio-omitted", `Omitted rows: ${view.omittedPositionCount}`);
+  text(
+    "portfolio-partial",
+    view.incompleteValuePositionCount > 0
+      ? `Partial values: ${view.incompleteValuePositionCount} position${view.incompleteValuePositionCount === 1 ? "" : "s"}`
+      : "Value coverage: complete",
+  );
+  text("chart-provider", `Provider timestamp: ${view.providerUpdatedAt ?? "unavailable"}`);
+  text("chart-request", "Provider request ID: hidden");
+  text("chart-cache", `Cache: ${labelize(cacheState)} (${view.cache?.ttlMs ?? 0} ms)`);
+  text("source-detail", view.incompleteValuePositionCount > 0 ? "Partial normalized provider values" : "Normalized provider portfolio");
+  updatePortfolioPeriod(selectedPortfolioPeriod);
+  return view;
+}
+
+function renderPortfolioReadFailure(error) {
+  const cache = error?.payload?.cache;
+  const validCache = cache &&
+    hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs", "reason"]) &&
+    new Set(["error", "backoff"]).has(cache.state) &&
+    isIsoInstant(cache.cachedAt) &&
+    isIsoInstant(cache.expiresAt) &&
+    Number.isInteger(cache.ttlMs) &&
+    cache.ttlMs > 0 &&
+    cache.ttlMs <= 300_000 &&
+    Date.parse(cache.expiresAt) - Date.parse(cache.cachedAt) === cache.ttlMs &&
+    typeof cache.reason === "string" &&
+    /^[A-Z0-9_]{1,80}$/.test(cache.reason);
+  text("portfolio-read-state", validCache ? `Portfolio: ${labelize(cache.state)}` : "Portfolio: unavailable");
+  text("portfolio-freshness", "Freshness: unavailable; existing in-memory rows retained");
+  text("portfolio-omitted", "Omitted rows: unavailable");
+  text("portfolio-partial", validCache ? `Provider read failed; retry window ${cache.ttlMs} ms` : "Provider read failed; retry window unavailable");
+}
+
+function renderFulfilledProviderPortfolio(payload) {
+  try {
+    const view = renderProviderPortfolio(payload);
+    renderAudit(
+      "Provider portfolio loaded",
+      `${view.instruments.length} instrument aggregates; ${view.omittedPositionCount} unsafe rows omitted; no account or position IDs returned`,
+    );
+    return true;
+  } catch (error) {
+    renderPortfolioReadFailure(error);
+    renderAudit(
+      "Partial provider read",
+      "Provider status loaded, but the portfolio response was invalid; existing rows are retained in memory only",
+    );
+    return false;
+  }
+}
+
 function renderSelectedPortfolioInstrument() {
+  if (portfolioDataSource === "provider-normalized") {
+    text("chart-title", `${selectedPortfolioSymbol} market chart unavailable`);
+    text("selected-period-pill", periodLabel(selectedPortfolioPeriod));
+    text("chart-period-label", "Selected-period market DTO not connected");
+    text("portfolio-financial-title", "Market context deferred");
+    text("portfolio-financial-detail", "Portfolio holdings do not supply chart or financial-record data.");
+    text("portfolio-news-title", "News context deferred");
+    text("portfolio-news-detail", "Read-only portfolio values cannot be reused as news or a trading signal.");
+    text("portfolio-insider-title", "Ownership context deferred");
+    text("portfolio-insider-detail", "Exact-symbol market contracts are the next separate read-only slice.");
+    document.getElementById("performance-line")?.setAttribute("points", "");
+    document.getElementById("performance-area")?.setAttribute("d", "");
+    return;
+  }
+
   const receipts = portfolioEnrichmentReceipts[selectedPortfolioSymbol] ?? portfolioEnrichmentReceipts.SPY;
 
   text("chart-title", `${selectedPortfolioSymbol} selected-period chart`);
@@ -487,7 +804,7 @@ function updatePortfolioPeriod(period) {
 
   document.querySelectorAll("[data-instrument-row]").forEach((row) => {
     const symbol = row.dataset.symbol;
-    const value = portfolioPeriodChanges[symbol]?.[period] ?? "0.0%";
+    const value = portfolioPeriodValue(row.dataset.source, symbol, period);
     const target = row.querySelector("[data-period-value]");
 
     if (target) {
@@ -516,6 +833,16 @@ function selectPortfolioInstrument(row) {
     `${selectedPortfolioSymbol} selected`,
     "Instrument summary row selected locally; enrichment receipts remain context-only",
   );
+}
+
+function bindPortfolioRow(row) {
+  row.addEventListener("click", () => selectPortfolioInstrument(row));
+  row.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectPortfolioInstrument(row);
+    }
+  });
 }
 
 function renderSelectedWatchlistInstrument() {
@@ -1337,17 +1664,48 @@ async function refreshEtoro() {
     await getJson("/api/health");
     const status = await getJson("/api/etoro/status");
     renderStatus(status);
-    await refreshTabStatus(activeTabId(), { force: true });
-    renderAudit(
-      "Portfolio aggregate retained",
-      status.credentialStatus.configured
-        ? "Server credentials are configured, but this Stage 1 view does not request provider-backed portfolio reads"
-        : "No credential values present in browser context; synthetic instrument aggregation remains active",
-    );
+    const portfolioRead = status.credentialStatus.configured
+      ? getJson("/api/etoro/demo/portfolio")
+      : Promise.resolve(null);
+    const [portfolioResult] = await Promise.allSettled([
+      portfolioRead,
+      refreshTabStatus(activeTabId(), { force: true }),
+    ]);
+
+    if (!status.credentialStatus.configured) {
+      const retainedProviderRows = portfolioDataSource === "provider-normalized";
+      text(
+        "portfolio-read-state",
+        retainedProviderRows ? "Portfolio: prior provider rows retained in memory" : "Portfolio: synthetic fixture",
+      );
+      text(
+        "portfolio-freshness",
+        retainedProviderRows ? "Freshness: stale; provider is no longer configured" : "Freshness: provider not configured",
+      );
+      if (!retainedProviderRows) {
+        text("portfolio-omitted", "Omitted rows: unavailable until provider read");
+        text("portfolio-partial", "Value coverage: synthetic fixture");
+      }
+      renderAudit(
+        retainedProviderRows ? "Provider rows retained in memory" : "Portfolio fixture retained",
+        retainedProviderRows
+          ? "Provider access is no longer configured; no refresh was attempted and prior rows are marked stale"
+          : "No credential values are present in the browser; provider portfolio reads remain server-only",
+      );
+    } else if (portfolioResult.status === "fulfilled") {
+      renderFulfilledProviderPortfolio(portfolioResult.value);
+    } else {
+      renderPortfolioReadFailure(portfolioResult.reason);
+      renderAudit(
+        "Partial provider read",
+        "Provider status loaded, but portfolio data is unavailable; existing rows are retained in memory only",
+      );
+    }
   } catch (error) {
     setTile("provider-status", "warn", "Provider offline", "Using synthetic fixtures");
     await refreshTabStatus(activeTabId(), { force: true });
-    renderAudit("Provider read failed", error.message);
+    renderPortfolioReadFailure(error);
+    renderAudit("Provider read failed", "Provider status is unavailable; no account-linked data was stored");
   } finally {
     if (button) {
       button.disabled = false;
@@ -1441,13 +1799,7 @@ document.querySelectorAll("[data-watchlist-period]").forEach((button) => {
   button.addEventListener("click", () => updateWatchlistPeriod(button.dataset.watchlistPeriod));
 });
 document.querySelectorAll("[data-instrument-row]").forEach((row) => {
-  row.addEventListener("click", () => selectPortfolioInstrument(row));
-  row.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      selectPortfolioInstrument(row);
-    }
-  });
+  bindPortfolioRow(row);
 });
 document.querySelectorAll("[data-watchlist-row]").forEach((row) => {
   row.addEventListener("click", () => selectWatchlistInstrument(row));

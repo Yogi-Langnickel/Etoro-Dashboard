@@ -11,6 +11,7 @@
     "lint": "node scripts/check-syntax.mjs",
     "safety:public": "node scripts/check-public-safety.mjs",
     "start": "node src/server.mjs",
+    "start:offline": "node scripts/start-offline.mjs",
     "test": "node --test",
     "typecheck": "node scripts/check-syntax.mjs"
   },

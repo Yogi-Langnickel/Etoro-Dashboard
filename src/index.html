@@ -58,32 +58,32 @@
         <article class="metric">
           <span id="mock-equity-label">Mock equity</span>
           <strong id="mock-equity">$124,580.00</strong>
-          <small class="neutral-text">Synthetic total balance</small>
+          <small class="neutral-text" id="equity-detail">Synthetic total balance</small>
         </article>
         <article class="metric">
           <span>Cash buffer</span>
           <strong id="cash-buffer">$18,420.00</strong>
-          <small class="good-text">14.8% unallocated</small>
+          <small class="good-text" id="cash-buffer-detail">14.8% unallocated</small>
         </article>
         <article class="metric">
           <span>Unrealized P/L</span>
           <strong class="good-text" id="unrealized-pnl">+$2,184.70</strong>
-          <small class="neutral-text">Mock mark-to-market</small>
+          <small class="neutral-text" id="unrealized-pnl-detail">Mock mark-to-market</small>
         </article>
         <article class="metric">
           <span>Exposure</span>
           <strong id="exposure">1.16x</strong>
-          <small class="warn-text">Leverage review required</small>
+          <small class="warn-text" id="exposure-detail">Leverage review required</small>
         </article>
         <article class="metric">
-          <span>Stale data</span>
+          <span id="stale-data-label">Stale data</span>
           <strong id="stale-data">3 tiles</strong>
-          <small class="warn-text">Provider timestamp missing</small>
+          <small class="warn-text" id="stale-data-detail">Provider timestamp missing</small>
         </article>
         <article class="metric">
           <span>Source watermark</span>
-          <strong>Fixture</strong>
-          <small class="warn-text">Synthetic overview values; no live account data</small>
+          <strong id="portfolio-source-watermark">Fixture</strong>
+          <small class="warn-text" id="portfolio-source-detail">Synthetic overview values; no live account data</small>
         </article>
       </section>
 
@@ -105,6 +105,12 @@
             <button class="period-button" type="button" data-period="5y" aria-pressed="false">5y</button>
             <button class="period-button" type="button" data-period="max" aria-pressed="false">Max</button>
           </div>
+          <div class="chart-meta" aria-live="polite" aria-label="Portfolio provider state">
+            <span id="portfolio-read-state">Portfolio: synthetic fixture</span>
+            <span id="portfolio-freshness">Freshness: not connected</span>
+            <span id="portfolio-omitted">Omitted rows: 0</span>
+            <span id="portfolio-partial">Value coverage: synthetic</span>
+          </div>
           <div class="table-wrap">
             <table class="instrument-table">
               <thead>
@@ -121,7 +127,7 @@
                   <th>Chart</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="portfolio-table-body">
                 <tr class="instrument-row active" data-instrument-row tabindex="0" data-symbol="SPY" data-name="SPDR S&P 500 ETF" data-period-change="+0.8%" data-chart-title="SPY selected-period chart">
                   <td>
                     <strong>SPY</strong>
