@@ -33,6 +33,43 @@ export const READ_ONLY_ENDPOINTS = Object.freeze({
     path: "/api/v1/trading/info/demo/portfolio",
     normalize: normalizeDemoPortfolio,
   }),
+  defaultWatchlist: Object.freeze({
+    method: "GET",
+    path: "/api/v1/watchlists/default-watchlists/items?itemsLimit=100&itemsPerPage=100",
+    normalize: normalizeDefaultWatchlist,
+  }),
+  instrumentSearch: Object.freeze({
+    method: "GET",
+    path: ({ symbol: rawSymbol }) => {
+      const symbol = requireSafeSymbol(rawSymbol);
+      const query = new URLSearchParams({
+        fields: "instrumentId,internalSymbolFull,displayname,marketId",
+        internalSymbolFull: symbol,
+        pageSize: "10",
+      });
+      return `/api/v1/market-data/search?${query}`;
+    },
+    normalize: normalizeInstrumentSearch,
+  }),
+  marketRates: Object.freeze({
+    method: "GET",
+    path: ({ instrumentIds }) =>
+      `/api/v1/market-data/instruments/rates?instrumentIds=${validatedInstrumentIds(instrumentIds).join(",")}`,
+    normalize: normalizeMarketRates,
+  }),
+  marketCandles: Object.freeze({
+    method: "GET",
+    path: (params) => {
+      const instrumentId = positiveInstrumentId(params.instrumentId);
+      const allowedIntervals = new Set(["OneMinute", "FiveMinutes", "TenMinutes", "FifteenMinutes", "ThirtyMinutes", "OneHour", "FourHours", "OneDay", "OneWeek"]);
+      if (instrumentId === null || !["asc", "desc"].includes(params.direction) || !allowedIntervals.has(params.interval) ||
+        !Number.isInteger(params.candlesCount) || params.candlesCount < 1 || params.candlesCount > 1000) {
+        throw new EtoroApiError("Market candle request parameters are invalid", { code: "ETORO_INVALID_MARKET_QUERY", status: 400 });
+      }
+      return `/api/v1/market-data/instruments/${instrumentId}/history/candles/${params.direction}/${params.interval}/${params.candlesCount}`;
+    },
+    normalize: normalizeMarketCandles,
+  }),
 });
 
 export function redactSecrets(input, secrets = []) {
@@ -367,6 +404,177 @@ function normalizeDemoPortfolio(payload) {
   };
 }
 
+function positiveInstrumentId(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 2_147_483_647 ? parsed : null;
+}
+
+function requireSafeSymbol(value) {
+  const symbol = normalizedSymbol(value);
+  if (!symbol) throw new EtoroApiError("Instrument symbol is invalid", { code: "ETORO_INVALID_SYMBOL", status: 400 });
+  return symbol;
+}
+
+function validatedInstrumentIds(values) {
+  if (!Array.isArray(values) || values.length < 1 || values.length > 100) {
+    throw new EtoroApiError("Market rate request parameters are invalid", { code: "ETORO_INVALID_MARKET_QUERY", status: 400 });
+  }
+  const ids = values.map(positiveInstrumentId);
+  if (ids.includes(null) || new Set(ids).size !== ids.length) {
+    throw new EtoroApiError("Market rate request parameters are invalid", { code: "ETORO_INVALID_MARKET_QUERY", status: 400 });
+  }
+  return ids;
+}
+
+function marketNumberOrNull(value) {
+  if ((typeof value !== "number" && typeof value !== "string") || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function safeDisplayText(value, fallback) {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim();
+  return normalized && normalized.length <= 120 && !/[\u0000-\u001F\u007F]/.test(normalized)
+    ? normalized
+    : fallback;
+}
+
+function normalizedSymbol(value) {
+  const symbol = typeof value === "string" ? value.trim().toUpperCase() : "";
+  return SAFE_INSTRUMENT_SYMBOL.test(symbol) ? symbol : null;
+}
+
+function normalizeDefaultWatchlist(payload) {
+  if (!Array.isArray(payload)) {
+    throw new EtoroApiError("Default watchlist response did not match expected shape", {
+      code: "ETORO_INVALID_WATCHLIST_RESPONSE",
+    });
+  }
+
+  const items = [];
+  let omittedItemCount = 0;
+  const seenSymbols = new Set();
+
+  for (const item of payload.slice(0, 100)) {
+    const instrumentId = positiveInstrumentId(item?.itemId ?? item?.ItemId);
+    const itemType = item?.itemType ?? item?.ItemType;
+    const symbol = normalizedSymbol(item?.market?.symbolName ?? item?.market?.internalSymbolFull);
+    const rank = Number(item?.itemRank ?? item?.ItemRank ?? 0);
+
+    if (itemType !== "Instrument" || instrumentId === null || !symbol || seenSymbols.has(symbol) ||
+      !Number.isInteger(rank) || rank < 0) {
+      omittedItemCount += 1;
+      continue;
+    }
+
+    seenSymbols.add(symbol);
+    items.push({
+      instrumentId,
+      symbol,
+      displayName: safeDisplayText(item?.market?.displayName, symbol),
+      rank,
+    });
+  }
+
+  omittedItemCount += Math.max(0, payload.length - 100);
+  items.sort((left, right) => left.rank - right.rank || left.symbol.localeCompare(right.symbol));
+  return { items, omittedItemCount };
+}
+
+function normalizeInstrumentSearch(payload, params) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) || !Array.isArray(payload.items)) {
+    throw new EtoroApiError("Instrument search response did not match expected shape", {
+      code: "ETORO_INVALID_INSTRUMENT_SEARCH_RESPONSE",
+    });
+  }
+
+  const requestedSymbol = normalizedSymbol(params?.symbol);
+  if (!requestedSymbol) {
+    throw new EtoroApiError("Instrument symbol is invalid", { code: "ETORO_INVALID_SYMBOL", status: 400 });
+  }
+
+  const matches = payload.items.flatMap((item) => {
+    const symbol = normalizedSymbol(item?.internalSymbolFull);
+    const instrumentId = positiveInstrumentId(item?.instrumentId ?? item?.InstrumentID);
+    if (symbol !== requestedSymbol || instrumentId === null) return [];
+    return [{ instrumentId, symbol, displayName: safeDisplayText(item?.displayname, symbol) }];
+  });
+
+  if (matches.length === 0) {
+    throw new EtoroApiError("Instrument symbol was not resolved", {
+      code: "ETORO_SYMBOL_NOT_FOUND",
+      status: 404,
+    });
+  }
+
+  if (matches.length !== 1 || new Set(matches.map(({ instrumentId }) => instrumentId)).size !== 1) {
+    throw new EtoroApiError("Instrument symbol resolution was ambiguous", {
+      code: "ETORO_SYMBOL_AMBIGUOUS",
+      status: 502,
+    });
+  }
+
+  return matches[0];
+}
+
+function normalizeMarketRates(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) || !Array.isArray(payload.rates)) {
+    throw new EtoroApiError("Market rates response did not match expected shape", {
+      code: "ETORO_INVALID_MARKET_RATES_RESPONSE",
+    });
+  }
+
+  const rates = [];
+  const seenIds = new Set();
+  for (const rate of payload.rates) {
+      const instrumentId = positiveInstrumentId(rate?.instrumentID ?? rate?.instrumentId);
+      const bid = marketNumberOrNull(rate?.bid);
+      const ask = marketNumberOrNull(rate?.ask);
+      const lastExecution = marketNumberOrNull(rate?.lastExecution);
+      const updatedAt = normalizeTimestamp(rate?.date);
+      if (instrumentId === null || seenIds.has(instrumentId) || bid === null || ask === null || bid < 0 || ask < 0 ||
+        (lastExecution !== null && lastExecution < 0) || !updatedAt) continue;
+      seenIds.add(instrumentId);
+      rates.push({ instrumentId, bid, ask, lastExecution, updatedAt });
+  }
+  return { rates };
+}
+
+function normalizeMarketCandles(payload, params) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+    payload.interval !== params?.interval || !Array.isArray(payload.candles)) {
+    throw new EtoroApiError("Market candle response did not match expected shape", {
+      code: "ETORO_INVALID_MARKET_CANDLES_RESPONSE",
+    });
+  }
+
+  const groups = payload.candles.filter((candidate) =>
+    positiveInstrumentId(candidate?.instrumentId ?? candidate?.InstrumentID) === params.instrumentId);
+  const group = groups[0];
+  if (groups.length !== 1 || !group || !Array.isArray(group.candles) ||
+    group.candles.length < 1 || group.candles.length > params.candlesCount) {
+    throw new EtoroApiError("Market candle response omitted the requested instrument", {
+      code: "ETORO_INVALID_MARKET_CANDLES_RESPONSE",
+    });
+  }
+
+  const points = group.candles.flatMap((candle) => {
+    const at = normalizeTimestamp(candle?.fromDate);
+    const close = marketNumberOrNull(candle?.close);
+    const candleInstrumentId = positiveInstrumentId(candle?.instrumentID ?? candle?.instrumentId);
+    return at && close !== null && close >= 0 && candleInstrumentId === params.instrumentId ? [{ at, close }] : [];
+  });
+  if (points.length === 0 || points.length !== group.candles.length ||
+    points.some((point, index) => index > 0 && point.at <= points[index - 1].at)) {
+    throw new EtoroApiError("Market candle response contained invalid points", {
+      code: "ETORO_INVALID_MARKET_CANDLES_RESPONSE",
+    });
+  }
+
+  return { interval: payload.interval, points };
+}
+
 function parseRetryAfterMs(value, nowMs = Date.now()) {
   if (typeof value !== "string" || !value.trim()) {
     return null;
@@ -458,7 +666,9 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  const url = new URL(endpoint.path, `${credentials.baseUrl}/`);
+  const params = options.params ?? {};
+  const path = typeof endpoint.path === "function" ? endpoint.path(params) : endpoint.path;
+  const url = new URL(path, `${credentials.baseUrl}/`);
   const secrets = [credentials.apiKey, credentials.userKey];
   const startedAtMs = now();
 
@@ -484,11 +694,11 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
     const payload = await parseProviderJson(response, requestId, secrets);
 
     return {
-      data: endpoint.normalize(payload),
+      data: endpoint.normalize(payload, params),
       provider: {
         endpoint: endpointName,
         method: endpoint.method,
-        path: endpoint.path,
+        path,
         baseUrl: credentials.baseUrl,
         status: response.status,
         requestId,

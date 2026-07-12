@@ -26,6 +26,7 @@ import {
   INTERNAL_API_ROUTES,
   createReadOnlyProviderCache,
   createRequestHandler,
+  resolveDashboardHost,
 } from "../src/server.mjs";
 import {
   denyOfflineProviderFetch,
@@ -160,6 +161,10 @@ test("server exposes only internal API routes and no execution routes", () => {
     "/api/etoro/identity",
     "/api/etoro/demo/pnl",
     "/api/etoro/demo/portfolio",
+    "/api/etoro/watchlist/default",
+    "/api/etoro/market/resolve",
+    "/api/etoro/market/rates",
+    "/api/etoro/market/chart",
     "/api/etoro/demo/trading/status",
     "/api/etoro/demo/trading/preview",
     "/api/etoro/bot/status",
@@ -176,6 +181,14 @@ test("server exposes only internal API routes and no execution routes", () => {
   assert.equal(serialized.includes("execution"), false);
   assert.equal(serialized.includes("market-open"), false);
   assert.equal(serialized.includes("market-close"), false);
+});
+
+test("dashboard host remains loopback-only until authentication exists", () => {
+  assert.equal(resolveDashboardHost(undefined), "127.0.0.1");
+  assert.equal(resolveDashboardHost(" localhost "), "localhost");
+  assert.equal(resolveDashboardHost("[::1]"), "::1");
+  assert.throws(() => resolveDashboardHost("0.0.0.0"), /loopback-only/);
+  assert.throws(() => resolveDashboardHost("192.168.1.20"), /loopback-only/);
 });
 
 test("bot monitoring status is read-only, disabled, and redacted", async () => {
@@ -474,7 +487,7 @@ test("watchlist interaction contract uses symbol-specific period chart data", as
   assert.equal(watchlistPeriodChanges.QQQ["1y"], "+21.6%");
 });
 
-test("browser bundle requests only the normalized read-only portfolio route", async () => {
+test("browser bundle requests only normalized read-only portfolio, watchlist, and market routes", async () => {
   const response = await callHandler(configuredHandler(), {
     url: "/app.js",
   });
@@ -483,6 +496,10 @@ test("browser bundle requests only the normalized read-only portfolio route", as
   assert.equal(response.text.includes("/api/etoro/identity"), false);
   assert.equal(response.text.includes("/api/etoro/demo/pnl"), false);
   assert.match(response.text, /getJson\("\/api\/etoro\/demo\/portfolio"\)/);
+  assert.match(response.text, /getJson\("\/api\/etoro\/watchlist\/default"\)/);
+  assert.match(response.text, /\/api\/etoro\/market\/chart\?symbol=/);
+  assert.equal(response.text.includes("/api/v1/market-data"), false);
+  assert.equal(response.text.includes("instrumentIds="), false);
   assert.match(response.text, /Partial provider read/);
   assert.match(response.text, /existing rows are retained in memory only/);
 });
@@ -1597,6 +1614,146 @@ test("demo trade preview validates required ticket fields", async () => {
   assert.equal(response.json.executionBlocked, true);
   assert.equal(response.json.error.code, "INVALID_DEMO_TRADE_PREVIEW");
   assert.match(response.json.error.message, /requires an instrument ID and units/);
+});
+
+function providerMeta(endpoint, requestId = `request-${endpoint}`) {
+  return {
+    endpoint,
+    method: "GET",
+    path: `/private/${endpoint}`,
+    baseUrl: "https://public-api.etoro.com",
+    status: 200,
+    requestId,
+    receivedAt: "2026-07-12T01:00:00.000Z",
+    durationMs: 3,
+  };
+}
+
+test("default watchlist route batches rates and strips provider identifiers", async () => {
+  const calls = [];
+  const handler = createRequestHandler({
+    loadConfig: configuredConfig,
+    fetchEndpoint: async (endpointName, options) => {
+      calls.push([endpointName, options.params]);
+      if (endpointName === "defaultWatchlist") {
+        return {
+          data: {
+            omittedItemCount: 1,
+            items: [
+              { instrumentId: 101, symbol: "AAPL", displayName: "Apple Inc.", rank: 1 },
+              { instrumentId: 202, symbol: "GLD", displayName: "SPDR Gold Shares", rank: 2 },
+            ],
+          },
+          provider: providerMeta(endpointName),
+        };
+      }
+      assert.equal(endpointName, "marketRates");
+      assert.deepEqual(options.params.instrumentIds, [101, 202]);
+      return {
+        data: { rates: [{ instrumentId: 101, bid: 190, ask: 191, lastExecution: 190.5, updatedAt: "2026-07-12T01:00:00.000Z" }] },
+        provider: providerMeta(endpointName),
+      };
+    },
+  });
+  const response = await callHandler(handler, { url: "/api/etoro/watchlist/default" });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.json.data.providerState, "partial");
+  assert.equal(response.json.data.omittedItemCount, 1);
+  assert.equal(response.json.data.unavailableRateCount, 1);
+  assert.equal(response.json.data.items[0].symbol, "AAPL");
+  assert.equal(response.json.data.items[1].rateStatus, "unavailable");
+  assert.equal(calls.filter(([name]) => name === "marketRates").length, 1);
+  assert.equal(response.text.includes("instrumentId"), false);
+  assert.equal(response.text.includes("101"), false);
+  assert.equal(response.text.includes("/private/"), false);
+  assert.equal(response.text.includes("public-api.etoro.com"), false);
+});
+
+test("default watchlist returns explicit partial state when the batched rate provider fails", async () => {
+  const handler = createRequestHandler({
+    loadConfig: configuredConfig,
+    fetchEndpoint: async (endpointName) => {
+      if (endpointName === "defaultWatchlist") {
+        return {
+          data: { omittedItemCount: 0, items: [{ instrumentId: 101, symbol: "AAPL", displayName: "Apple", rank: 1 }] },
+          provider: providerMeta(endpointName),
+        };
+      }
+      throw providerError("private rate failure", { code: "ETORO_PROVIDER_ERROR", status: 503 });
+    },
+  });
+  const response = await callHandler(handler, { url: "/api/etoro/watchlist/default" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.json.data.partialFailure, { component: "rates", state: "unavailable" });
+  assert.equal(response.json.data.items[0].rateStatus, "unavailable");
+  assert.equal(response.text.includes("private rate failure"), false);
+});
+
+test("market rate DTO resolves exact symbols then performs one batched rate read", async () => {
+  const calls = [];
+  const ids = { AAPL: 101, GLD: 202 };
+  const handler = createRequestHandler({
+    loadConfig: configuredConfig,
+    fetchEndpoint: async (endpointName, options) => {
+      calls.push([endpointName, options.params]);
+      if (endpointName === "instrumentSearch") {
+        const symbol = options.params.symbol;
+        return { data: { instrumentId: ids[symbol], symbol, displayName: `${symbol} name` }, provider: providerMeta(endpointName, `resolve-${symbol}`) };
+      }
+      assert.deepEqual(options.params.instrumentIds, [101, 202]);
+      return {
+        data: { rates: [
+          { instrumentId: 101, bid: 1, ask: 2, lastExecution: 1.5, updatedAt: "2026-07-12T01:00:00.000Z" },
+          { instrumentId: 202, bid: 3, ask: 4, lastExecution: 3.5, updatedAt: "2026-07-12T01:00:00.000Z" },
+        ] },
+        provider: providerMeta(endpointName),
+      };
+    },
+  });
+  const response = await callHandler(handler, { url: "/api/etoro/market/rates?symbols=aapl,GLD" });
+  assert.equal(response.status, 200);
+  assert.equal(response.json.data.providerState, "complete");
+  assert.deepEqual(response.json.data.items.map(({ symbol, resolution }) => [symbol, resolution]), [
+    ["AAPL", "exact"], ["GLD", "exact"],
+  ]);
+  assert.equal(calls.filter(([name]) => name === "marketRates").length, 1);
+  assert.equal(response.text.includes("instrumentId"), false);
+
+  const invalid = await callHandler(handler, { url: "/api/etoro/market/rates?symbols=AAPL,AAPL" });
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.json.error.code, "ETORO_INVALID_MARKET_QUERY");
+});
+
+test("market chart DTO exposes selected-period close points after exact resolution", async () => {
+  const handler = createRequestHandler({
+    loadConfig: configuredConfig,
+    fetchEndpoint: async (endpointName, options) => {
+      if (endpointName === "instrumentSearch") {
+        assert.equal(options.params.symbol, "AAPL");
+        return { data: { instrumentId: 101, symbol: "AAPL", displayName: "Apple" }, provider: providerMeta(endpointName) };
+      }
+      assert.equal(endpointName, "marketCandles");
+      assert.deepEqual(options.params, { instrumentId: 101, direction: "asc", interval: "FourHours", candlesCount: 42 });
+      return {
+        data: { interval: "FourHours", points: [
+          { at: "2026-07-11T00:00:00.000Z", close: 100 },
+          { at: "2026-07-12T00:00:00.000Z", close: 105 },
+        ] },
+        provider: providerMeta(endpointName),
+      };
+    },
+  });
+  const response = await callHandler(handler, { url: "/api/etoro/market/chart?symbol=AAPL&period=1w" });
+  assert.equal(response.status, 200);
+  assert.equal(response.json.data.resolution, "exact");
+  assert.equal(response.json.data.period, "1w");
+  assert.equal(response.json.data.changePercent, 5);
+  assert.deepEqual(response.json.data.points.map(({ close }) => close), [100, 105]);
+  assert.equal(response.text.includes("instrumentId"), false);
+
+  const invalid = await callHandler(handler, { url: "/api/etoro/market/chart?symbol=AAPL&period=2h" });
+  assert.equal(invalid.status, 400);
 });
 
 test("status route never returns configured secret values", async () => {
