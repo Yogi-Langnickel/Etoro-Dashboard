@@ -1,5 +1,5 @@
 import { createServer as createHttpServer } from "node:http";
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +20,23 @@ import {
 import { fetchReadOnlyEndpoint } from "./etoro-client.mjs";
 import { DEFAULT_READ_CACHE_TTL_MS, loadEtoroConfig, publicCredentialStatus } from "./etoro-config.mjs";
 import { researchIntelligenceStatus } from "./research-intelligence.mjs";
+import {
+  defaultWatchlistView,
+  marketChartView,
+  marketInputError,
+  marketRatesView,
+  MARKET_PERIODS,
+  normalizeRequestedSymbol,
+  requestedSymbols,
+} from "./market-views.mjs";
+import {
+  createReadOnlyProviderCache,
+  DEFAULT_PROVIDER_FAILURE_BACKOFF_MS,
+  publicProviderErrorMessage,
+} from "./provider-read-cache.mjs";
+import { syntheticFixtureWatermark } from "./synthetic-fixture.mjs";
+
+export { createReadOnlyProviderCache } from "./provider-read-cache.mjs";
 
 const STATIC_ROOT = fileURLToPath(new URL("./", import.meta.url));
 const DEFAULT_PORT = 4173;
@@ -54,18 +71,7 @@ const BOT_CONFIG_CSRF_HEADER = "x-etoro-dashboard-csrf";
 const BOT_CONFIG_CSRF_RESPONSE_HEADER = "x-etoro-dashboard-config-token";
 const botConfigCsrfToken = randomBytes(32).toString("base64url");
 const MAX_API_BODY_BYTES = 16 * 1024;
-export const DEFAULT_PROVIDER_FAILURE_BACKOFF_MS = 5_000;
-const MAX_PROVIDER_RETRY_AFTER_MS = 60_000;
-const SAFE_MARKET_SYMBOL = /^[A-Z0-9][A-Z0-9._:/-]{0,31}$/;
-const MAX_MARKET_RATE_SYMBOLS = 10;
-const MARKET_PERIODS = Object.freeze({
-  "24h": Object.freeze({ interval: "OneHour", candlesCount: 24 }),
-  "1w": Object.freeze({ interval: "FourHours", candlesCount: 42 }),
-  "1m": Object.freeze({ interval: "OneDay", candlesCount: 31 }),
-  "1y": Object.freeze({ interval: "OneDay", candlesCount: 366 }),
-  "5y": Object.freeze({ interval: "OneWeek", candlesCount: 261 }),
-  max: Object.freeze({ interval: "OneWeek", candlesCount: 1000 }),
-});
+export { DEFAULT_PROVIDER_FAILURE_BACKOFF_MS } from "./provider-read-cache.mjs";
 
 export function resolveDashboardHost(value) {
   const host = typeof value === "string" && value.trim() ? value.trim().toLowerCase() : "127.0.0.1";
@@ -122,6 +128,7 @@ const STATIC_FILES = new Map([
   ["/", "index.html"],
   ["/index.html", "index.html"],
   ["/styles.css", "styles.css"],
+  ["/browser-contracts.js", "browser-contracts.js"],
   ["/app.js", "app.js"],
 ]);
 
@@ -325,41 +332,6 @@ function safeErrorPayload(error) {
   };
 }
 
-function redactErrorMessage(message, config = {}) {
-  let redacted = String(message ?? "");
-  const replacements = [
-    config.apiKey,
-    config.userKey,
-    "x-api-key",
-    "x-user-key",
-    "authorization",
-    "api-key",
-    "user-key",
-  ].filter(Boolean);
-
-  for (const value of replacements) {
-    redacted = redacted.replaceAll(String(value), "[redacted]");
-  }
-
-  return redacted;
-}
-
-function publicProviderErrorMessage(error) {
-  if (error?.code === "ETORO_TIMEOUT") {
-    return "eToro provider request timed out.";
-  }
-
-  if (error?.status === 429) {
-    return "eToro provider rate limit is temporarily backing off.";
-  }
-
-  if (error?.status >= 500) {
-    return "eToro provider is temporarily unavailable.";
-  }
-
-  return "eToro provider request failed.";
-}
-
 function assertSafeStaticPath(pathname) {
   let decoded = "/";
 
@@ -457,344 +429,6 @@ function publicProviderMetadata(provider = {}) {
   };
 }
 
-function marketInputError(message = "Market data query is invalid.") {
-  const error = new Error(message);
-  error.code = "ETORO_INVALID_MARKET_QUERY";
-  error.status = 400;
-  return error;
-}
-
-function normalizeRequestedSymbol(value) {
-  const symbol = typeof value === "string" ? value.trim().toUpperCase() : "";
-  if (!SAFE_MARKET_SYMBOL.test(symbol)) throw marketInputError();
-  return symbol;
-}
-
-function requestedSymbols(searchParams) {
-  const raw = searchParams?.get("symbols") ?? "";
-  const symbols = raw.split(",").filter(Boolean).map(normalizeRequestedSymbol);
-  if (symbols.length === 0 || symbols.length > MAX_MARKET_RATE_SYMBOLS || new Set(symbols).size !== symbols.length) {
-    throw marketInputError();
-  }
-  return symbols;
-}
-
-async function resolveExactSymbol(fetchEndpoint, config, symbol) {
-  const result = await fetchEndpoint("instrumentSearch", {
-    credentials: config,
-    params: { symbol },
-  });
-  return { data: result.data, provider: result.provider };
-}
-
-function combinedProviderMetadata(endpoint, results) {
-  const providers = results.map((result) => result?.provider).filter(Boolean);
-  return {
-    endpoint,
-    method: "GET",
-    status: 200,
-    requestId: providers[0]?.requestId ?? null,
-    receivedAt: providers.at(-1)?.receivedAt ?? new Date().toISOString(),
-    durationMs: providers.reduce((total, provider) => total + (Number(provider.durationMs) || 0), 0),
-  };
-}
-
-async function defaultWatchlistView(config, fetchEndpoint) {
-  const watchlist = await fetchEndpoint("defaultWatchlist", { credentials: config });
-  const internalItems = watchlist.data.items;
-  let rates = null;
-  let rateFailure = false;
-
-  if (internalItems.length > 0) {
-    try {
-      rates = await fetchEndpoint("marketRates", {
-        credentials: config,
-        params: { instrumentIds: internalItems.map(({ instrumentId }) => instrumentId) },
-      });
-    } catch {
-      rateFailure = true;
-    }
-  }
-
-  const ratesById = new Map((rates?.data.rates ?? []).map((rate) => [rate.instrumentId, rate]));
-  const items = internalItems.map(({ instrumentId, symbol, displayName, rank }) => {
-    const rate = ratesById.get(instrumentId);
-    return {
-      symbol,
-      displayName,
-      rank,
-      bid: rate?.bid ?? null,
-      ask: rate?.ask ?? null,
-      lastExecution: rate?.lastExecution ?? null,
-      rateUpdatedAt: rate?.updatedAt ?? null,
-      rateStatus: rate ? "available" : "unavailable",
-    };
-  });
-  const unavailableRateCount = items.filter(({ rateStatus }) => rateStatus === "unavailable").length;
-
-  return {
-    data: {
-      source: "provider-default-watchlist",
-      itemCount: items.length,
-      omittedItemCount: watchlist.data.omittedItemCount,
-      unavailableRateCount,
-      providerState: rateFailure || unavailableRateCount > 0 ? "partial" : "complete",
-      partialFailure: rateFailure ? { component: "rates", state: "unavailable" } : null,
-      items,
-    },
-    provider: combinedProviderMetadata("defaultWatchlistView", [watchlist, rates]),
-  };
-}
-
-async function marketRatesView(config, fetchEndpoint, symbols) {
-  const resolutions = await Promise.all(symbols.map(async (symbol) => {
-    try {
-      return { symbol, ...(await resolveExactSymbol(fetchEndpoint, config, symbol)), resolution: "exact" };
-    } catch {
-      return { symbol, data: null, provider: null, resolution: "unresolved" };
-    }
-  }));
-  const exact = resolutions.filter(({ resolution }) => resolution === "exact");
-  let rates = null;
-  let rateFailure = false;
-  if (exact.length > 0) {
-    try {
-      rates = await fetchEndpoint("marketRates", {
-        credentials: config,
-        params: { instrumentIds: exact.map(({ data }) => data.instrumentId) },
-      });
-    } catch {
-      rateFailure = true;
-    }
-  }
-  const ratesById = new Map((rates?.data.rates ?? []).map((rate) => [rate.instrumentId, rate]));
-  const items = resolutions.map(({ symbol, data, resolution }) => {
-    const rate = data ? ratesById.get(data.instrumentId) : null;
-    return {
-      symbol,
-      displayName: data?.displayName ?? symbol,
-      resolution,
-      bid: rate?.bid ?? null,
-      ask: rate?.ask ?? null,
-      lastExecution: rate?.lastExecution ?? null,
-      rateUpdatedAt: rate?.updatedAt ?? null,
-      rateStatus: rate ? "available" : "unavailable",
-    };
-  });
-  return {
-    data: {
-      requestedCount: symbols.length,
-      exactMatchCount: exact.length,
-      unavailableRateCount: items.filter(({ rateStatus }) => rateStatus === "unavailable").length,
-      providerState: rateFailure || exact.length !== symbols.length || items.some(({ rateStatus }) => rateStatus === "unavailable")
-        ? "partial"
-        : "complete",
-      items,
-    },
-    provider: combinedProviderMetadata("marketRatesView", [...resolutions, rates]),
-  };
-}
-
-async function marketChartView(config, fetchEndpoint, symbol, period) {
-  const periodConfig = MARKET_PERIODS[period];
-  if (!periodConfig) throw marketInputError();
-  const resolution = await resolveExactSymbol(fetchEndpoint, config, symbol);
-  const candles = await fetchEndpoint("marketCandles", {
-    credentials: config,
-    params: {
-      instrumentId: resolution.data.instrumentId,
-      direction: "asc",
-      interval: periodConfig.interval,
-      candlesCount: periodConfig.candlesCount,
-    },
-  });
-  const points = candles.data.points;
-  const first = points[0].close;
-  const last = points.at(-1).close;
-  return {
-    data: {
-      symbol,
-      displayName: resolution.data.displayName,
-      resolution: "exact",
-      period,
-      interval: candles.data.interval,
-      pointCount: points.length,
-      changePercent: first > 0 ? Number((((last - first) / first) * 100).toFixed(4)) : null,
-      providerUpdatedAt: points.at(-1).at,
-      points,
-    },
-    provider: combinedProviderMetadata("marketChartView", [resolution, candles]),
-  };
-}
-
-function cloneJson(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-function syntheticFixtureWatermark(surface) {
-  return {
-    surface,
-    kind: "synthetic-fixture",
-    label: "Synthetic fixture",
-    detail: "No live provider response, account identifier, or raw payload is present.",
-    sourceLineage: {
-      providerResponses: "absent",
-      accountLinkedData: "absent",
-      persistence: "not-persisted",
-      generatedFrom: "repo-local synthetic status DTO",
-    },
-    liveProviderConnected: false,
-    containsPrivateAccountData: false,
-    containsRawProviderPayloads: false,
-    safeForPublicDemo: true,
-  };
-}
-
-function readOnlyCacheKey(endpointName, config) {
-  const credentialFingerprint = createHash("sha256")
-    .update(config.apiKey ?? "")
-    .update("\0")
-    .update(config.userKey ?? "")
-    .digest("hex");
-
-  return [
-    endpointName,
-    config.baseUrl,
-    config.credentialSource,
-    config.credentialFileLoaded ? "file" : "no-file",
-    credentialFingerprint,
-  ].join("|");
-}
-
-function withCacheMetadata(result, cacheState, entry) {
-  return {
-    ...cloneJson(result),
-    cache: {
-      state: cacheState,
-      cachedAt: entry.cachedAt,
-      expiresAt: entry.expiresAt,
-      ttlMs: entry.ttlMs,
-    },
-  };
-}
-
-function providerFailureBackoffEligible(error) {
-  return error?.code === "ETORO_TIMEOUT" || error?.status === 429 || error?.status >= 500;
-}
-
-function serializeProviderError(error, config) {
-  return {
-    code: error?.code ?? "ETORO_PROVIDER_UNAVAILABLE",
-    message: publicProviderErrorMessage(error),
-    redactedDetail: redactErrorMessage(error?.message, config),
-    status: error?.status ?? undefined,
-    requestId: error?.requestId ?? undefined,
-    retryAfterMs: Number.isFinite(error?.retryAfterMs) ? error.retryAfterMs : undefined,
-  };
-}
-
-function providerErrorWithCacheMetadata(serializedError, cacheState, entry) {
-  const error = new Error(serializedError.message);
-  error.code = serializedError.code;
-  error.status = serializedError.status;
-  error.requestId = serializedError.requestId;
-  error.cache = {
-    state: cacheState,
-    cachedAt: entry.cachedAt,
-    expiresAt: entry.expiresAt,
-    ttlMs: entry.ttlMs,
-    reason: serializedError.code,
-  };
-  return error;
-}
-
-function publicProviderError(error, config) {
-  const serializedError = serializeProviderError(error, config);
-  const publicError = new Error(serializedError.message);
-  publicError.code = serializedError.code;
-  publicError.status = serializedError.status;
-  publicError.requestId = serializedError.requestId;
-  return publicError;
-}
-
-function resolveCacheTtlMs(ttlMs, config) {
-  return typeof ttlMs === "function" ? ttlMs(config) : ttlMs;
-}
-
-export function createReadOnlyProviderCache({
-  ttlMs = DEFAULT_READ_CACHE_TTL_MS,
-  failureBackoffMs = DEFAULT_PROVIDER_FAILURE_BACKOFF_MS,
-  now = Date.now,
-} = {}) {
-  const entries = new Map();
-
-  return {
-    async fetch(endpointName, config, fetchEndpoint) {
-      const key = readOnlyCacheKey(endpointName, config);
-      const nowMs = now();
-      const resolvedTtlMs = resolveCacheTtlMs(ttlMs, config);
-      const resolvedFailureBackoffMs = resolveCacheTtlMs(failureBackoffMs, config);
-      const existing = entries.get(key);
-
-      if (existing?.value && existing.expiresAtMs > nowMs) {
-        return withCacheMetadata(existing.value, "hit", existing);
-      }
-
-      if (existing?.error && existing.expiresAtMs > nowMs) {
-        throw providerErrorWithCacheMetadata(existing.error, "backoff", existing);
-      }
-
-      if (existing?.inflight) {
-        const value = await existing.inflight;
-        const updated = entries.get(key);
-        return withCacheMetadata(value, "coalesced", updated);
-      }
-
-      const entry = {
-        cachedAt: new Date(nowMs).toISOString(),
-        expiresAt: new Date(nowMs + resolvedTtlMs).toISOString(),
-        expiresAtMs: nowMs + resolvedTtlMs,
-        ttlMs: resolvedTtlMs,
-      };
-
-      entry.inflight = fetchEndpoint(endpointName, { credentials: config })
-        .then((value) => {
-          const cachedAtMs = now();
-          entry.value = cloneJson(value);
-          entry.cachedAt = new Date(cachedAtMs).toISOString();
-          entry.expiresAtMs = cachedAtMs + resolvedTtlMs;
-          entry.expiresAt = new Date(entry.expiresAtMs).toISOString();
-          delete entry.inflight;
-          entries.set(key, entry);
-          return entry.value;
-        })
-        .catch((error) => {
-          if (!providerFailureBackoffEligible(error) || resolvedFailureBackoffMs <= 0) {
-            entries.delete(key);
-            throw publicProviderError(error, config);
-          }
-
-          const backoffStartedAt = now();
-          const providerBackoffMs = Number.isFinite(error?.retryAfterMs)
-            ? Math.min(MAX_PROVIDER_RETRY_AFTER_MS, Math.max(0, error.retryAfterMs))
-            : 0;
-          const effectiveBackoffMs = Math.max(resolvedFailureBackoffMs, providerBackoffMs);
-          entry.error = serializeProviderError(error, config);
-          entry.cachedAt = new Date(backoffStartedAt).toISOString();
-          entry.expiresAtMs = backoffStartedAt + effectiveBackoffMs;
-          entry.expiresAt = new Date(entry.expiresAtMs).toISOString();
-          entry.ttlMs = effectiveBackoffMs;
-          delete entry.inflight;
-          entries.set(key, entry);
-          throw providerErrorWithCacheMetadata(entry.error, "error", entry);
-        });
-
-      entries.set(key, entry);
-      const value = await entry.inflight;
-      return withCacheMetadata(value, "miss", entry);
-    },
-  };
-}
 
 function botMonitoringStatus(config) {
   return {
