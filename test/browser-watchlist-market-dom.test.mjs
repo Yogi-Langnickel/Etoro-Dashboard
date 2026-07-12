@@ -192,6 +192,11 @@ test("watchlist and market DTOs reject identifier-shaped or mismatched data", as
   poisoned.data.items[0].instrumentId = 101;
   assert.throws(() => normalizeWatchlistViewPayload(poisoned), /unavailable/);
 
+  const crossedRate = watchlistPayload();
+  crossedRate.data.items[0].bid = 192;
+  crossedRate.data.items[0].ask = 191;
+  assert.throws(() => normalizeWatchlistViewPayload(crossedRate), /unavailable/);
+
   assert.throws(() => normalizeMarketChartPayload({
     data: {
       symbol: "GLD",
@@ -201,6 +206,21 @@ test("watchlist and market DTOs reject identifier-shaped or mismatched data", as
       interval: "FourHours",
       pointCount: 1,
       changePercent: 0,
+      providerUpdatedAt: "2026-07-12T01:00:00.000Z",
+      points: [{ at: "2026-07-12T01:00:00.000Z", close: 1 }],
+    },
+    cache: cache(),
+  }, "AAPL", "1w"), /unavailable/);
+
+  assert.throws(() => normalizeMarketChartPayload({
+    data: {
+      symbol: "AAPL",
+      displayName: "Apple",
+      resolution: "exact",
+      period: "1w",
+      interval: "OneMinute",
+      pointCount: 1,
+      changePercent: 99,
       providerUpdatedAt: "2026-07-12T01:00:00.000Z",
       points: [{ at: "2026-07-12T01:00:00.000Z", close: 1 }],
     },

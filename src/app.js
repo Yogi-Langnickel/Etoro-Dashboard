@@ -170,6 +170,14 @@ function portfolioChartFor(symbol, period) {
 
 const portfolioForbiddenKeys = /^(?:account|position|order|instrument|cid|gcId|rawPayload|providerPayload)(?:Id|Ids|ID|IDs)?$/i;
 const portfolioCacheStates = new Set(["miss", "hit", "coalesced"]);
+const marketPeriodIntervals = Object.freeze({
+  "24h": "OneHour",
+  "1w": "FourHours",
+  "1m": "OneDay",
+  "1y": "OneDay",
+  "5y": "OneWeek",
+  max: "OneWeek",
+});
 
 function hasExactKeys(value, expectedKeys) {
   const actual = Object.keys(value).sort();
@@ -356,6 +364,7 @@ function normalizeWatchlistViewPayload(payload) {
       "symbol", "displayName", "rank", "bid", "ask", "lastExecution", "rateUpdatedAt", "rateStatus",
     ]) || typeof item.symbol !== "string" || !/^[A-Z0-9][A-Z0-9._:/-]{0,31}$/.test(item.symbol) ||
       symbols.has(item.symbol) || typeof item.displayName !== "string" || !item.displayName.trim() ||
+      /[\u0000-\u001F\u007F]/.test(item.displayName) ||
       item.displayName.length > 120 || !Number.isInteger(item.rank) || item.rank < 0 ||
       !["available", "unavailable"].includes(item.rateStatus)) {
       throw new Error("Watchlist data is unavailable.");
@@ -363,7 +372,7 @@ function normalizeWatchlistViewPayload(payload) {
     symbols.add(item.symbol);
     const available = item.rateStatus === "available";
     const numericValues = [item.bid, item.ask];
-    if ((available && (!numericValues.every((value) => Number.isFinite(value) && value >= 0) ||
+    if ((available && (!numericValues.every((value) => Number.isFinite(value) && value >= 0) || item.ask < item.bid ||
       (item.lastExecution !== null && (!Number.isFinite(item.lastExecution) || item.lastExecution < 0)) ||
       !isIsoInstant(item.rateUpdatedAt))) ||
       (!available && (item.bid !== null || item.ask !== null || item.lastExecution !== null || item.rateUpdatedAt !== null))) {
@@ -373,7 +382,9 @@ function normalizeWatchlistViewPayload(payload) {
   });
   const unavailable = items.filter(({ rateStatus }) => rateStatus === "unavailable").length;
   if (items.length !== data.itemCount || unavailable !== data.unavailableRateCount ||
-    (data.providerState === "complete" && (unavailable > 0 || data.partialFailure !== null))) {
+    (data.providerState === "complete" && (unavailable > 0 || data.partialFailure !== null)) ||
+    (data.providerState === "partial" && unavailable === 0 && data.partialFailure === null) ||
+    (data.partialFailure !== null && data.providerState !== "partial")) {
     throw new Error("Watchlist data is unavailable.");
   }
   return {
@@ -393,7 +404,7 @@ function normalizeMarketChartPayload(payload, expectedSymbol, expectedPeriod) {
       "symbol", "displayName", "resolution", "period", "interval", "pointCount", "changePercent", "providerUpdatedAt", "points",
     ]) || data.symbol !== expectedSymbol || data.period !== expectedPeriod || data.resolution !== "exact" ||
     typeof data.displayName !== "string" || !data.displayName.trim() || data.displayName.length > 120 ||
-    typeof data.interval !== "string" || !Array.isArray(data.points) || data.points.length < 1 || data.points.length > 1000 ||
+    data.interval !== marketPeriodIntervals[expectedPeriod] || !Array.isArray(data.points) || data.points.length < 1 || data.points.length > 1000 ||
     data.pointCount !== data.points.length || (data.changePercent !== null && !Number.isFinite(data.changePercent)) ||
     !isIsoInstant(data.providerUpdatedAt)) {
     throw new Error("Market chart data is unavailable.");
@@ -405,6 +416,13 @@ function normalizeMarketChartPayload(payload, expectedSymbol, expectedPeriod) {
     }
     return { at: point.at, close: point.close };
   });
+  const firstClose = points[0].close;
+  const expectedChange = firstClose > 0
+    ? Number((((points.at(-1).close - firstClose) / firstClose) * 100).toFixed(4))
+    : null;
+  if (data.providerUpdatedAt !== points.at(-1).at || data.changePercent !== expectedChange) {
+    throw new Error("Market chart data is unavailable.");
+  }
   return { ...data, displayName: data.displayName.trim(), points, cache: normalizeReadCache(payload.cache, "Market chart data is unavailable.") };
 }
 
@@ -691,7 +709,7 @@ function labelize(value) {
 }
 
 function periodLabel(value) {
-  return value === "max" ? "Max" : value;
+  return value === "max" ? "Max API window" : value;
 }
 
 function signedClass(value) {
