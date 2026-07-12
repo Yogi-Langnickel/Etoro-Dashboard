@@ -2,104 +2,38 @@ import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import {
+  ALLOWED_BOT_BUDGETS_USD,
+  ALLOWED_BOT_CADENCES,
+  ALLOWED_BOT_INSTRUMENT_CLASSES,
+  ALLOWED_BOT_MARKETS,
+  ALLOWED_BOT_RUN_MODES,
+  ALLOWED_BOT_STRATEGY_IDS,
+  BOT_CONFIG_CONTRACT_VERSION,
+  BOT_CONFIG_MIRROR_SOURCE,
+  BOT_MARKET_INSTRUMENT_CLASS_RULES,
+  BOT_RUN_MODE_POLICY,
+  BOT_STRATEGY_CONFIG_RULES,
+  DISABLED_BOT_RUN_MODES,
+  MIN_BOT_EVALUATION_INTERVAL_MINUTES,
+} from "./money-maker-contract.mjs";
+export {
+  ALLOWED_BOT_BUDGETS_USD,
+  ALLOWED_BOT_CADENCES,
+  ALLOWED_BOT_INSTRUMENT_CLASSES,
+  ALLOWED_BOT_MARKETS,
+  ALLOWED_BOT_RUN_MODES,
+  ALLOWED_BOT_STRATEGY_IDS,
+  BOT_CONFIG_CONTRACT_VERSION,
+  BOT_CONFIG_MIRROR_SOURCE,
+  BOT_MARKET_INSTRUMENT_CLASS_RULES,
+  BOT_RUN_MODE_POLICY,
+  BOT_STRATEGY_CONFIG_RULES,
+  DISABLED_BOT_RUN_MODES,
+  MIN_BOT_EVALUATION_INTERVAL_MINUTES,
+} from "./money-maker-contract.mjs";
 
 const DEFAULT_BOT_CONFIG_FILE = join(homedir(), ".config", "etoro-dashboard", "bot-config.json");
-export const BOT_CONFIG_MIRROR_SOURCE = "Money-maker-3000/src/money_maker_3000/contracts.py";
-export const BOT_CONFIG_CONTRACT_VERSION = "0.1.0-sim";
-
-export const ALLOWED_BOT_STRATEGY_IDS = Object.freeze([
-  "dca-cash-reserve",
-  "threshold-rebalance",
-  "volatility-band-accumulator",
-  "slow-trend-allocation",
-  "news-aware-watchlist",
-]);
-
-export const ALLOWED_BOT_BUDGETS_USD = Object.freeze([500, 1000, 1500, 2500]);
-export const ALLOWED_BOT_RUN_MODES = Object.freeze(["backtest"]);
-export const DISABLED_BOT_RUN_MODES = Object.freeze(["execute", "trade", "trading"]);
-export const ALLOWED_BOT_MARKETS = Object.freeze(["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"]);
-export const ALLOWED_BOT_INSTRUMENT_CLASSES = Object.freeze(["EQUITY", "ETF", "FOREX", "COMMODITY"]);
-export const ALLOWED_BOT_CADENCES = Object.freeze(["daily", "weekly"]);
-export const MIN_BOT_EVALUATION_INTERVAL_MINUTES = 240;
-export const BOT_RUN_MODE_POLICY = Object.freeze({
-  backtest: Object.freeze({
-    enabled: true,
-    providerCalls: "blocked",
-    historicalInputs: "offline-fixture-only",
-    accountData: "absent",
-    executionRoutes: "absent",
-  }),
-  execute: Object.freeze({
-    enabled: false,
-    providerCalls: "blocked",
-    demoExecution: "blocked",
-    liveExecution: "blocked",
-    reason: "demo execution requires a separate review and explicit approval",
-  }),
-  trade: Object.freeze({
-    enabled: false,
-    providerCalls: "blocked",
-    demoExecution: "blocked",
-    liveExecution: "blocked",
-    reason: "trading aliases are disabled; only offline backtest mode is allowed",
-  }),
-  trading: Object.freeze({
-    enabled: false,
-    providerCalls: "blocked",
-    demoExecution: "blocked",
-    liveExecution: "blocked",
-    reason: "trading aliases are disabled; only offline backtest mode is allowed",
-  }),
-});
-export const BOT_MARKET_INSTRUMENT_CLASS_RULES = Object.freeze({
-  US_EQUITIES: Object.freeze(["EQUITY", "ETF"]),
-  AU_EQUITIES: Object.freeze(["EQUITY", "ETF"]),
-  FOREX: Object.freeze(["FOREX"]),
-  COMMODITIES: Object.freeze(["COMMODITY", "ETF"]),
-});
-export const BOT_STRATEGY_CONFIG_RULES = Object.freeze({
-  "dca-cash-reserve": Object.freeze({
-    name: "Cash-reserved DCA",
-    version: "0.1.0-sim",
-    status: "simulation-only",
-    allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES"]),
-    allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF"]),
-    cadence: "daily",
-  }),
-  "threshold-rebalance": Object.freeze({
-    name: "Threshold rebalance",
-    version: "0.1.0-sim",
-    status: "simulation-only",
-    allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES", "COMMODITIES"]),
-    allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF", "COMMODITY"]),
-    cadence: "weekly",
-  }),
-  "volatility-band-accumulator": Object.freeze({
-    name: "Volatility band accumulator",
-    version: "0.1.0-sim",
-    status: "simulation-only",
-    allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES"]),
-    allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF"]),
-    cadence: "daily",
-  }),
-  "slow-trend-allocation": Object.freeze({
-    name: "Slow trend allocation",
-    version: "0.1.0-sim",
-    status: "simulation-only",
-    allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES"]),
-    allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF"]),
-    cadence: "weekly",
-  }),
-  "news-aware-watchlist": Object.freeze({
-    name: "News-aware watchlist",
-    version: "0.1.0-plan",
-    status: "context-only",
-    allowedMarkets: Object.freeze(["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"]),
-    allowedInstrumentClasses: Object.freeze(["EQUITY", "ETF", "FOREX", "COMMODITY"]),
-    cadence: "daily",
-  }),
-});
 
 const DEFAULT_BOT_CONFIG = Object.freeze({
   runMode: "backtest",

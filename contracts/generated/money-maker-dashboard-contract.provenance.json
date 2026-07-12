@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "generated-contract-provenance.v1",
+  "producerRepository": "Yogi-Langnickel/Money-maker-3000",
+  "producerCommit": "93524a0a43f763f1d06cb5cbc4be62acbbe2e499",
+  "producerPath": "contracts/dashboard-simulation-contract.json",
+  "artifactSha256": "75571c32a3a04a28ebba29c54edc4dadabfc3101bf101f005a2774e113c060f0"
+}

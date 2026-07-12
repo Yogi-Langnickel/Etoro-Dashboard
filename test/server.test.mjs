@@ -12,6 +12,7 @@ import {
   ALLOWED_BOT_INSTRUMENT_CLASSES,
   ALLOWED_BOT_MARKETS,
   ALLOWED_BOT_RUN_MODES,
+  ALLOWED_BOT_STRATEGY_IDS,
   BOT_CONFIG_CONTRACT_VERSION,
   BOT_CONFIG_MIRROR_SOURCE,
   BOT_RUN_MODE_POLICY,
@@ -21,6 +22,10 @@ import {
   MIN_BOT_EVALUATION_INTERVAL_MINUTES,
   saveBotConfig,
 } from "../src/bot-config-store.mjs";
+import {
+  MONEY_MAKER_CONTRACT,
+  MONEY_MAKER_CONTRACT_PROVENANCE,
+} from "../src/money-maker-contract.mjs";
 import {
   DEFAULT_PROVIDER_FAILURE_BACKOFF_MS,
   INTERNAL_API_ROUTES,
@@ -75,7 +80,7 @@ const execFileAsync = promisify(execFile);
 
 async function readMoneyMakerContractSnapshot() {
   return JSON.parse(
-    await readFile(new URL("./fixtures/money-maker-simulation-contract.snapshot.json", import.meta.url), "utf8"),
+    await readFile(new URL("../contracts/generated/money-maker-dashboard-contract.json", import.meta.url), "utf8"),
   );
 }
 
@@ -708,7 +713,7 @@ test("bot config returns default server-side simulation controls without secrets
   assert.equal(response.text.includes('"accountId"'), false);
 });
 
-test("bot config mirror matches the Money-maker simulation contract snapshot", async () => {
+test("bot config consumes the generated Money-maker simulation contract", async () => {
   const snapshot = await readMoneyMakerContractSnapshot();
 
   assert.equal(BOT_CONFIG_MIRROR_SOURCE, snapshot.source);
@@ -725,6 +730,11 @@ test("bot config mirror matches the Money-maker simulation contract snapshot", a
   assert.deepEqual(ALLOWED_BOT_CADENCES, snapshot.cadences);
   assert.equal(MIN_BOT_EVALUATION_INTERVAL_MINUTES, snapshot.minimumEvaluationIntervalMinutes);
   assert.deepEqual(BOT_STRATEGY_CONFIG_RULES, snapshot.strategyRules);
+  assert.deepEqual(ALLOWED_BOT_STRATEGY_IDS, snapshot.strategyIds);
+  assert.deepEqual(new Set(ALLOWED_BOT_STRATEGY_IDS), new Set(Object.keys(BOT_STRATEGY_CONFIG_RULES)));
+  assert.equal(MONEY_MAKER_CONTRACT_PROVENANCE.producerCommit, "93524a0a43f763f1d06cb5cbc4be62acbbe2e499");
+  assert.equal(Object.isFrozen(MONEY_MAKER_CONTRACT), true);
+  assert.equal(Object.isFrozen(BOT_STRATEGY_CONFIG_RULES["dca-cash-reserve"].parameterSchema), true);
 });
 
 test("bot config snapshot matches local Money-maker Python contract when available", async (context) => {
@@ -740,45 +750,9 @@ test("bot config snapshot matches local Money-maker Python contract when availab
 
   const python = `
 import json
-from money_maker_3000.contracts import (
-    BLOCKED_SIMULATION_INSTRUMENT_CLASSES,
-    MINIMUM_SIMULATION_EVALUATION_INTERVAL_MINUTES,
-    SIMULATION_ALLOWED_RUN_MODES,
-    SIMULATION_CADENCES,
-    SIMULATION_CONTRACT_SOURCE,
-    SIMULATION_CONTRACT_VERSION,
-    SIMULATION_DISABLED_RUN_MODES,
-    SIMULATION_INSTRUMENT_CLASSES,
-    SIMULATION_MARKET_INSTRUMENT_CLASS_RULES,
-    SIMULATION_MARKETS,
-    SIMULATION_RUN_MODE_POLICY,
-    SIMULATION_STRATEGY_CONFIG_RULES,
-)
+from money_maker_3000.contract_manifest import build_dashboard_contract_manifest
 
-print(json.dumps({
-    "source": SIMULATION_CONTRACT_SOURCE,
-    "version": SIMULATION_CONTRACT_VERSION,
-    "markets": list(SIMULATION_MARKETS),
-    "instrumentClasses": list(SIMULATION_INSTRUMENT_CLASSES),
-    "blockedInstrumentClasses": list(BLOCKED_SIMULATION_INSTRUMENT_CLASSES),
-    "runModes": list(SIMULATION_ALLOWED_RUN_MODES),
-    "disabledRunModes": list(SIMULATION_DISABLED_RUN_MODES),
-    "runModePolicy": SIMULATION_RUN_MODE_POLICY,
-    "marketInstrumentClassRules": {
-        key: list(value)
-        for key, value in SIMULATION_MARKET_INSTRUMENT_CLASS_RULES.items()
-    },
-    "cadences": list(SIMULATION_CADENCES),
-    "minimumEvaluationIntervalMinutes": MINIMUM_SIMULATION_EVALUATION_INTERVAL_MINUTES,
-    "strategyRules": {
-        key: {
-            **value,
-            "allowedMarkets": list(value["allowedMarkets"]),
-            "allowedInstrumentClasses": list(value["allowedInstrumentClasses"]),
-        }
-        for key, value in SIMULATION_STRATEGY_CONFIG_RULES.items()
-    },
-}, sort_keys=True))
+print(json.dumps(build_dashboard_contract_manifest(), sort_keys=True))
 `;
   const { stdout } = await execFileAsync("python3", ["-c", python], {
     env: {
