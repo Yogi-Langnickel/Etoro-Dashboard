@@ -47,6 +47,7 @@ const safeLiteralValues = new Set([
 const safeLiteralPattern = /^(?:test|mock|fake|synthetic|example|placeholder|redacted)(?:[-_][a-z0-9_-]+)?$/i;
 const placeholderLiteralPattern = /^your[-_][a-z0-9_-]+$/i;
 const knownFixtureLiteralPattern = /^(?:server|file|env)-(?:api|user)-(?:secret|key)(?:-[a-z0-9_-]+)?$/i;
+const productionPortfolioFixturePattern = /(?:portfolioChartPoints|portfolioEnrichmentReceipts|portfolioPeriodChanges|mock-read-|\b(?:SPY|NVDA|BTC|EURUSD)\b|Portfolio:\s*synthetic fixture|data-instrument-row[^>]+data-symbol=|performance-line"\s+points="[0-9]|\$[0-9][0-9,]*\.\d{2}|\brequest(?:-|_)?id\b\s*[:=])/i;
 
 function normalizedPath(path) {
   return path.replaceAll("\\", "/").replace(/^\.\//, "");
@@ -110,6 +111,11 @@ export function inspectPublicSafetyEntries(entries) {
     }
 
     const content = contentBuffer.toString("utf8");
+
+    const productionPortfolioSource = path === "src/index.html" ? content.split('id="bot-view"')[0] : content;
+    if (["src/app.js", "src/index.html", "src/browser-fixtures.js"].includes(path) && productionPortfolioFixturePattern.test(productionPortfolioSource)) {
+      findings.push({ path, reason: "production Portfolio View fixture or plausible hard-coded portfolio value" });
+    }
 
     for (const rule of highConfidenceSecretPatterns) {
       if (rule.pattern.test(content)) {

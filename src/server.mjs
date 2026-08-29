@@ -9,8 +9,8 @@ import {
   publicBotConfigPayload,
   saveBotConfig,
 } from "./bot-config-store.mjs";
-import { fetchReadOnlyEndpoint } from "./etoro-client.mjs";
-import { DEFAULT_READ_CACHE_TTL_MS, loadEtoroConfig, publicCredentialStatus } from "./etoro-config.mjs";
+import { fetchPortfolioSnapshot, fetchReadOnlyEndpoint } from "./etoro-client.mjs";
+import { DEFAULT_READ_CACHE_TTL_MS, credentialsForEnvironment, ETORO_ENVIRONMENTS, loadEtoroConfig, publicCredentialStatus } from "./etoro-config.mjs";
 import {
   defaultWatchlistView,
   marketChartView,
@@ -54,6 +54,7 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/identity",
   "/api/etoro/demo/pnl",
   "/api/etoro/demo/portfolio",
+  "/api/etoro/portfolio",
   "/api/etoro/watchlist/default",
   "/api/etoro/market/resolve",
   "/api/etoro/market/rates",
@@ -235,6 +236,9 @@ const PUBLIC_CONFIG_ERROR_MESSAGES = Object.freeze({
   ETORO_INVALID_CREDENTIAL_FILE: "Credential file must contain a JSON object.",
   ETORO_INVALID_CREDENTIAL_JSON: "Credential file contains invalid JSON.",
   ETORO_CREDENTIAL_FILE_READ_FAILED: "Unable to read eToro credential file.",
+  ETORO_CREDENTIAL_PERMISSIONS: "eToro credential storage must be owner-only.",
+  ETORO_INVALID_ENVIRONMENT: "Requested eToro environment is invalid.",
+  ETORO_PROFILE_NOT_CONFIGURED: "Requested eToro environment is not configured on the server.",
   ETORO_CREDENTIALS_MISSING: "eToro credentials are not configured on the server.",
   ETORO_ENDPOINT_NOT_ALLOWED: "Requested eToro endpoint is not in the read-only allow-list.",
   ETORO_INVALID_MARKET_QUERY: "Market data query is invalid.",
@@ -260,7 +264,6 @@ function safeErrorPayload(error) {
     code: safeErrorCode(error),
     message: safePublicErrorMessage(error),
     status: error?.status ?? undefined,
-    requestId: error?.requestId ?? undefined,
   };
 }
 
@@ -353,12 +356,41 @@ function publicProviderMetadata(provider = {}) {
     endpoint: provider.endpoint,
     method: provider.method,
     status: provider.status,
-    requestId: provider.requestId,
     receivedAt: provider.receivedAt,
     durationMs: provider.durationMs,
     endpointDetails: "server-only",
     baseUrlDetails: "server-only",
   };
+}
+
+function requestedEnvironment(searchParams, defaultEnvironment) {
+  const environment = searchParams?.get("environment") ?? defaultEnvironment;
+  if (!ETORO_ENVIRONMENTS.includes(environment)) {
+    const error = new Error("Requested environment is invalid");
+    error.code = "ETORO_INVALID_ENVIRONMENT";
+    error.status = 400;
+    throw error;
+  }
+  return environment;
+}
+
+function profileFailureState(error) {
+  if (error?.code === "ETORO_PROFILE_NOT_CONFIGURED") return "not-configured";
+  if (error?.status === 401) return "unauthorized-or-expired";
+  if (error?.status === 403) return "wrong-environment";
+  return "provider-unavailable";
+}
+
+async function profileReadiness(environment, config, providerCache, fetchEndpoint) {
+  try {
+    const credentials = credentialsForEnvironment(config, environment);
+    await providerCache.fetch(`portfolio:${environment}`, credentials, () =>
+      fetchPortfolioSnapshot(environment, { credentials, fetchEndpoint }),
+    );
+    return { environment, state: "ready" };
+  } catch (error) {
+    return { environment, state: profileFailureState(error) };
+  }
 }
 
 
@@ -552,10 +584,14 @@ async function handleApiRoute(pathname, response, options) {
     const config = await getConfig(loadConfig);
 
     if (pathname === "/api/etoro/status") {
+      const readiness = await Promise.all(ETORO_ENVIRONMENTS.map((environment) =>
+        profileReadiness(environment, config, providerCache, fetchEndpoint),
+      ));
       sendJson(response, 200, {
         ok: true,
         mode: "read-only",
         credentialStatus: publicCredentialStatus(config),
+        profileReadiness: Object.fromEntries(readiness.map(({ environment, state }) => [environment, state])),
         cachePolicy: readOnlyCachePolicy(config),
         provider: {
           endpointDetails: "server-only",
@@ -652,6 +688,21 @@ async function handleApiRoute(pathname, response, options) {
 
     if (pathname === DEMO_TRADE_PREVIEW_ROUTE) {
       await handleTradePreview(options.request, response, config);
+      return;
+    }
+
+    if (pathname === "/api/etoro/portfolio") {
+      const environment = requestedEnvironment(options.searchParams, config.defaultEnvironment);
+      const credentials = credentialsForEnvironment(config, environment);
+      const result = await providerCache.fetch(`portfolio:${environment}`, credentials, () =>
+        fetchPortfolioSnapshot(environment, { credentials, fetchEndpoint }),
+      );
+      sendJson(response, 200, {
+        ok: true,
+        mode: "read-only",
+        data: result.data,
+        cache: result.cache,
+      });
       return;
     }
 

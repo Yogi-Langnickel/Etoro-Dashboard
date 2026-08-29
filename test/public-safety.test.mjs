@@ -81,6 +81,24 @@ test("synthetic marker substrings do not excuse otherwise literal credentials", 
   ]);
 });
 
+test("production Portfolio View scan rejects fixture markers, rows, charts, request ids, and plausible values", () => {
+  const markers = [
+    'const portfolioChartPoints = {};',
+    'const mock = "mock-read-1";',
+    'const symbol = "SPY";',
+    '<tr data-instrument-row data-symbol="AAPL">',
+    '<polyline id="performance-line" points="1,2 3,4">',
+    '<span>$124,580.00</span>',
+    'const requestId = "provider-request-123";',
+  ];
+  for (const content of markers) {
+    const findings = inspectPublicSafetyEntries([{ path: "src/index.html", content }]);
+    assert.deepEqual(findings.map((finding) => finding.reason), [
+      "production Portfolio View fixture or plausible hard-coded portfolio value",
+    ]);
+  }
+});
+
 test("unreviewed oversized and binary files fail closed", () => {
   const findings = inspectPublicSafetyEntries([
     { path: "docs/large.txt", content: "x".repeat(2 * 1024 * 1024 + 1) },

@@ -141,6 +141,20 @@ h2 {
   background: var(--surface-strong);
 }
 
+.portfolio-loading-skeleton {
+  display: block;
+  min-height: 1.2rem;
+  border-radius: 4px;
+  color: var(--muted);
+  background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.12), rgba(255,255,255,.05));
+  background-size: 240% 100%;
+  animation: portfolio-loading 1.4s ease-in-out infinite;
+}
+
+@keyframes portfolio-loading {
+  to { background-position: -240% 0; }
+}
+
 .tab-button:focus-visible,
 .trade-ticket input:focus,
 .trade-ticket select:focus {
