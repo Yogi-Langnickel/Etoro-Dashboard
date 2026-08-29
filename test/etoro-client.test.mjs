@@ -368,6 +368,23 @@ test("demo PnL response supports the documented clientPortfolio wrapper", async 
   assert.equal(JSON.stringify(result).includes("orderId"), false);
 });
 
+test("documented top-level real and demo PnL payloads use credits without inventing values", async () => {
+  for (const endpoint of ["realPnl", "demoPnl"]) {
+    const result = await fetchReadOnlyEndpoint(endpoint, {
+      credentials,
+      fetchImpl: async () => new Response(JSON.stringify({
+        credits: 1000,
+        positions: [], mirrors: [], ordersForOpen: [], orders: [],
+      }), { status: 200 }),
+    });
+    assert.equal(result.data.credit, 1000);
+    assert.equal(result.data.availableCash, 1000);
+    assert.equal(result.data.totalInvested, 0);
+    assert.equal(result.data.unrealizedPnL, 0);
+    assert.equal(result.data.equity, 1000);
+  }
+});
+
 test("demo PnL ignores nullable provider totals and uses derived fallbacks", async () => {
   const result = await fetchReadOnlyEndpoint("demoPnl", {
     credentials,

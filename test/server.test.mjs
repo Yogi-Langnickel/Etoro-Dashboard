@@ -238,6 +238,26 @@ test("status readiness shares a Real snapshot with portfolio and reports Demo no
   assert.equal(portfolio.text.includes("requestId"), false);
 });
 
+test("unified portfolio route reports safe malformed, timeout, rate-limit/backoff, and 5xx states", async () => {
+  const config = { baseUrl: "https://public-api.etoro.com", defaultEnvironment: "real", readCacheTtlMs: 15_000, credentialFileLoaded: true, configured: true, profiles: { real: { apiKey: "server-api-secret", userKey: "server-user-secret", configured: true, missing: [] }, demo: null } };
+  for (const failure of [
+    providerError("malformed", { code: "ETORO_INVALID_DEMO_PNL_RESPONSE", status: 502 }),
+    providerError("timeout", { code: "ETORO_TIMEOUT", status: 504 }),
+    providerError("rate limited", { code: "ETORO_PROVIDER_ERROR", status: 429 }),
+    providerError("unavailable", { code: "ETORO_PROVIDER_ERROR", status: 503 }),
+  ]) {
+    const handler = createRequestHandler({ loadConfig: async () => config, providerCache: createReadOnlyProviderCache({ failureBackoffMs: 1000 }), fetchEndpoint: async () => { throw failure; } });
+    const first = await callHandler(handler, { url: "/api/etoro/portfolio?environment=real" });
+    assert.equal(first.status, failure.status);
+    assert.equal(first.json.error.code, failure.code);
+    assert.equal(first.text.includes("requestId"), false);
+    if (failure.status === 429) {
+      const second = await callHandler(handler, { url: "/api/etoro/portfolio?environment=real" });
+      assert.equal(second.json.cache.state, "backoff");
+    }
+  }
+});
+
 test("dashboard host remains loopback-only until authentication exists", () => {
   assert.equal(resolveDashboardHost(undefined), "127.0.0.1");
   assert.equal(resolveDashboardHost(" localhost "), "localhost");
@@ -2054,10 +2074,14 @@ test("cached portfolio snapshots serve stale last-good data during backoff then 
   const first = await cache.fetch("portfolio:real", config, async () => ({ data: { environment: "real" } }));
   assert.equal(first.cache.state, "miss");
   nowMs += 11;
-  const stale = await cache.fetch("portfolio:real", config, async () => {
-    throw providerError("temporary upstream failure", { code: "ETORO_PROVIDER_ERROR", status: 503, requestId: "internal-only" });
-  });
+  let rejectFetch;
+  const failure = new Promise((_, reject) => { rejectFetch = reject; });
+  const leader = cache.fetch("portfolio:real", config, async () => failure);
+  const follower = cache.fetch("portfolio:real", config, async () => ({ data: { shouldNotRun: true } }));
+  rejectFetch(providerError("temporary upstream failure", { code: "ETORO_PROVIDER_ERROR", status: 503, requestId: "internal-only" }));
+  const [stale, coalescedStale] = await Promise.all([leader, follower]);
   assert.equal(stale.cache.state, "stale");
+  assert.equal(coalescedStale.cache.state, "stale");
   assert.equal(JSON.stringify(stale).includes("requestId"), false);
   nowMs += 100;
   const recovered = await cache.fetch("portfolio:real", config, async () => ({ data: { environment: "real", recovered: true } }));
@@ -2124,9 +2148,10 @@ test("concurrent read-only provider requests are coalesced", async () => {
   assert.equal(second.text.includes("server-user-secret"), false);
 });
 
-test("read-only provider cache is separated by credential fingerprint", async () => {
+test("read-only provider cache uses profile generation invalidation without credential hashing", async () => {
   let fetchCount = 0;
   let userKey = "server-user-secret-a";
+  let credentialGeneration = "credential-file:1:1:1:1";
   const handler = createRequestHandler({
     loadConfig: async () => ({
       baseUrl: "https://public-api.etoro.com",
@@ -2135,6 +2160,7 @@ test("read-only provider cache is separated by credential fingerprint", async ()
       configured: true,
       credentialFileLoaded: true,
       credentialSource: "file",
+      credentialGeneration,
       missing: [],
     }),
     providerCache: createReadOnlyProviderCache({ ttlMs: 60_000 }),
@@ -2165,12 +2191,16 @@ test("read-only provider cache is separated by credential fingerprint", async ()
   const first = await callHandler(handler, { url: "/api/etoro/identity" });
   userKey = "server-user-secret-b";
   const second = await callHandler(handler, { url: "/api/etoro/identity" });
+  credentialGeneration = "credential-file:1:1:2:2";
+  const third = await callHandler(handler, { url: "/api/etoro/identity" });
 
   assert.equal(first.status, 200);
   assert.equal(second.status, 200);
+  assert.equal(third.status, 200);
   assert.equal(fetchCount, 2);
   assert.equal(first.json.cache.state, "miss");
-  assert.equal(second.json.cache.state, "miss");
+  assert.equal(second.json.cache.state, "hit");
+  assert.equal(third.json.cache.state, "miss");
   assert.equal(second.text.includes("server-api-secret"), false);
   assert.equal(second.text.includes("server-user-secret-a"), false);
   assert.equal(second.text.includes("server-user-secret-b"), false);

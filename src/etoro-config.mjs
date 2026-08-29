@@ -45,6 +45,12 @@ async function verifyCredentialPermissions(credentialsFile, statImpl) {
   if (((file.mode & 0o777) !== 0o600) || ((directory.mode & 0o777) !== 0o700)) {
     throw new EtoroConfigError("Credential file and directory must be owner-only", { code: "ETORO_CREDENTIAL_PERMISSIONS" });
   }
+  return file;
+}
+function credentialGeneration(file) {
+  const parts = [file?.dev, file?.ino, file?.size, file?.mtimeMs]
+    .map((value) => Number.isFinite(value) ? String(value) : "unknown");
+  return `credential-file:${parts.join(":")}`;
 }
 function normalizeProfile(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -58,11 +64,12 @@ export async function loadEtoroConfig(options = {}) {
   const env = options.env ?? process.env; const readFileImpl = options.readFile ?? readFile;
   const credentialsFile = optionalTrim(env.ETORO_CREDENTIALS_FILE) ?? DEFAULT_CREDENTIALS_FILE;
   const { parsed: fileConfig, loaded: credentialFileLoaded } = await readCredentialFile(credentialsFile, readFileImpl);
+  let credentialFileMetadata = null;
   if (credentialFileLoaded) {
     const statImpl = options.stat ?? (options.readFile
       ? async (path) => ({ mode: path === credentialsFile ? 0o100600 : 0o040700 })
       : stat);
-    await verifyCredentialPermissions(credentialsFile, statImpl);
+    credentialFileMetadata = await verifyCredentialPermissions(credentialsFile, statImpl);
   }
   const hasNamedProfiles = fileConfig.profiles && typeof fileConfig.profiles === "object" && !Array.isArray(fileConfig.profiles);
   const fileProfiles = hasNamedProfiles ? fileConfig.profiles : {};
@@ -71,14 +78,14 @@ export async function loadEtoroConfig(options = {}) {
   const defaultEnvironment = profileEnvironment(optionalTrim(env.ETORO_DEFAULT_ENVIRONMENT) ?? fileConfig.defaultEnvironment ?? "real");
   if (!defaultEnvironment) throw new EtoroConfigError("Default environment must be real or demo", { code: "ETORO_INVALID_DEFAULT_ENVIRONMENT" });
   const selected = profiles[defaultEnvironment];
-  return { baseUrl: parseBaseUrl(env.ETORO_API_BASE_URL ?? fileConfig.baseUrl), defaultEnvironment, profiles, legacyProfilePresent: Boolean(legacyProfile), configured: Boolean(selected?.configured), readCacheTtlMs: parsePositiveInteger(env.ETORO_READ_CACHE_TTL_MS ?? fileConfig.readCacheTtlMs, DEFAULT_READ_CACHE_TTL_MS, "Read cache TTL", MAX_READ_CACHE_TTL_MS), demoTradePreviewEnabled: String(env.ENABLE_DEMO_TRADE_PREVIEW ?? fileConfig.enableDemoTradePreview ?? "").toLowerCase() === "true", credentialsFile, credentialFileLoaded, credentialSource: credentialFileLoaded ? "file" : "none", missing: selected?.missing ?? ["publicApiKey", "userKey"] };
+  return { baseUrl: parseBaseUrl(env.ETORO_API_BASE_URL ?? fileConfig.baseUrl), defaultEnvironment, profiles, legacyProfilePresent: Boolean(legacyProfile), configured: Boolean(selected?.configured), readCacheTtlMs: parsePositiveInteger(env.ETORO_READ_CACHE_TTL_MS ?? fileConfig.readCacheTtlMs, DEFAULT_READ_CACHE_TTL_MS, "Read cache TTL", MAX_READ_CACHE_TTL_MS), demoTradePreviewEnabled: String(env.ENABLE_DEMO_TRADE_PREVIEW ?? fileConfig.enableDemoTradePreview ?? "").toLowerCase() === "true", credentialsFile, credentialFileLoaded, credentialSource: credentialFileLoaded ? "file" : "none", credentialGeneration: credentialFileLoaded ? credentialGeneration(credentialFileMetadata) : "no-credential-file", missing: selected?.missing ?? ["publicApiKey", "userKey"] };
 }
 
 export function credentialsForEnvironment(config, environment) {
   if (!ETORO_ENVIRONMENTS.includes(environment)) throw new EtoroConfigError("Requested eToro environment is invalid", { code: "ETORO_INVALID_ENVIRONMENT" });
   const profile = config?.profiles?.[environment];
   if (!profile?.configured) throw new EtoroConfigError(`${environment === "demo" ? "Demo" : "Real"} is not configured`, { code: "ETORO_PROFILE_NOT_CONFIGURED" });
-  return { baseUrl: config.baseUrl, apiKey: profile.apiKey, userKey: profile.userKey, environment, readCacheTtlMs: config.readCacheTtlMs, credentialSource: `profile:${environment}`, credentialFileLoaded: Boolean(config.credentialFileLoaded) };
+  return { baseUrl: config.baseUrl, apiKey: profile.apiKey, userKey: profile.userKey, environment, readCacheTtlMs: config.readCacheTtlMs, credentialSource: `profile:${environment}`, credentialFileLoaded: Boolean(config.credentialFileLoaded), credentialGeneration: config.credentialGeneration ?? "credential-generation-unavailable" };
 }
 export function publicCredentialStatus(config) {
   return { configured: Boolean(config.configured), defaultEnvironment: config.defaultEnvironment, profiles: Object.fromEntries(ETORO_ENVIRONMENTS.map((environment) => [environment, publicProfileStatus(config.profiles?.[environment])])), readCacheTtlMs: config.readCacheTtlMs, demoTradePreviewEnabled: Boolean(config.demoTradePreviewEnabled), credentialPosture: "server-only-named-profiles", providerHostPolicy: "official-host-allow-list", providerEndpointDetails: "server-only" };

@@ -130,11 +130,26 @@ function requiredArray(value) {
   return Array.isArray(value) ? value : null;
 }
 
+function optionalArray(value) {
+  return value === undefined ? [] : requiredArray(value);
+}
+
 function flattenRequiredCollections(items, field) {
   if (!Array.isArray(items)) return null;
   const flattened = [];
   for (const item of items) {
     const nested = requiredArray(item?.[field]);
+    if (nested === null) return null;
+    flattened.push(...nested);
+  }
+  return flattened;
+}
+
+function flattenOptionalCollections(items, field) {
+  if (!Array.isArray(items)) return null;
+  const flattened = [];
+  for (const item of items) {
+    const nested = optionalArray(item?.[field]);
     if (nested === null) return null;
     flattened.push(...nested);
   }
@@ -232,17 +247,19 @@ function normalizeDemoPnl(payload) {
     });
   }
 
-  if (
-    !payload.clientPortfolio ||
-    typeof payload.clientPortfolio !== "object" ||
-    Array.isArray(payload.clientPortfolio)
-  ) {
-    throw new EtoroApiError("Demo PnL response did not include clientPortfolio", {
+  const portfolio = payload.clientPortfolio ?? payload;
+  if (!portfolio || typeof portfolio !== "object" || Array.isArray(portfolio)) {
+    throw new EtoroApiError("Demo PnL response did not include a supported portfolio shape", {
       code: "ETORO_INVALID_DEMO_PNL_RESPONSE",
     });
   }
-
-  const portfolio = payload.clientPortfolio;
+  if (portfolio !== payload.clientPortfolio &&
+    firstNumber(portfolio.credits, portfolio.credit, portfolio.cash, portfolio.balance, portfolio.availableBalance) === null &&
+    !Array.isArray(portfolio.positions)) {
+    throw new EtoroApiError("Demo PnL response did not include documented portfolio fields", {
+      code: "ETORO_INVALID_DEMO_PNL_RESPONSE",
+    });
+  }
   const positions = requiredArray(
     portfolio.positions ??
       portfolio.openPositions ??
@@ -253,11 +270,11 @@ function normalizeDemoPnl(payload) {
   const mirrorPositions = flattenRequiredCollections(mirrors, "positions");
   const orders = requiredArray(portfolio.orders);
   const ordersForOpen = requiredArray(portfolio.ordersForOpen);
-  const ordersForClose = requiredArray(portfolio.ordersForClose);
-  const ordersForCloseMultiple = requiredArray(portfolio.ordersForCloseMultiple);
+  const ordersForClose = optionalArray(portfolio.ordersForClose);
+  const ordersForCloseMultiple = optionalArray(portfolio.ordersForCloseMultiple);
   const mirrorOrdersForOpen = flattenRequiredCollections(mirrors, "ordersForOpen");
-  const mirrorOrdersForClose = flattenRequiredCollections(mirrors, "ordersForClose");
-  const mirrorOrdersForCloseMultiple = flattenRequiredCollections(mirrors, "ordersForCloseMultiple");
+  const mirrorOrdersForClose = flattenOptionalCollections(mirrors, "ordersForClose");
+  const mirrorOrdersForCloseMultiple = flattenOptionalCollections(mirrors, "ordersForCloseMultiple");
   const allOrdersForOpen = ordersForOpen && mirrorOrdersForOpen ? [...ordersForOpen, ...mirrorOrdersForOpen] : null;
   const allOrdersForClose = ordersForClose && ordersForCloseMultiple && mirrorOrdersForClose && mirrorOrdersForCloseMultiple
     ? [...ordersForClose, ...ordersForCloseMultiple, ...mirrorOrdersForClose, ...mirrorOrdersForCloseMultiple]
@@ -267,6 +284,7 @@ function normalizeDemoPnl(payload) {
     return mirrorId === 0;
   });
   const credit = firstNumber(
+    portfolio.credits,
     portfolio.credit,
     portfolio.cash,
     portfolio.balance,

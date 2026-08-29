@@ -14,6 +14,7 @@ let selectedPortfolioPeriod = "24h";
 let portfolioDataSource = "none";
 let selectedPortfolioEnvironment = null;
 let portfolioChartRequestSequence = 0;
+let etoroRefreshRequestSequence = 0;
 let selectedWatchlistSymbol = "AAPL";
 let selectedWatchlistPeriod = "24h";
 let watchlistDataSource = "fixture";
@@ -416,7 +417,10 @@ function renderProviderPortfolio(payload) {
 }
 
 function renderPortfolioReadFailure(error) {
-  const cache = error?.payload?.cache;
+  const payload = error?.payload ?? {};
+  const cache = payload.cache;
+  const code = payload.error?.code ?? error?.code ?? "";
+  const status = payload.error?.status ?? error?.status ?? null;
   const validCache = cache &&
     hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs", "reason"]) &&
     new Set(["error", "backoff"]).has(cache.state) &&
@@ -428,7 +432,18 @@ function renderPortfolioReadFailure(error) {
     Date.parse(cache.expiresAt) - Date.parse(cache.cachedAt) === cache.ttlMs &&
     typeof cache.reason === "string" &&
     /^[A-Z0-9_]{1,80}$/.test(cache.reason);
-  text("portfolio-read-state", validCache ? `Portfolio: ${labelize(cache.state)}` : "Portfolio: unavailable");
+  const state = validCache && cache.state === "backoff"
+    ? "Portfolio: provider backoff"
+    : code === "ETORO_TIMEOUT"
+      ? "Portfolio: provider timeout"
+      : code.startsWith("ETORO_INVALID_")
+        ? "Portfolio: provider response malformed"
+        : status === 429
+          ? "Portfolio: provider rate-limited"
+          : typeof status === "number" && status >= 500
+            ? "Portfolio: provider unavailable"
+            : "Portfolio: unavailable";
+  text("portfolio-read-state", state);
   text("portfolio-freshness", "Freshness: unavailable; existing in-memory rows retained");
   text("portfolio-omitted", "Omitted rows: unavailable");
   text("portfolio-partial", validCache ? `Provider read failed; retry window ${cache.ttlMs} ms` : "Provider read failed; retry window unavailable");
@@ -1547,6 +1562,7 @@ function activateTab(targetId) {
 }
 
 async function refreshEtoro() {
+  const sequence = ++etoroRefreshRequestSequence;
   const button = document.getElementById("refresh-etoro");
 
   if (button) {
@@ -1556,16 +1572,19 @@ async function refreshEtoro() {
   try {
     await getJson("/api/health");
     const status = await getJson("/api/etoro/status");
+    if (sequence !== etoroRefreshRequestSequence) return;
     selectedPortfolioEnvironment ??= status.credentialStatus?.defaultEnvironment === "demo" ? "demo" : "real";
+    const environment = selectedPortfolioEnvironment;
     renderStatus(status);
-    const selectedState = status.profileReadiness?.[selectedPortfolioEnvironment] ?? "not-configured";
+    const selectedState = status.profileReadiness?.[environment] ?? "not-configured";
     const portfolioRead = selectedState === "ready"
-      ? getJson(`/api/etoro/portfolio?environment=${encodeURIComponent(selectedPortfolioEnvironment)}`)
+      ? getJson(`/api/etoro/portfolio?environment=${encodeURIComponent(environment)}`)
       : Promise.resolve(null);
     const [portfolioResult] = await Promise.allSettled([
       portfolioRead,
       refreshTabStatus(activeTabId(), { force: true }),
     ]);
+    if (sequence !== etoroRefreshRequestSequence || environment !== selectedPortfolioEnvironment) return;
 
     if (selectedState !== "ready") {
       const retainedProviderRows = portfolioDataSource === "provider-normalized";
@@ -1603,12 +1622,13 @@ async function refreshEtoro() {
       );
     }
   } catch (error) {
+    if (sequence !== etoroRefreshRequestSequence) return;
     setTile("provider-status", "warn", "Provider unavailable", "No synthetic portfolio fallback");
     await refreshTabStatus(activeTabId(), { force: true });
     renderPortfolioReadFailure(error);
     renderAudit("Provider read failed", "Provider status is unavailable; no account-linked data was stored");
   } finally {
-    if (button) {
+    if (button && sequence === etoroRefreshRequestSequence) {
       button.disabled = false;
     }
   }
@@ -1645,6 +1665,7 @@ function collectBotConfig() {
 
 document.getElementById("refresh-etoro")?.addEventListener("click", refreshEtoro);
 document.getElementById("portfolio-environment")?.addEventListener("change", (event) => {
+  etoroRefreshRequestSequence += 1;
   selectedPortfolioEnvironment = event.target.value === "demo" ? "demo" : "real";
   portfolioDataSource = "none";
   selectedPortfolioSymbol = null;

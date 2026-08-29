@@ -18,7 +18,7 @@ async function renderer(document) {
   const contracts = await readFile(new URL("../src/browser-contracts.js", import.meta.url), "utf8");
   const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
   const source = app.slice(0, app.indexOf("function renderSelectedWatchlistInstrument"));
-  return Function("document", `${contracts}\n${source}; return { renderProviderPortfolio, renderFulfilledProviderPortfolio };`)(document);
+  return Function("document", `${contracts}\n${source}; return { renderProviderPortfolio, renderFulfilledProviderPortfolio, renderPortfolioReadFailure };`)(document);
 }
 function payload(instruments = [{ symbol: "AAPL", displayName: "Apple", positionCount: 1, units: 2, averageOpenPrice: 100, currentPrice: 120, investedValue: 200, netValue: 220, unrealizedPnl: 20, unrealizedPnlPercent: 10, allocationPercent: 100, completeness: "complete" }]) {
   return { ok: true, mode: "read-only", data: { environment: "real", currency: "USD", equity: 220, availableCash: 0, totalInvested: 200, unrealizedPnl: 20, realizedPnl: null, openPositionCount: instruments.reduce((sum, item) => sum + item.positionCount, 0), instrumentCount: instruments.length, mirrorCount: null, pendingOrderCount: null, providerUpdatedAt: "2026-08-30T00:00:00.000Z", omittedRowCount: 0, incompleteRowCount: 0, instruments }, cache: { state: "hit", cachedAt: "2026-08-30T00:00:00.000Z", expiresAt: "2026-08-30T00:00:15.000Z", ttlMs: 15000 } };
@@ -38,4 +38,23 @@ test("empty live portfolio provides an explicit no-open-positions state", async 
 test("identifier-shaped or extra browser fields fail closed", async () => {
   const document = new Document(); const { renderFulfilledProviderPortfolio } = await renderer(document); const invalid = payload(); invalid.provider = { requestId: "private" };
   assert.equal(renderFulfilledProviderPortfolio(invalid), false);
+});
+
+test("portfolio failure states distinguish malformed, timeout, rate-limit/backoff, and 5xx provider failures", async () => {
+  const document = new Document(); const { renderPortfolioReadFailure } = await renderer(document);
+  renderPortfolioReadFailure({ payload: { error: { code: "ETORO_INVALID_DEMO_PNL_RESPONSE", status: 502 } } });
+  assert.equal(document.getElementById("portfolio-read-state").textContent, "Portfolio: provider response malformed");
+  renderPortfolioReadFailure({ payload: { error: { code: "ETORO_TIMEOUT", status: 504 } } });
+  assert.equal(document.getElementById("portfolio-read-state").textContent, "Portfolio: provider timeout");
+  renderPortfolioReadFailure({ payload: { error: { code: "ETORO_PROVIDER_ERROR", status: 429 }, cache: { state: "backoff", cachedAt: "2026-08-30T00:00:00.000Z", expiresAt: "2026-08-30T00:00:15.000Z", ttlMs: 15000, reason: "ETORO_PROVIDER_ERROR" } } });
+  assert.equal(document.getElementById("portfolio-read-state").textContent, "Portfolio: provider backoff");
+  renderPortfolioReadFailure({ payload: { error: { code: "ETORO_PROVIDER_ERROR", status: 503 } } });
+  assert.equal(document.getElementById("portfolio-read-state").textContent, "Portfolio: provider unavailable");
+});
+
+test("Portfolio refresh has a request sequence guard against stale environment rendering", async () => {
+  const source = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
+  assert.match(source, /let etoroRefreshRequestSequence = 0/);
+  assert.match(source, /sequence !== etoroRefreshRequestSequence \|\| environment !== selectedPortfolioEnvironment/);
+  assert.match(source, /etoroRefreshRequestSequence \+= 1;/);
 });

@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { DEFAULT_READ_CACHE_TTL_MS } from "./etoro-config.mjs";
 
 export const DEFAULT_PROVIDER_FAILURE_BACKOFF_MS = 5_000;
@@ -36,18 +34,13 @@ export function publicProviderErrorMessage(error) {
 }
 
 function readOnlyCacheKey(endpointName, config) {
-  const credentialFingerprint = createHash("sha256")
-    .update(config.apiKey ?? "")
-    .update("\0")
-    .update(config.userKey ?? "")
-    .digest("hex");
-
   return [
     endpointName,
     config.baseUrl,
     config.credentialSource,
+    config.environment ?? "no-environment",
     config.credentialFileLoaded ? "file" : "no-file",
-    credentialFingerprint,
+    config.credentialGeneration ?? "credential-generation-unavailable",
   ].join("|");
 }
 
@@ -128,6 +121,9 @@ export function createReadOnlyProviderCache({
       if (existing?.inflight) {
         const value = await existing.inflight;
         const updated = entries.get(key);
+        if (value?.cache?.state === "stale") {
+          return value;
+        }
         return withCacheMetadata(value, "coalesced", updated);
       }
 
