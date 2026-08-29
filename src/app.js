@@ -15,6 +15,7 @@ let portfolioDataSource = "none";
 let selectedPortfolioEnvironment = null;
 let portfolioChartRequestSequence = 0;
 let etoroRefreshRequestSequence = 0;
+let portfolioLastGoodEnvironment = null;
 let selectedWatchlistSymbol = "AAPL";
 let selectedWatchlistPeriod = "24h";
 let watchlistDataSource = "fixture";
@@ -325,6 +326,41 @@ function appendPortfolioCell(row, value, className) {
   return cell;
 }
 
+function clearPortfolioBoundState() {
+  portfolioDataSource = "none";
+  portfolioLastGoodEnvironment = null;
+  selectedPortfolioSymbol = null;
+  portfolioChartRequestSequence += 1;
+  document.getElementById("portfolio-table-body")?.replaceChildren();
+  text("mock-equity-label", "Equity");
+  text("mock-equity", "Unavailable");
+  text("equity-detail", "Awaiting provider data");
+  text("cash-buffer", "Unavailable");
+  text("cash-buffer-detail", "Awaiting provider data");
+  text("unrealized-pnl", "Unavailable");
+  text("unrealized-pnl-detail", "Awaiting provider data");
+  text("exposure", "Unavailable");
+  text("exposure-detail", "Awaiting provider data");
+  text("stale-data-label", "Open positions");
+  text("stale-data", "Unavailable");
+  text("stale-data-detail", "Awaiting provider data");
+  text("portfolio-source-watermark", "Provider only");
+  text("portfolio-source-detail", "No provider portfolio values loaded");
+  text("portfolio-freshness", "Freshness: unavailable");
+  text("portfolio-omitted", "Omitted rows: unavailable");
+  text("portfolio-partial", "No provider portfolio values loaded");
+  text("chart-title", "Select a live holding");
+  text("chart-period-label", "Market-price history unavailable");
+  text("chart-provider", "Provider timestamp: unavailable");
+  text("chart-request", "Provider request ID: hidden");
+  text("chart-cache", "Cache: unavailable");
+  text("source-detail", "No provider portfolio data loaded");
+  text("portfolio-stat-cash", "Cash percentage unavailable");
+  text("portfolio-stat-largest", "Largest holding unavailable");
+  document.getElementById("performance-line")?.setAttribute("points", "");
+  document.getElementById("performance-area")?.setAttribute("d", "");
+}
+
 function renderProviderPortfolio(payload) {
   const view = normalizeLivePortfolioPayload(payload);
   const body = document.getElementById("portfolio-table-body");
@@ -332,6 +368,7 @@ function renderProviderPortfolio(payload) {
   if (!body) return view;
 
   portfolioDataSource = "provider-normalized";
+  portfolioLastGoodEnvironment = view.environment;
   body.replaceChildren();
   for (const instrument of view.instruments) {
     const row = document.createElement("tr");
@@ -416,7 +453,10 @@ function renderProviderPortfolio(payload) {
   return view;
 }
 
-function renderPortfolioReadFailure(error) {
+function renderPortfolioReadFailure(error, { retainLastGood = false } = {}) {
+  if (!retainLastGood) {
+    clearPortfolioBoundState();
+  }
   const payload = error?.payload ?? {};
   const cache = payload.cache;
   const code = payload.error?.code ?? error?.code ?? "";
@@ -444,9 +484,9 @@ function renderPortfolioReadFailure(error) {
             ? "Portfolio: provider unavailable"
             : "Portfolio: unavailable";
   text("portfolio-read-state", state);
-  text("portfolio-freshness", "Freshness: unavailable; existing in-memory rows retained");
+  text("portfolio-freshness", retainLastGood ? "Freshness: unavailable; last-good provider rows retained" : "Freshness: unavailable; no provider rows loaded");
   text("portfolio-omitted", "Omitted rows: unavailable");
-  text("portfolio-partial", validCache ? `Provider read failed; retry window ${cache.ttlMs} ms` : "Provider read failed; retry window unavailable");
+  text("portfolio-partial", validCache ? `Provider read failed; retry window ${cache.ttlMs} ms` : "Provider read failed; no last-good provider response");
 }
 
 function renderFulfilledProviderPortfolio(payload) {
@@ -1587,14 +1627,15 @@ async function refreshEtoro() {
     if (sequence !== etoroRefreshRequestSequence || environment !== selectedPortfolioEnvironment) return;
 
     if (selectedState !== "ready") {
-      const retainedProviderRows = portfolioDataSource === "provider-normalized";
+      const retainedProviderRows = portfolioDataSource === "provider-normalized" && portfolioLastGoodEnvironment === environment;
+      if (!retainedProviderRows) clearPortfolioBoundState();
       text(
         "portfolio-read-state",
         retainedProviderRows ? "Portfolio: prior provider rows retained in memory" : `Portfolio: ${labelize(selectedState)}`,
       );
       text(
         "portfolio-freshness",
-        retainedProviderRows ? "Freshness: stale; provider is no longer configured" : "Freshness: provider not configured",
+        retainedProviderRows ? "Freshness: stale; last-good provider rows retained" : "Freshness: provider not configured; no provider rows loaded",
       );
       if (!retainedProviderRows) {
         text("portfolio-omitted", "Omitted rows: unavailable until provider read");
@@ -1667,9 +1708,7 @@ document.getElementById("refresh-etoro")?.addEventListener("click", refreshEtoro
 document.getElementById("portfolio-environment")?.addEventListener("change", (event) => {
   etoroRefreshRequestSequence += 1;
   selectedPortfolioEnvironment = event.target.value === "demo" ? "demo" : "real";
-  portfolioDataSource = "none";
-  selectedPortfolioSymbol = null;
-  document.getElementById("portfolio-table-body")?.replaceChildren();
+  clearPortfolioBoundState();
   void refreshEtoro();
 });
 document.getElementById("trade-ticket")?.addEventListener("submit", (event) => {

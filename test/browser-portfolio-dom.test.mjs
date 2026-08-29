@@ -18,7 +18,7 @@ async function renderer(document) {
   const contracts = await readFile(new URL("../src/browser-contracts.js", import.meta.url), "utf8");
   const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
   const source = app.slice(0, app.indexOf("function renderSelectedWatchlistInstrument"));
-  return Function("document", `${contracts}\n${source}; return { renderProviderPortfolio, renderFulfilledProviderPortfolio, renderPortfolioReadFailure };`)(document);
+  return Function("document", `${contracts}\n${source}; return { clearPortfolioBoundState, renderProviderPortfolio, renderFulfilledProviderPortfolio, renderPortfolioReadFailure };`)(document);
 }
 function payload(instruments = [{ symbol: "AAPL", displayName: "Apple", positionCount: 1, units: 2, averageOpenPrice: 100, currentPrice: 120, investedValue: 200, netValue: 220, unrealizedPnl: 20, unrealizedPnlPercent: 10, allocationPercent: 100, completeness: "complete" }]) {
   return { ok: true, mode: "read-only", data: { environment: "real", currency: "USD", equity: 220, availableCash: 0, totalInvested: 200, unrealizedPnl: 20, realizedPnl: null, openPositionCount: instruments.reduce((sum, item) => sum + item.positionCount, 0), instrumentCount: instruments.length, mirrorCount: null, pendingOrderCount: null, providerUpdatedAt: "2026-08-30T00:00:00.000Z", omittedRowCount: 0, incompleteRowCount: 0, instruments }, cache: { state: "hit", cachedAt: "2026-08-30T00:00:00.000Z", expiresAt: "2026-08-30T00:00:15.000Z", ttlMs: 15000 } };
@@ -34,6 +34,21 @@ test("live portfolio DOM renders only exact provider DTO rows and never provider
 test("empty live portfolio provides an explicit no-open-positions state", async () => {
   const document = new Document(); const { renderProviderPortfolio } = await renderer(document); renderProviderPortfolio(payload([]));
   assert.equal(document.getElementById("portfolio-table-body").children[0].children[0].textContent, "No open positions");
+});
+
+test("loaded Real to unavailable Demo transition clears every portfolio-bound browser value", async () => {
+  const document = new Document(); const { clearPortfolioBoundState, renderPortfolioReadFailure, renderProviderPortfolio } = await renderer(document);
+  renderProviderPortfolio(payload());
+  assert.equal(document.getElementById("mock-equity").textContent, "$220.00");
+  clearPortfolioBoundState();
+  renderPortfolioReadFailure({ payload: { error: { code: "ETORO_PROFILE_NOT_CONFIGURED", status: 503 } } });
+  assert.equal(document.getElementById("portfolio-table-body").children.length, 0);
+  assert.equal(document.getElementById("mock-equity").textContent, "Unavailable");
+  assert.equal(document.getElementById("cash-buffer").textContent, "Unavailable");
+  assert.equal(document.getElementById("portfolio-source-watermark").textContent, "Provider only");
+  assert.equal(document.getElementById("chart-title").textContent, "Select a live holding");
+  assert.equal(document.getElementById("performance-line").attributes.points, "");
+  assert.match(document.getElementById("portfolio-freshness").textContent, /no provider rows loaded/);
 });
 test("identifier-shaped or extra browser fields fail closed", async () => {
   const document = new Document(); const { renderFulfilledProviderPortfolio } = await renderer(document); const invalid = payload(); invalid.provider = { requestId: "private" };
