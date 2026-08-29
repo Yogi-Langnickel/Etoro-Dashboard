@@ -3,10 +3,9 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>eToro Dashboard Mock Cockpit</title>
+    <title>eToro Portfolio View</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23171b22'/%3E%3Cpath d='M8 17h4l3-7 4 13 3-6h2' fill='none' stroke='%2368a8ff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="./styles.css">
-    <script src="./browser-fixtures.js" defer></script>
     <script src="./browser-contracts.js" defer></script>
     <script src="./app.js" defer></script>
   </head>
@@ -14,9 +13,9 @@
     <main class="cockpit" aria-label="Local eToro dashboard">
       <header class="topbar">
         <section class="identity" aria-labelledby="dashboard-title">
-          <p class="eyebrow">Static operational cockpit</p>
+          <p class="eyebrow">Read-only provider portfolio</p>
           <h1 id="dashboard-title">eToro Dashboard</h1>
-          <p class="subtle">Local dashboard for demo account monitoring and gated demo-trading preparation. eToro credentials stay on the Node server.</p>
+          <p class="subtle">Local portfolio view. Credentials and provider identifiers remain on the Node server.</p>
         </section>
         <section class="safety-strip" aria-label="Safety and connection status">
           <div class="status-tile ok">
@@ -29,15 +28,15 @@
           <div class="status-tile warn" id="provider-status">
             <span class="status-dot" aria-hidden="true"></span>
             <span>
-              <strong>Provider offline</strong>
-              <small>Using synthetic fixtures</small>
+              <strong>Provider not checked</strong>
+              <small>Portfolio data loads from the read-only provider only</small>
             </span>
           </div>
           <div class="status-tile neutral" id="demo-status">
             <span class="status-dot" aria-hidden="true"></span>
             <span>
-              <strong>Demo frame</strong>
-              <small>No real account IDs</small>
+              <strong id="portfolio-environment-label">Environment</strong>
+              <small id="portfolio-environment-detail">Not configured</small>
             </span>
           </div>
           <div class="status-tile neutral" id="last-sync">
@@ -58,34 +57,34 @@
 
       <section class="kpi-grid tab-view" id="portfolio-view" role="tabpanel" aria-labelledby="portfolio-tab" data-tab-panel="portfolio-view" aria-label="Portfolio KPI summary">
         <article class="metric">
-          <span id="mock-equity-label">Mock equity</span>
-          <strong id="mock-equity">$124,580.00</strong>
-          <small class="neutral-text" id="equity-detail">Synthetic total balance</small>
+          <span id="mock-equity-label">Equity</span>
+          <strong id="mock-equity">Unavailable</strong>
+          <small class="neutral-text" id="equity-detail">Awaiting provider data</small>
         </article>
         <article class="metric">
-          <span>Cash buffer</span>
-          <strong id="cash-buffer">$18,420.00</strong>
-          <small class="good-text" id="cash-buffer-detail">14.8% unallocated</small>
+          <span>Available cash</span>
+          <strong id="cash-buffer">Unavailable</strong>
+          <small class="neutral-text" id="cash-buffer-detail">Awaiting provider data</small>
         </article>
         <article class="metric">
           <span>Unrealized P/L</span>
-          <strong class="good-text" id="unrealized-pnl">+$2,184.70</strong>
-          <small class="neutral-text" id="unrealized-pnl-detail">Mock mark-to-market</small>
+          <strong class="neutral-text" id="unrealized-pnl">Unavailable</strong>
+          <small class="neutral-text" id="unrealized-pnl-detail">Awaiting provider data</small>
         </article>
         <article class="metric">
-          <span>Exposure</span>
-          <strong id="exposure">1.16x</strong>
-          <small class="warn-text" id="exposure-detail">Leverage review required</small>
+          <span>Total invested</span>
+          <strong id="exposure">Unavailable</strong>
+          <small class="neutral-text" id="exposure-detail">Awaiting provider data</small>
         </article>
         <article class="metric">
-          <span id="stale-data-label">Stale data</span>
-          <strong id="stale-data">3 tiles</strong>
-          <small class="warn-text" id="stale-data-detail">Provider timestamp missing</small>
+          <span id="stale-data-label">Open positions</span>
+          <strong id="stale-data">Unavailable</strong>
+          <small class="neutral-text" id="stale-data-detail">Awaiting provider data</small>
         </article>
         <article class="metric">
           <span>Source watermark</span>
-          <strong id="portfolio-source-watermark">Fixture</strong>
-          <small class="warn-text" id="portfolio-source-detail">Synthetic overview values; no live account data</small>
+          <strong id="portfolio-source-watermark">Provider only</strong>
+          <small class="neutral-text" id="portfolio-source-detail">No fixture values are used for Portfolio View</small>
         </article>
       </section>
 
@@ -96,6 +95,7 @@
               <p class="eyebrow">Portfolio</p>
               <h2 id="positions-title">Instrument summary</h2>
             </div>
+            <label class="environment-select">Environment <select id="portfolio-environment" aria-label="Portfolio environment"><option value="real">Real</option><option value="demo">Demo</option></select></label>
             <span class="pill lock">Aggregated by asset</span>
             <button class="icon-button" id="refresh-etoro" type="button">Refresh</button>
           </div>
@@ -108,10 +108,10 @@
             <button class="period-button" type="button" data-period="max" aria-pressed="false">Max</button>
           </div>
           <div class="chart-meta" aria-live="polite" aria-label="Portfolio provider state">
-            <span id="portfolio-read-state">Portfolio: synthetic fixture</span>
+            <span id="portfolio-read-state">Portfolio: loading</span>
             <span id="portfolio-freshness">Freshness: not connected</span>
-            <span id="portfolio-omitted">Omitted rows: 0</span>
-            <span id="portfolio-partial">Value coverage: synthetic</span>
+            <span id="portfolio-omitted">Omitted rows: unavailable</span>
+            <span id="portfolio-partial">Value coverage: unavailable</span>
           </div>
           <div class="table-wrap">
             <table class="instrument-table">
@@ -130,66 +130,7 @@
                 </tr>
               </thead>
               <tbody id="portfolio-table-body">
-                <tr class="instrument-row active" data-instrument-row tabindex="0" data-symbol="SPY" data-name="SPDR S&P 500 ETF" data-period-change="+0.8%" data-chart-title="SPY selected-period chart">
-                  <td>
-                    <strong>SPY</strong>
-                    <span>US ETF · 3 open positions</span>
-                  </td>
-                  <td>$518.34</td>
-                  <td class="good-text" data-period-value>+0.8%</td>
-                  <td>48.20</td>
-                  <td>$482.10</td>
-                  <td class="good-text">+$1,746</td>
-                  <td class="good-text">+7.52%</td>
-                  <td>$23,238</td>
-                  <td>$24,984</td>
-                  <td><span class="sparkline" aria-label="SPY 24h performance sparkline"></span></td>
-                </tr>
-                <tr class="instrument-row" data-instrument-row tabindex="0" data-symbol="NVDA" data-name="NVIDIA Corporation" data-period-change="+1.9%" data-chart-title="NVDA selected-period chart">
-                  <td>
-                    <strong>NVDA</strong>
-                    <span>US equity · 2 open positions</span>
-                  </td>
-                  <td>$956.83</td>
-                  <td class="good-text" data-period-value>+1.9%</td>
-                  <td>12.00</td>
-                  <td>$873.40</td>
-                  <td class="good-text">+$1,006</td>
-                  <td class="good-text">+9.60%</td>
-                  <td>$10,481</td>
-                  <td>$11,482</td>
-                  <td><span class="sparkline up" aria-label="NVDA 24h performance sparkline"></span></td>
-                </tr>
-                <tr class="instrument-row" data-instrument-row tabindex="0" data-symbol="BTC" data-name="Bitcoin" data-period-change="-0.6%" data-chart-title="BTC selected-period chart">
-                  <td>
-                    <strong>BTC</strong>
-                    <span>Crypto · 1 open position</span>
-                  </td>
-                  <td>$65,028.57</td>
-                  <td class="bad-text" data-period-value>-0.6%</td>
-                  <td>0.42</td>
-                  <td>$61,840.00</td>
-                  <td class="good-text">+$592</td>
-                  <td class="good-text">+2.22%</td>
-                  <td>$25,973</td>
-                  <td>$27,312</td>
-                  <td><span class="sparkline volatile" aria-label="BTC 24h performance sparkline"></span></td>
-                </tr>
-                <tr class="instrument-row" data-instrument-row tabindex="0" data-symbol="EURUSD" data-name="Euro / US Dollar" data-period-change="-0.2%" data-chart-title="EURUSD selected-period chart">
-                  <td>
-                    <strong>EURUSD</strong>
-                    <span>FX CFD · 2 open positions</span>
-                  </td>
-                  <td>1.0686</td>
-                  <td class="bad-text" data-period-value>-0.2%</td>
-                  <td>18,000</td>
-                  <td>1.0812</td>
-                  <td class="bad-text">-$226</td>
-                  <td class="bad-text">-1.15%</td>
-                  <td>$19,688</td>
-                  <td>$19,462</td>
-                  <td><span class="sparkline down" aria-label="EURUSD 24h performance sparkline"></span></td>
-                </tr>
+                <tr data-portfolio-loading><td colspan="10"><span class="portfolio-loading-skeleton">Loading provider portfolio…</span></td></tr>
               </tbody>
             </table>
           </div>
@@ -199,39 +140,39 @@
           <div class="panel-header">
             <div>
               <p class="eyebrow">Selected instrument</p>
-              <h2 id="chart-title">SPY selected-period chart</h2>
+              <h2 id="chart-title">Select a live holding</h2>
             </div>
             <span class="pill warn" id="selected-period-pill">24h</span>
           </div>
-          <div class="chart-shell" role="img" aria-label="Selected-period performance chart using synthetic values">
+          <div class="chart-shell" role="img" aria-label="Selected instrument market-price history">
             <div class="chart-grid" aria-hidden="true"></div>
             <svg viewBox="0 0 640 260" preserveAspectRatio="none" aria-hidden="true" data-performance-svg>
-              <polyline id="performance-line" points="0,205 64,190 128,198 192,154 256,168 320,118 384,132 448,86 512,102 576,62 640,78"></polyline>
-              <path id="performance-area" d="M0 205 L64 190 L128 198 L192 154 L256 168 L320 118 L384 132 L448 86 L512 102 L576 62 L640 78 L640 260 L0 260 Z"></path>
+              <polyline id="performance-line" points=""></polyline>
+              <path id="performance-area" d=""></path>
             </svg>
           </div>
           <div class="chart-meta">
             <span id="chart-provider">Provider timestamp: unavailable</span>
             <span id="chart-period-label">Selected period: 24h</span>
-            <span id="source-detail">No server credentials</span>
-            <span id="chart-request">Request ID: mock-read-7f3a</span>
-            <span id="chart-cache">Cache: fixture</span>
+            <span id="source-detail">No portfolio data loaded</span>
+            <span id="chart-request">Provider identifiers are not displayed</span>
+            <span id="chart-cache">Cache: unavailable</span>
           </div>
           <div class="instrument-context" aria-label="Selected instrument context-only enrichment receipts">
             <article>
               <span>Financials</span>
-              <strong id="portfolio-financial-title">Holdings, fees, distribution</strong>
-              <small id="portfolio-financial-detail">Issuer factsheet and ETF datasets are context-only receipts, not advice.</small>
+              <strong id="portfolio-financial-title">Unavailable</strong>
+              <small id="portfolio-financial-detail">No synthetic financial context is shown.</small>
             </article>
             <article>
               <span>News</span>
-              <strong id="portfolio-news-title">Broad market headlines</strong>
-              <small id="portfolio-news-detail">Read-only market context; no bot signal or trade trigger.</small>
+              <strong id="portfolio-news-title">Unavailable</strong>
+              <small id="portfolio-news-detail">No synthetic market context is shown.</small>
             </article>
             <article>
               <span>Insiders</span>
-              <strong id="portfolio-insider-title">Fund ownership context</strong>
-              <small id="portfolio-insider-detail">Ownership activity is a neutral enrichment record only.</small>
+              <strong id="portfolio-insider-title">Unavailable</strong>
+              <small id="portfolio-insider-detail">No synthetic ownership context is shown.</small>
             </article>
           </div>
         </section>
@@ -247,19 +188,19 @@
           <ul class="readiness-list">
             <li>
               <span>Performance breakdown</span>
-              <strong>Equity +8.4%, ETF +7.5%, Crypto +2.2%</strong>
+              <strong id="portfolio-stat-cash">Unavailable until provider data loads</strong>
             </li>
             <li>
               <span>Portfolio risk</span>
-              <strong>Largest asset 23%; stale quote review pending</strong>
+              <strong id="portfolio-stat-largest">Unavailable until provider data loads</strong>
             </li>
             <li>
               <span>Dividend expectations</span>
-              <strong>ETF monthly/quarterly receipts need source coverage</strong>
+              <strong>Unavailable without provider evidence</strong>
             </li>
             <li>
               <span>Dividend context</span>
-              <strong>Market, frequency, weight, yield, income, source, confidence</strong>
+              <strong>Unavailable without provider evidence</strong>
             </li>
           </ul>
         </aside>
@@ -276,8 +217,8 @@
             <li>
               <span class="event-time">09:32:14</span>
               <span>
-                <strong>Portfolio summary fixture loaded</strong>
-                <small>Status 200 · 18 ms · payload normalized</small>
+                <strong>Portfolio not yet loaded</strong>
+                <small>No fixture financial values are displayed</small>
               </span>
             </li>
             <li>
@@ -652,7 +593,7 @@
         </section>
       </section>
 
-      <section class="risk-layout tab-view" id="risk-view" aria-label="Portfolio risk and statistics" data-tab-panel="portfolio-view">
+      <section class="risk-layout tab-view" id="risk-view" aria-label="Synthetic risk planning" data-tab-panel="risk-planning" hidden>
         <section class="panel risk-status-panel" aria-labelledby="risk-status-title">
           <div class="panel-header">
             <div>

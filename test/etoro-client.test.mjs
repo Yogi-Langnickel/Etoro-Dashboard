@@ -67,6 +67,9 @@ test("demo PnL response is summarized and raw order details are not returned", a
               { amount: 200, mirrorID: 5 },
             ],
             orders: [{ amount: 50 }],
+            mirrors: [],
+            ordersForClose: [],
+            ordersForCloseMultiple: [],
           },
         }),
         { status: 200 },
@@ -81,6 +84,37 @@ test("demo PnL response is summarized and raw order details are not returned", a
   assert.equal(result.data.pendingOrderCount, 3);
   assert.equal(JSON.stringify(result).includes("privateNote"), false);
   assert.equal(JSON.stringify(result).includes("instrumentId"), false);
+});
+
+test("PnL summaries never turn missing, null, NaN, or infinity inputs into zero", async () => {
+  for (const amount of [undefined, null, "not-a-number", Infinity]) {
+    const result = await fetchReadOnlyEndpoint("demoPnl", {
+      credentials,
+      fetchImpl: async () => new Response(JSON.stringify({ clientPortfolio: {
+        credit: 1000,
+        positions: [{ amount: 100, unrealizedPnL: amount }],
+        orders: [], ordersForOpen: [], ordersForClose: [], ordersForCloseMultiple: [], mirrors: [],
+      } }), { status: 200 }),
+    });
+    assert.equal(result.data.calculatedUnrealizedPnL, null);
+    assert.equal(result.data.unrealizedPnL, null);
+    assert.equal(result.data.equity, null);
+  }
+});
+
+test("PnL summaries treat omitted provider collections as unavailable, not empty", async () => {
+  const result = await fetchReadOnlyEndpoint("demoPnl", {
+    credentials,
+    fetchImpl: async () => new Response(JSON.stringify({ clientPortfolio: {
+      credit: 1000,
+      positions: [{ amount: 100, unrealizedPnL: 5 }],
+    } }), { status: 200 }),
+  });
+  assert.equal(result.data.availableCash, null);
+  assert.equal(result.data.totalInvested, null);
+  assert.equal(result.data.calculatedUnrealizedPnL, null);
+  assert.equal(result.data.positionCount, null);
+  assert.equal(result.data.pendingOrderCount, null);
 });
 
 test("demo portfolio response is aggregated by symbol without provider identifiers", async () => {
@@ -98,16 +132,33 @@ test("demo portfolio response is aggregated by symbol without provider identifie
   });
 
   assert.deepEqual(result.data.instruments, [{
-    symbol: "AAPL",
-    positionCount: 2,
-    investedUsd: 150,
-    unrealizedPnlUsd: 3,
-    valueStatus: "complete",
+      symbol: "AAPL",
+      positionCount: 2,
+      investedUsd: 150,
+      unrealizedPnlUsd: 3,
+      units: null,
+      averageOpenPrice: null,
+      currentPrice: null,
+      displayName: "AAPL",
+      valueStatus: "complete",
   }]);
   assert.equal(result.data.positionCount, 3);
   assert.equal(result.data.omittedPositionCount, 1);
   assert.equal(JSON.stringify(result).includes("instrumentId"), false);
   assert.equal(JSON.stringify(result).includes("positionId"), false);
+});
+
+test("portfolio aggregation uses a units-weighted open price or marks mixed market values unavailable", async () => {
+  const result = await fetchReadOnlyEndpoint("demoPortfolio", {
+    credentials,
+    fetchImpl: async () => new Response(JSON.stringify({ clientPortfolio: { positions: [
+      { symbol: "AAPL", amount: 100, unrealizedPnL: 1, units: 2, openRate: 10, currentRate: 12 },
+      { symbol: "AAPL", amount: 200, unrealizedPnL: 2, units: 8, openRate: 20, currentRate: 12 },
+    ] } }), { status: 200 }),
+  });
+  assert.equal(result.data.instruments[0].averageOpenPrice, 18);
+  assert.equal(result.data.instruments[0].units, 10);
+  assert.equal(result.data.instruments[0].currentPrice, 12);
 });
 
 test("demo portfolio omits unsafe symbols and marks incomplete financial values", async () => {
@@ -124,11 +175,15 @@ test("demo portfolio omits unsafe symbols and marks incomplete financial values"
   });
 
   assert.deepEqual(result.data.instruments, [{
-    symbol: "MSFT",
-    positionCount: 1,
-    investedUsd: null,
-    unrealizedPnlUsd: null,
-    valueStatus: "incomplete",
+      symbol: "MSFT",
+      positionCount: 1,
+      investedUsd: null,
+      unrealizedPnlUsd: null,
+      units: null,
+      averageOpenPrice: null,
+      currentPrice: null,
+      displayName: "MSFT",
+      valueStatus: "incomplete",
   }]);
   assert.equal(result.data.omittedPositionCount, 1);
   assert.equal(result.data.incompleteValuePositionCount, 1);
@@ -245,11 +300,15 @@ test("demo portfolio marks overflowing aggregate values as incomplete", async ()
   });
 
   assert.deepEqual(result.data.instruments, [{
-    symbol: "AAPL",
-    positionCount: 2,
-    investedUsd: null,
-    unrealizedPnlUsd: null,
-    valueStatus: "incomplete",
+      symbol: "AAPL",
+      positionCount: 2,
+      investedUsd: null,
+      unrealizedPnlUsd: null,
+      units: null,
+      averageOpenPrice: null,
+      currentPrice: null,
+      displayName: "AAPL",
+      valueStatus: "incomplete",
   }]);
   assert.equal(result.data.incompleteValuePositionCount, 1);
 });
@@ -288,6 +347,7 @@ test("demo PnL response supports the documented clientPortfolio wrapper", async 
               },
             ],
             orders: [{ amount: 250 }],
+            ordersForOpen: [],
             ordersForClose: [{ orderId: 2001 }],
             ordersForCloseMultiple: [{ orderId: 3001 }],
           },
@@ -319,6 +379,11 @@ test("demo PnL ignores nullable provider totals and uses derived fallbacks", asy
             equity: null,
             unrealizedPnL: null,
             positions: [{ amount: 500, positionID: 1, unrealizedPnL: 25 }],
+            mirrors: [],
+            orders: [],
+            ordersForOpen: [],
+            ordersForClose: [],
+            ordersForCloseMultiple: [],
           },
         }),
         { status: 200 },
@@ -379,6 +444,8 @@ test("read-only endpoint allow-list excludes mutation routes", async () => {
     "instrumentSearch",
     "marketCandles",
     "marketRates",
+    "realPnl",
+    "realPortfolio",
   ]);
   assert.equal(Object.values(READ_ONLY_ENDPOINTS).every(({ method }) => method === "GET"), true);
   assert.equal(serialized.includes("order"), false);

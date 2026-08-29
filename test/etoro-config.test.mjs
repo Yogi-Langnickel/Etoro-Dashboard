@@ -5,7 +5,9 @@ import {
   DEFAULT_READ_CACHE_TTL_MS,
   MAX_READ_CACHE_TTL_MS,
   EtoroConfigError,
+  credentialsForEnvironment,
   loadEtoroConfig,
+  migrateLegacyRealProfile,
   publicCredentialStatus,
 } from "../src/etoro-config.mjs";
 
@@ -15,20 +17,90 @@ test("loads credentials from the configured JSON file", async () => {
     readFile: async () =>
       JSON.stringify({
         baseUrl: "https://public-api.etoro.com/",
-        publicApiKey: "file-api-key",
-        userKey: "file-user-key",
+        defaultEnvironment: "demo",
+        profiles: { demo: { publicApiKey: "file-api-key", userKey: "file-user-key" } },
       }),
   });
 
   assert.equal(config.configured, true);
   assert.equal(config.baseUrl, DEFAULT_ETORO_BASE_URL);
-  assert.equal(config.apiKey, "file-api-key");
-  assert.equal(config.userKey, "file-user-key");
   assert.equal(config.readCacheTtlMs, DEFAULT_READ_CACHE_TTL_MS);
   assert.equal(config.credentialSource, "file");
 });
 
-test("environment credentials override file credentials when present", async () => {
+test("named profiles remain independent and no legacy root profile is guessed as Demo", async () => {
+  const config = await loadEtoroConfig({
+    env: { ETORO_CREDENTIALS_FILE: "/tmp/credentials.json" },
+    readFile: async () => JSON.stringify({
+      apiKey: "test-api-key",
+      userKey: "test-user-key",
+      defaultEnvironment: "real",
+      profiles: { real: { publicApiKey: "test-api-key-two", userKey: "test-user-key-two" } },
+    }),
+  });
+  assert.equal(config.configured, true);
+  assert.equal(config.legacyProfilePresent, true);
+  assert.equal(config.profiles.demo, null);
+  assert.equal(credentialsForEnvironment(config, "real").environment, "real");
+  assert.throws(() => credentialsForEnvironment(config, "demo"), (error) => error.code === "ETORO_PROFILE_NOT_CONFIGURED");
+});
+
+test("flat legacy credential files are preserved but not selected as an environment", async () => {
+  const config = await loadEtoroConfig({
+    env: { ETORO_CREDENTIALS_FILE: "/tmp/credentials.json" },
+    readFile: async () => JSON.stringify({ apiKey: "test-api-key", userKey: "test-user-key" }),
+  });
+  assert.equal(config.legacyProfilePresent, true);
+  assert.equal(config.configured, false);
+  assert.equal(config.profiles.real, null);
+  assert.equal(config.profiles.demo, null);
+});
+
+test("rejects credential files or parent directories that are not owner-only", async () => {
+  const namedFile = JSON.stringify({ profiles: { real: { publicApiKey: "test-api-key", userKey: "test-user-key" } } });
+  await assert.rejects(loadEtoroConfig({
+    env: { ETORO_CREDENTIALS_FILE: "/tmp/credentials.json" }, readFile: async () => namedFile,
+    stat: async (path) => ({ mode: path.endsWith("credentials.json") ? 0o100644 : 0o040700 }),
+  }), (error) => error.code === "ETORO_CREDENTIAL_PERMISSIONS");
+  await assert.rejects(loadEtoroConfig({
+    env: { ETORO_CREDENTIALS_FILE: "/tmp/credentials.json" }, readFile: async () => namedFile,
+    stat: async (path) => ({ mode: path.endsWith("credentials.json") ? 0o100600 : 0o040755 }),
+  }), (error) => error.code === "ETORO_CREDENTIAL_PERMISSIONS");
+});
+
+test("value-blind migration preserves a differing Real profile and does not write", async () => {
+  let wrote = false;
+  await assert.rejects(migrateLegacyRealProfile({
+    sourceFile: "/legacy/.env.real",
+    credentialsFile: "/target/credentials.json",
+    statImpl: async (path) => ({ mode: path === "/target" ? 0o040700 : 0o100600 }),
+    mkdirImpl: async () => {}, chmodImpl: async () => {}, renameImpl: async () => {}, unlinkImpl: async () => {}, writeFileImpl: async () => { wrote = true; },
+    readFileImpl: async (path) => path.includes("legacy")
+      ? "ETORO_DASHBOARD_PUBLIC_KEY=test-public\nETORO_DASHBOARD_PRIVAT_KEY=test-user\n"
+      : JSON.stringify({ profiles: { real: { publicApiKey: "test-api-key-two", userKey: "test-user-key-two" } } }),
+  }), (error) => error.code === "ETORO_MIGRATION_PROFILE_CONFLICT");
+  assert.equal(wrote, false);
+});
+
+test("value-blind migration copies only after owner-only checks and retains source until explicitly removed", async () => {
+  let destination = null; let removed = false;
+  const source = "ETORO_DASHBOARD_PUBLIC_KEY=test-public\nETORO_DASHBOARD_PRIVAT_KEY=test-user\n";
+  const result = await migrateLegacyRealProfile({
+    sourceFile: "/legacy/.env.real", credentialsFile: "/target/credentials.json",
+    statImpl: async (path) => ({ mode: path === "/target" ? 0o040700 : 0o100600 }), mkdirImpl: async () => {}, chmodImpl: async () => {}, renameImpl: async () => {},
+    writeFileImpl: async (_path, contents) => { destination = contents; },
+    readFileImpl: async (path) => path.includes("legacy") ? source : destination ?? (() => { const error = new Error("missing"); error.code = "ENOENT"; throw error; })(),
+    unlinkImpl: async () => { removed = true; },
+  });
+  assert.equal(result.sourceRetained, true);
+  assert.equal(result.permissionsVerified, true);
+  assert.equal(result.valuesComparedInsideProcess, true);
+  assert.equal(removed, false);
+  await result.removeSource();
+  assert.equal(removed, true);
+});
+
+test("ambient generic credentials are ignored so they cannot cross environments", async () => {
   const config = await loadEtoroConfig({
     env: {
       ETORO_CREDENTIALS_FILE: "/tmp/credentials.json",
@@ -38,14 +110,16 @@ test("environment credentials override file credentials when present", async () 
     },
     readFile: async () =>
       JSON.stringify({
-        apiKey: "file-api-key",
-        userKey: "file-user-key",
+        defaultEnvironment: "demo",
+        profiles: { demo: { apiKey: "file-api-key", userKey: "file-user-key" } },
       }),
   });
 
-  assert.equal(config.apiKey, "env-api-key");
-  assert.equal(config.userKey, "env-user-key");
-  assert.equal(config.credentialSource, "mixed");
+  assert.equal(config.configured, true);
+  const selected = credentialsForEnvironment(config, "demo");
+  assert.equal(selected.apiKey, "file-api-key");
+  assert.equal(selected.userKey, "file-user-key");
+  assert.equal(selected.apiKey === "env-api-key", false);
 });
 
 test("public credential status excludes secret values", async () => {
@@ -60,7 +134,7 @@ test("public credential status excludes secret values", async () => {
   const status = publicCredentialStatus(config);
   const serialized = JSON.stringify(status);
 
-  assert.equal(status.configured, true);
+  assert.equal(status.configured, false);
   assert.equal(status.providerHostPolicy, "official-host-allow-list");
   assert.equal(status.providerEndpointDetails, "server-only");
   assert.equal(status.baseUrl, undefined);

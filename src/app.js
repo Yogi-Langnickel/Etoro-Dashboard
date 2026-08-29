@@ -9,57 +9,33 @@ const botConfigCsrfResponseHeader = "x-etoro-dashboard-config-token";
 const loadedTabIds = new Set();
 let botConfigMutationProtection = null;
 let botConfigOptionsPayload = null;
-let selectedPortfolioSymbol = "SPY";
+let selectedPortfolioSymbol = null;
 let selectedPortfolioPeriod = "24h";
-let portfolioDataSource = "fixture";
+let portfolioDataSource = "none";
+let selectedPortfolioEnvironment = null;
+let portfolioChartRequestSequence = 0;
 let selectedWatchlistSymbol = "AAPL";
 let selectedWatchlistPeriod = "24h";
 let watchlistDataSource = "fixture";
 let watchlistChartRequestSequence = 0;
 const watchlistItemsBySymbol = new Map();
 
-const {
-  portfolioChartPoints,
-  portfolioEnrichmentReceipts,
-  portfolioPeriodChanges,
-  watchlistChartPoints,
-  watchlistContextReceipts,
-  watchlistPeriodChanges,
-} = globalThis.EtoroBrowserFixtures;
+// Portfolio View never imports browser fixtures. Synthetic tabs keep their own visible watermarks.
+const watchlistChartPoints = {};
+const watchlistContextReceipts = {};
+const watchlistPeriodChanges = {};
 
 function chartPointsFor(pointsBySymbol, symbol, period, fallbackSymbol) {
   return pointsBySymbol[symbol]?.[period] ?? pointsBySymbol[fallbackSymbol]?.[period] ?? "";
-}
-
-function portfolioChartFor(symbol, period) {
-  return chartPointsFor(portfolioChartPoints, symbol, period, "SPY");
 }
 
 const {
   hasExactKeys,
   isIsoInstant,
   normalizeMarketChartPayload,
-  normalizePortfolioViewPayload,
+  normalizeLivePortfolioPayload,
   normalizeWatchlistViewPayload,
 } = globalThis.EtoroBrowserContracts;
-
-function portfolioTotalsFor(instruments) {
-  const complete = instruments.filter(({ valueStatus }) => valueStatus === "complete");
-  if (complete.length === 0) return { investedUsd: null, unrealizedPnlUsd: null, netValueUsd: null };
-  const investedUsd = complete.reduce((total, instrument) => total + instrument.investedUsd, 0);
-  const unrealizedPnlUsd = complete.reduce((total, instrument) => total + instrument.unrealizedPnlUsd, 0);
-  const netValueUsd = investedUsd + unrealizedPnlUsd;
-  if (![investedUsd, unrealizedPnlUsd, netValueUsd].every(Number.isFinite)) {
-    throw new Error("Portfolio data is unavailable.");
-  }
-  return { investedUsd, unrealizedPnlUsd, netValueUsd };
-}
-
-function portfolioPeriodValue(source, symbol, period) {
-  return source === "provider-normalized"
-    ? "Unavailable"
-    : portfolioPeriodChanges[symbol]?.[period] ?? "Unavailable";
-}
 
 function watchlistChartFor(symbol, period) {
   return chartPointsFor(watchlistChartPoints, symbol, period, "AAPL");
@@ -116,14 +92,6 @@ function formatCacheDuration(milliseconds) {
   }
 
   return `${milliseconds} ms read cache`;
-}
-
-function formatProviderDuration(milliseconds) {
-  if (typeof milliseconds !== "number" || !Number.isFinite(milliseconds) || milliseconds < 0) {
-    return "Latency unavailable";
-  }
-
-  return `Latency: ${Math.round(milliseconds)} ms`;
 }
 
 async function getJson(path) {
@@ -195,49 +163,32 @@ async function sendJsonWithMethod(method, path, body, extraHeaders = {}) {
 
 function renderStatus(payload) {
   const status = payload.credentialStatus;
-  const configured = Boolean(status?.configured);
+  const defaultEnvironment = selectedPortfolioEnvironment ?? (status?.defaultEnvironment === "demo" ? "demo" : "real");
+  const readiness = payload.profileReadiness ?? {};
+  const activeState = readiness[defaultEnvironment] ?? status?.profiles?.[defaultEnvironment]?.state ?? "not-configured";
+  const configured = activeState === "ready";
   const cacheTtlMs = payload.cachePolicy?.readOnlyTtlMs ?? status?.readCacheTtlMs;
 
   setTile(
     "provider-status",
     configured ? "ok" : "warn",
-    configured ? "Provider configured" : "Provider offline",
-    configured ? "Server-side provider boundary" : "Using synthetic fixtures",
+    configured ? `${labelize(defaultEnvironment)} ready` : labelize(activeState),
+    configured ? "Server-side read-only provider boundary" : "No synthetic portfolio fallback",
   );
   text(
     "source-detail",
     configured
-      ? `Server configured; ${formatCacheDuration(cacheTtlMs)}`
-      : `No server credentials; ${formatCacheDuration(cacheTtlMs)}`,
+      ? `${labelize(defaultEnvironment)} profile ready; ${formatCacheDuration(cacheTtlMs)}`
+      : `${labelize(defaultEnvironment)} profile ${labelize(activeState)}; ${formatCacheDuration(cacheTtlMs)}`,
   );
   text("chart-provider", configured ? "Provider boundary: server-side only" : "Provider timestamp: unavailable");
-}
-
-function renderIdentity(payload) {
-  const refs = payload.data?.accountRefs;
-  const demoAvailable = Boolean(refs?.hasDemoCid);
-
-  setTile(
-    "demo-status",
-    demoAvailable ? "ok" : "warn",
-    demoAvailable ? "Demo account" : "Demo not verified",
-    refs?.hasRealCid ? "Real account also present" : "Read-only demo route",
+  const select = document.getElementById("portfolio-environment");
+  if (select) { select.value = defaultEnvironment; for (const option of select.options) option.disabled = readiness[option.value] === "not-configured"; }
+  text("portfolio-environment-label", "Profile readiness");
+  text(
+    "portfolio-environment-detail",
+    `Real ${labelize(readiness.real ?? "not-configured")} · Demo ${labelize(readiness.demo ?? "not-configured")}`,
   );
-}
-
-function renderPnl(payload) {
-  const data = payload.data;
-
-  text("mock-equity-label", "Demo equity");
-  text("mock-equity", money(data.equity ?? data.credit));
-  text("cash-buffer", money(data.availableCash));
-  text("unrealized-pnl", signedMoney(data.unrealizedPnL));
-  text("exposure", money(data.totalInvested));
-  text("stale-data", `${data.positionCount} positions`);
-  text("chart-provider", data.providerUpdatedAt ? `Provider timestamp: ${data.providerUpdatedAt}` : "Provider timestamp: unavailable");
-  text("chart-request", `Request ID: ${payload.provider.requestId} | ${formatProviderDuration(payload.provider.durationMs)}`);
-  text("chart-cache", `Cache: ${labelize(payload.cache?.state)} (${payload.cache?.ttlMs ?? 0} ms)`);
-  setTile("last-sync", "ok", "Last sync", new Date(payload.provider.receivedAt).toLocaleTimeString());
 }
 
 function renderAudit(message, detail, listId = "audit-list") {
@@ -374,7 +325,7 @@ function appendPortfolioCell(row, value, className) {
 }
 
 function renderProviderPortfolio(payload) {
-  const view = normalizePortfolioViewPayload(payload);
+  const view = normalizeLivePortfolioPayload(payload);
   const body = document.getElementById("portfolio-table-body");
 
   if (!body) return view;
@@ -393,21 +344,29 @@ function renderProviderPortfolio(payload) {
     const symbol = document.createElement("strong");
     const detail = document.createElement("span");
     symbol.textContent = instrument.symbol;
-    detail.textContent = `${instrument.positionCount} aggregated position${instrument.positionCount === 1 ? "" : "s"}`;
+    detail.textContent = `${instrument.displayName} · ${instrument.positionCount} aggregated position${instrument.positionCount === 1 ? "" : "s"}`;
     assetCell.append(symbol, detail);
     row.append(assetCell);
 
-    appendPortfolioCell(row, "Unavailable");
+    appendPortfolioCell(row, money(instrument.currentPrice));
     const periodCell = appendPortfolioCell(row, "Unavailable", "neutral-text");
     periodCell.dataset.periodValue = "";
-    appendPortfolioCell(row, "Unavailable");
-    appendPortfolioCell(row, "Unavailable");
-    appendPortfolioCell(row, signedMoney(instrument.unrealizedPnlUsd), signedClass(signedMoney(instrument.unrealizedPnlUsd)));
-    appendPortfolioCell(row, signedPercent(instrument.pnlPercent), signedClass(signedPercent(instrument.pnlPercent)));
-    appendPortfolioCell(row, money(instrument.investedUsd));
-    appendPortfolioCell(row, money(instrument.netValueUsd));
-    appendPortfolioCell(row, instrument.valueStatus === "complete" ? "Normalized" : "Incomplete", instrument.valueStatus === "complete" ? "good-text" : "warn-text");
+    appendPortfolioCell(row, instrument.units === null ? "Unavailable" : String(instrument.units));
+    appendPortfolioCell(row, money(instrument.averageOpenPrice));
+    appendPortfolioCell(row, signedMoney(instrument.unrealizedPnl), signedClass(signedMoney(instrument.unrealizedPnl)));
+    appendPortfolioCell(row, signedPercent(instrument.unrealizedPnlPercent), signedClass(signedPercent(instrument.unrealizedPnlPercent)));
+    appendPortfolioCell(row, money(instrument.investedValue));
+    appendPortfolioCell(row, money(instrument.netValue));
+    appendPortfolioCell(row, instrument.completeness === "complete" ? "Complete" : "Partial", instrument.completeness === "complete" ? "good-text" : "warn-text");
     bindPortfolioRow(row);
+    body.append(row);
+  }
+  if (view.instruments.length === 0) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 10;
+    cell.textContent = "No open positions";
+    row.append(cell);
     body.append(row);
   }
 
@@ -418,38 +377,40 @@ function renderProviderPortfolio(payload) {
     selected.classList.add("active");
   }
 
-  const completeRows = view.instruments.filter((instrument) => instrument.valueStatus === "complete");
-  const totals = portfolioTotalsFor(view.instruments);
-  text("mock-equity-label", "Normalized demo net value");
-  text("mock-equity", money(totals.netValueUsd));
-  text("equity-detail", completeRows.length > 0 ? "Complete normalized instrument values only" : "No complete instrument values");
-  text("cash-buffer", "Unavailable");
-  text("cash-buffer-detail", "Not included in the portfolio aggregate");
-  text("unrealized-pnl", signedMoney(totals.unrealizedPnlUsd));
-  text("unrealized-pnl-detail", completeRows.length > 0 ? "Complete normalized rows only" : "No complete instrument values");
-  text("exposure", "Unavailable");
-  text("exposure-detail", "Not included in the portfolio aggregate");
-  text("stale-data-label", "Provider timestamp");
-  text("stale-data", view.providerUpdatedAt ? "Available" : "Unavailable");
-  text("stale-data-detail", view.providerUpdatedAt ? "Exact time shown in portfolio freshness" : "Provider timestamp missing");
-  text("portfolio-source-watermark", "Provider normalized");
+  text("mock-equity-label", "Equity");
+  text("mock-equity", money(view.equity));
+  text("equity-detail", "Provider-normalized equity");
+  text("cash-buffer", money(view.availableCash));
+  text("cash-buffer-detail", "Provider-normalized available cash");
+  text("unrealized-pnl", signedMoney(view.unrealizedPnl));
+  text("unrealized-pnl-detail", "Provider-normalized unrealized P/L");
+  text("exposure", money(view.totalInvested));
+  text("exposure-detail", "Provider-normalized total invested");
+  text("stale-data-label", "Open positions");
+  text("stale-data", String(view.openPositionCount));
+  text("stale-data-detail", `${view.instrumentCount} instrument aggregate${view.instrumentCount === 1 ? "" : "s"}`);
+  text("portfolio-source-watermark", `${labelize(view.environment)} provider`);
   text("portfolio-source-detail", "Read-only aggregate; no account, position, or order identifiers");
 
   const cacheState = view.cache?.state ?? "unknown";
   const cacheAge = view.cache?.cachedAt ? ` · cached ${view.cache.cachedAt}` : "";
   text("portfolio-read-state", `Portfolio: provider ${labelize(cacheState)}${cacheAge}`);
   text("portfolio-freshness", `Provider updated: ${view.providerUpdatedAt ?? "unavailable"}`);
-  text("portfolio-omitted", `Omitted rows: ${view.omittedPositionCount}`);
+  text("portfolio-omitted", `Omitted rows: ${view.omittedRowCount}`);
   text(
     "portfolio-partial",
-    view.incompleteValuePositionCount > 0
-      ? `Partial values: ${view.incompleteValuePositionCount} position${view.incompleteValuePositionCount === 1 ? "" : "s"}`
+    view.incompleteRowCount > 0
+      ? `Partial values: ${view.incompleteRowCount} position${view.incompleteRowCount === 1 ? "" : "s"}`
       : "Value coverage: complete",
   );
   text("chart-provider", `Provider timestamp: ${view.providerUpdatedAt ?? "unavailable"}`);
   text("chart-request", "Provider request ID: hidden");
   text("chart-cache", `Cache: ${labelize(cacheState)} (${view.cache?.ttlMs ?? 0} ms)`);
-  text("source-detail", view.incompleteValuePositionCount > 0 ? "Partial normalized provider values" : "Normalized provider portfolio");
+  text("source-detail", view.incompleteRowCount > 0 ? "Partial normalized provider values" : "Normalized provider portfolio");
+  const cashPercent = view.equity !== null && view.equity > 0 && view.availableCash !== null ? (view.availableCash / view.equity) * 100 : null;
+  const largest = [...view.instruments].filter((instrument) => instrument.allocationPercent !== null).sort((left, right) => right.allocationPercent - left.allocationPercent)[0];
+  text("portfolio-stat-cash", cashPercent === null ? "Cash percentage unavailable" : `Cash: ${cashPercent.toFixed(2)}%`);
+  text("portfolio-stat-largest", largest ? `Largest holding: ${largest.symbol} (${largest.allocationPercent.toFixed(2)}%)` : "Largest holding unavailable");
   updatePortfolioPeriod(selectedPortfolioPeriod);
   return view;
 }
@@ -478,7 +439,7 @@ function renderFulfilledProviderPortfolio(payload) {
     const view = renderProviderPortfolio(payload);
     renderAudit(
       "Provider portfolio loaded",
-      `${view.instruments.length} instrument aggregates; ${view.omittedPositionCount} unsafe rows omitted; no account or position IDs returned`,
+      `${view.instruments.length} instrument aggregates; ${view.omittedRowCount} unsafe rows omitted; no account or position IDs returned`,
     );
     return true;
   } catch (error) {
@@ -491,34 +452,33 @@ function renderFulfilledProviderPortfolio(payload) {
   }
 }
 
-function renderSelectedPortfolioInstrument() {
-  if (portfolioDataSource === "provider-normalized") {
-    text("chart-title", `${selectedPortfolioSymbol} market chart unavailable`);
-    text("selected-period-pill", periodLabel(selectedPortfolioPeriod));
-    text("chart-period-label", "Selected-period market DTO not connected");
-    text("portfolio-financial-title", "Market context deferred");
-    text("portfolio-financial-detail", "Portfolio holdings do not supply chart or financial-record data.");
-    text("portfolio-news-title", "News context deferred");
-    text("portfolio-news-detail", "Read-only portfolio values cannot be reused as news or a trading signal.");
-    text("portfolio-insider-title", "Ownership context deferred");
-    text("portfolio-insider-detail", "Exact-symbol market contracts are the next separate read-only slice.");
-    document.getElementById("performance-line")?.setAttribute("points", "");
-    document.getElementById("performance-area")?.setAttribute("d", "");
-    return;
-  }
-
-  const receipts = portfolioEnrichmentReceipts[selectedPortfolioSymbol] ?? portfolioEnrichmentReceipts.SPY;
-
-  text("chart-title", `${selectedPortfolioSymbol} selected-period chart`);
+async function renderSelectedPortfolioInstrument() {
+  const sequence = ++portfolioChartRequestSequence;
+  const line = document.getElementById("performance-line");
+  const area = document.getElementById("performance-area");
+  line?.setAttribute("points", ""); area?.setAttribute("d", "");
   text("selected-period-pill", periodLabel(selectedPortfolioPeriod));
-  text("chart-period-label", `Selected period: ${periodLabel(selectedPortfolioPeriod)}`);
-  text("portfolio-financial-title", receipts.financial[0]);
-  text("portfolio-financial-detail", receipts.financial[1]);
-  text("portfolio-news-title", receipts.news[0]);
-  text("portfolio-news-detail", receipts.news[1]);
-  text("portfolio-insider-title", receipts.insider[0]);
-  text("portfolio-insider-detail", receipts.insider[1]);
-  setPerformanceChart(portfolioChartFor(selectedPortfolioSymbol, selectedPortfolioPeriod));
+  if (!selectedPortfolioSymbol || portfolioDataSource !== "provider-normalized") {
+    text("chart-title", "Select a live holding"); text("chart-period-label", "Market-price history unavailable"); return;
+  }
+  text("chart-title", `${selectedPortfolioSymbol} market-price history`);
+  text("chart-period-label", `Loading ${periodLabel(selectedPortfolioPeriod)} close points`);
+  text("portfolio-financial-title", "Provider holding selected");
+  text("portfolio-financial-detail", "Market history is independent from portfolio performance.");
+  text("portfolio-news-title", "Unavailable"); text("portfolio-news-detail", "No synthetic market context is shown.");
+  text("portfolio-insider-title", "Unavailable"); text("portfolio-insider-detail", "No synthetic ownership context is shown.");
+  try {
+    const chart = normalizeMarketChartPayload(await getJson(`/api/etoro/market/chart?symbol=${encodeURIComponent(selectedPortfolioSymbol)}&period=${encodeURIComponent(selectedPortfolioPeriod)}`), selectedPortfolioSymbol, selectedPortfolioPeriod);
+    if (sequence !== portfolioChartRequestSequence) return;
+    setPerformanceChart(marketChartSvgPoints(chart.points));
+    text("chart-period-label", `Instrument market-price history · ${chart.pointCount} close points`);
+    text("chart-provider", `Provider updated: ${chart.providerUpdatedAt}`);
+    text("chart-cache", `Cache: ${labelize(chart.cache.state)} (${chart.cache.ttlMs} ms)`);
+  } catch {
+    if (sequence !== portfolioChartRequestSequence) return;
+    text("chart-period-label", "Instrument market-price history unavailable");
+    text("chart-cache", "Cache: unavailable");
+  }
 }
 
 function updatePortfolioPeriod(period) {
@@ -532,18 +492,10 @@ function updatePortfolioPeriod(period) {
   });
 
   document.querySelectorAll("[data-instrument-row]").forEach((row) => {
-    const symbol = row.dataset.symbol;
-    const value = portfolioPeriodValue(row.dataset.source, symbol, period);
     const target = row.querySelector("[data-period-value]");
-
-    if (target) {
-      target.textContent = value;
-      target.classList.remove("good-text", "bad-text", "neutral-text");
-      target.classList.add(signedClass(value));
-    }
+    if (target) { target.textContent = "Market history"; target.className = "neutral-text"; }
   });
-
-  renderSelectedPortfolioInstrument();
+  void renderSelectedPortfolioInstrument();
 }
 
 function selectPortfolioInstrument(row) {
@@ -765,6 +717,17 @@ function renderSelectedWatchlistInstrument() {
   }
   const context = watchlistContextReceipts[selectedWatchlistSymbol] ?? watchlistContextReceipts.AAPL;
 
+  if (!context) {
+    text("watchlist-chart-title", "Watchlist market chart unavailable");
+    text("watchlist-selected-period-pill", periodLabel(selectedWatchlistPeriod));
+    text("watchlist-chart-period-label", "Selected-period market data unavailable");
+    text("watchlist-context-title", "Unavailable");
+    text("watchlist-context-source", "No synthetic fixture was loaded");
+    text("watchlist-context-freshness", "Freshness: unavailable");
+    text("watchlist-context-detail", "Provider watchlist reads are loaded only when this tab is opened.");
+    return;
+  }
+
   text("watchlist-chart-title", `${selectedWatchlistSymbol} watchlist chart`);
   text("watchlist-selected-period-pill", periodLabel(selectedWatchlistPeriod));
   text("watchlist-chart-period-label", `Selected period: ${periodLabel(selectedWatchlistPeriod)}`);
@@ -793,7 +756,7 @@ function updateWatchlistPeriod(period) {
     const symbol = row.dataset.watchlistSymbol;
     const value = watchlistDataSource === "provider-normalized"
       ? "Unavailable"
-      : watchlistPeriodChanges[symbol]?.[period] ?? "0.0%";
+      : watchlistPeriodChanges[symbol]?.[period] ?? "Unavailable";
     const target = row.querySelector("[data-watchlist-period-value]");
 
     if (target) {
@@ -1593,20 +1556,22 @@ async function refreshEtoro() {
   try {
     await getJson("/api/health");
     const status = await getJson("/api/etoro/status");
+    selectedPortfolioEnvironment ??= status.credentialStatus?.defaultEnvironment === "demo" ? "demo" : "real";
     renderStatus(status);
-    const portfolioRead = status.credentialStatus.configured
-      ? getJson("/api/etoro/demo/portfolio")
+    const selectedState = status.profileReadiness?.[selectedPortfolioEnvironment] ?? "not-configured";
+    const portfolioRead = selectedState === "ready"
+      ? getJson(`/api/etoro/portfolio?environment=${encodeURIComponent(selectedPortfolioEnvironment)}`)
       : Promise.resolve(null);
     const [portfolioResult] = await Promise.allSettled([
       portfolioRead,
       refreshTabStatus(activeTabId(), { force: true }),
     ]);
 
-    if (!status.credentialStatus.configured) {
+    if (selectedState !== "ready") {
       const retainedProviderRows = portfolioDataSource === "provider-normalized";
       text(
         "portfolio-read-state",
-        retainedProviderRows ? "Portfolio: prior provider rows retained in memory" : "Portfolio: synthetic fixture",
+        retainedProviderRows ? "Portfolio: prior provider rows retained in memory" : `Portfolio: ${labelize(selectedState)}`,
       );
       text(
         "portfolio-freshness",
@@ -1614,16 +1579,22 @@ async function refreshEtoro() {
       );
       if (!retainedProviderRows) {
         text("portfolio-omitted", "Omitted rows: unavailable until provider read");
-        text("portfolio-partial", "Value coverage: synthetic fixture");
+        text("portfolio-partial", "No provider portfolio values loaded");
       }
       renderAudit(
-        retainedProviderRows ? "Provider rows retained in memory" : "Portfolio fixture retained",
+        retainedProviderRows ? "Provider rows retained in memory" : "Portfolio provider unavailable",
         retainedProviderRows
           ? "Provider access is no longer configured; no refresh was attempted and prior rows are marked stale"
-          : "No credential values are present in the browser; provider portfolio reads remain server-only",
+          : "No credentials or synthetic portfolio values are present in the browser",
       );
     } else if (portfolioResult.status === "fulfilled") {
-      renderFulfilledProviderPortfolio(portfolioResult.value);
+      if (renderFulfilledProviderPortfolio(portfolioResult.value)) {
+        const cache = portfolioResult.value?.cache;
+        const detail = cache?.state === "stale"
+          ? `Stale provider data cached ${cache.cachedAt}`
+          : `Provider data cached ${cache?.cachedAt ?? "just now"}`;
+        setTile("last-sync", cache?.state === "stale" ? "warn" : "ok", "Last sync", detail);
+      }
     } else {
       renderPortfolioReadFailure(portfolioResult.reason);
       renderAudit(
@@ -1632,7 +1603,7 @@ async function refreshEtoro() {
       );
     }
   } catch (error) {
-    setTile("provider-status", "warn", "Provider offline", "Using synthetic fixtures");
+    setTile("provider-status", "warn", "Provider unavailable", "No synthetic portfolio fallback");
     await refreshTabStatus(activeTabId(), { force: true });
     renderPortfolioReadFailure(error);
     renderAudit("Provider read failed", "Provider status is unavailable; no account-linked data was stored");
@@ -1673,6 +1644,13 @@ function collectBotConfig() {
 }
 
 document.getElementById("refresh-etoro")?.addEventListener("click", refreshEtoro);
+document.getElementById("portfolio-environment")?.addEventListener("change", (event) => {
+  selectedPortfolioEnvironment = event.target.value === "demo" ? "demo" : "real";
+  portfolioDataSource = "none";
+  selectedPortfolioSymbol = null;
+  document.getElementById("portfolio-table-body")?.replaceChildren();
+  void refreshEtoro();
+});
 document.getElementById("trade-ticket")?.addEventListener("submit", (event) => {
   event.preventDefault();
   renderAudit("Trade submit blocked", "No local execution route exists in this slice", "trading-audit-list");

@@ -49,6 +49,12 @@ User-Agent contact value are configured.
 
 Do not paste eToro keys into chat or commit them to the repo. Store your demo/read credentials at `${HOME}/.config/etoro/credentials.json`:
 
+The current Portfolio View uses explicit named profiles. A normal server reads no repo-local `.env` file and never sends credentials to the browser:
+
+The file declares the official base URL, a `real` or `demo` default, and a `profiles` object. Each configured profile contains its server-only eToro public API key and environment-specific user key. Create the containing directory with mode `0700` and the file with mode `0600`. Demo is optional; an absent Demo profile is shown as **Demo not configured**, never as a provider failure or fixture portfolio.
+
+The exported `migrateLegacyRealProfile` helper is deliberately value-blind. Use it only with the owner-only legacy source, preserve an existing differing profile, then run the normal-server Real identity, P&L, and portfolio smoke checks. Call its explicit source-removal callback only after those checks and a normal `npm run start` browser smoke succeed. Do not print, hash, or paste either source or destination value.
+
 ```json
 {
   "baseUrl": "https://public-api.etoro.com",

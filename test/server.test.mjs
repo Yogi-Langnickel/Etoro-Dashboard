@@ -170,6 +170,7 @@ test("server exposes only internal API routes and no execution routes", () => {
     "/api/etoro/identity",
     "/api/etoro/demo/pnl",
     "/api/etoro/demo/portfolio",
+    "/api/etoro/portfolio",
     "/api/etoro/watchlist/default",
     "/api/etoro/market/resolve",
     "/api/etoro/market/rates",
@@ -190,6 +191,51 @@ test("server exposes only internal API routes and no execution routes", () => {
   assert.equal(serialized.includes("execution"), false);
   assert.equal(serialized.includes("market-open"), false);
   assert.equal(serialized.includes("market-close"), false);
+});
+
+test("unified portfolio route is environment-allowlisted and omits provider metadata", async () => {
+  const config = { baseUrl: "https://public-api.etoro.com", defaultEnvironment: "real", readCacheTtlMs: 15000, profiles: { real: { apiKey: "server-api-secret", userKey: "server-user-secret", configured: true, missing: [] }, demo: null } };
+  const handler = createRequestHandler({
+    loadConfig: async () => config,
+    fetchEndpoint: async (endpoint) => {
+      if (endpoint === "identity") return { data: { authenticated: true }, provider: {} };
+      if (endpoint.endsWith("Pnl")) return { data: { equity: 120, availableCash: 20, totalInvested: 100, unrealizedPnL: 5, realizedPnL: null, mirrorCount: 0, pendingOrderCount: 0, providerUpdatedAt: null }, provider: {} };
+      return { data: { positionCount: 1, instrumentCount: 1, omittedPositionCount: 0, incompleteValuePositionCount: 0, providerUpdatedAt: null, instruments: [{ symbol: "AAPL", displayName: "Apple", positionCount: 1, units: 1, averageOpenPrice: 100, currentPrice: 120, investedUsd: 100, unrealizedPnlUsd: 5, valueStatus: "complete" }] }, provider: {} };
+    },
+  });
+  const response = await callHandler(handler, { url: "/api/etoro/portfolio?environment=real" });
+  assert.equal(response.status, 200);
+  assert.equal(response.json.data.environment, "real");
+  assert.equal(Object.hasOwn(response.json, "provider"), false);
+  assert.equal(response.text.includes("server-api-secret"), false);
+  const invalid = await callHandler(handler, { url: "/api/etoro/portfolio?environment=bad" });
+  assert.equal(invalid.status, 400);
+});
+
+test("status readiness shares a Real snapshot with portfolio and reports Demo not-configured", async () => {
+  const config = {
+    baseUrl: "https://public-api.etoro.com", defaultEnvironment: "real", readCacheTtlMs: 15_000,
+    credentialFileLoaded: true, configured: true,
+    profiles: { real: { apiKey: "server-api-secret", userKey: "server-user-secret", configured: true, missing: [] }, demo: null },
+  };
+  const endpointCalls = [];
+  const handler = createRequestHandler({
+    loadConfig: async () => config,
+    fetchEndpoint: async (endpoint) => {
+      endpointCalls.push(endpoint);
+      if (endpoint === "identity") return { data: { authenticated: true }, provider: {} };
+      if (endpoint === "realPnl") return { data: { equity: 120, availableCash: 20, totalInvested: 100, unrealizedPnL: 5, realizedPnL: null, mirrorCount: 0, pendingOrderCount: 0, providerUpdatedAt: null }, provider: {} };
+      return { data: { positionCount: 0, instrumentCount: 0, omittedPositionCount: 0, incompleteValuePositionCount: 0, providerUpdatedAt: null, instruments: [] }, provider: {} };
+    },
+  });
+  const status = await callHandler(handler, { url: "/api/etoro/status" });
+  const portfolio = await callHandler(handler, { url: "/api/etoro/portfolio?environment=real" });
+  assert.equal(status.json.profileReadiness.real, "ready");
+  assert.equal(status.json.profileReadiness.demo, "not-configured");
+  assert.equal(portfolio.status, 200);
+  assert.equal(portfolio.json.cache.state, "hit");
+  assert.deepEqual(endpointCalls.sort(), ["identity", "realPnl", "realPortfolio"]);
+  assert.equal(portfolio.text.includes("requestId"), false);
 });
 
 test("dashboard host remains loopback-only until authentication exists", () => {
@@ -402,7 +448,7 @@ test("dashboard shell exposes the active three-tab workspace", async () => {
   assert.equal(response.text.includes('"accountId"'), false);
 });
 
-test("portfolio view summarizes one row per instrument with period controls", async () => {
+test("portfolio view starts without fixture rows and has period controls", async () => {
   const response = await callHandler(configuredHandler(), {
     url: "/",
   });
@@ -412,8 +458,7 @@ test("portfolio view summarizes one row per instrument with period controls", as
   const periods = [...response.text.matchAll(/data-period="([^"]+)"/g)].map(([, period]) => period);
 
   assert.equal(response.status, 200);
-  assert.deepEqual(symbols, ["SPY", "NVDA", "BTC", "EURUSD"]);
-  assert.equal(new Set(symbols).size, symbols.length);
+  assert.deepEqual(symbols, []);
   assert.deepEqual(periods, ["24h", "1w", "1m", "1y", "5y", "max"]);
   assert.match(response.text, /Aggregated by asset/);
   assert.match(response.text, /Instrument summary/);
@@ -422,34 +467,21 @@ test("portfolio view summarizes one row per instrument with period controls", as
   assert.match(response.text, /Invested/);
   assert.match(response.text, /Net value/);
   assert.match(response.text, /Selected instrument/);
-  assert.match(response.text, /Selected period: 24h/);
+  assert.match(response.text, /No fixture values are used for Portfolio View/);
 });
 
-test("portfolio interaction contract uses instrument-specific period chart data", async () => {
-  const { portfolioChartFor, portfolioPeriodChanges } = await readBrowserChartContracts();
-
-  assert.notEqual(portfolioChartFor("SPY", "24h"), portfolioChartFor("NVDA", "24h"));
-  assert.notEqual(portfolioChartFor("SPY", "24h"), portfolioChartFor("SPY", "1w"));
-  assert.notEqual(portfolioChartFor("BTC", "24h"), portfolioChartFor("BTC", "1m"));
-  assert.equal(portfolioChartFor("UNKNOWN", "24h"), portfolioChartFor("SPY", "24h"));
-  assert.equal(portfolioPeriodChanges.NVDA["5y"], "+1,041.0%");
-  assert.equal(portfolioPeriodChanges.EURUSD["24h"], "-0.2%");
-});
-
-test("portfolio view keeps enrichment and risk context read-only and redacted", async () => {
+test("portfolio view keeps unavailable enrichment and risk context redacted", async () => {
   const response = await callHandler(configuredHandler(), {
     url: "/",
   });
 
   assert.equal(response.status, 200);
   assert.match(response.text, /context-only enrichment receipts/);
-  assert.match(response.text, /not advice/);
-  assert.match(response.text, /no bot signal or trade trigger/i);
-  assert.match(response.text, /Ownership activity is a neutral enrichment record only/);
+  assert.match(response.text, /No synthetic market context is shown/);
   assert.match(response.text, /Performance breakdown/);
   assert.match(response.text, /Portfolio risk/);
   assert.match(response.text, /Dividend expectations/);
-  assert.match(response.text, /Market, frequency, weight, yield, income, source, confidence/);
+  assert.match(response.text, /Unavailable without provider evidence/);
   assert.match(response.text, /No write actions|No writes|No orders|Read only/);
   assert.match(response.text, /Submit disabled/);
   assert.equal(response.text.includes("server-api-secret"), false);
@@ -485,17 +517,6 @@ test("watchlist tab exposes compact read-only rows and selected context", async 
   assert.equal(response.text.includes('"orderId"'), false);
 });
 
-test("watchlist interaction contract uses symbol-specific period chart data", async () => {
-  const { watchlistChartFor, watchlistPeriodChanges } = await readBrowserChartContracts();
-
-  assert.notEqual(watchlistChartFor("AAPL", "24h"), watchlistChartFor("GLD", "24h"));
-  assert.notEqual(watchlistChartFor("AAPL", "24h"), watchlistChartFor("AAPL", "1w"));
-  assert.notEqual(watchlistChartFor("USOIL", "24h"), watchlistChartFor("USOIL", "1m"));
-  assert.equal(watchlistChartFor("UNKNOWN", "24h"), watchlistChartFor("AAPL", "24h"));
-  assert.equal(watchlistPeriodChanges.USOIL["24h"], "-1.1%");
-  assert.equal(watchlistPeriodChanges.QQQ["1y"], "+21.6%");
-});
-
 test("browser bundle requests only normalized read-only portfolio, watchlist, and market routes", async () => {
   const response = await callHandler(configuredHandler(), {
     url: "/app.js",
@@ -504,12 +525,12 @@ test("browser bundle requests only normalized read-only portfolio, watchlist, an
   assert.equal(response.status, 200);
   assert.equal(response.text.includes("/api/etoro/identity"), false);
   assert.equal(response.text.includes("/api/etoro/demo/pnl"), false);
-  assert.match(response.text, /getJson\("\/api\/etoro\/demo\/portfolio"\)/);
+  assert.match(response.text, /\/api\/etoro\/portfolio\?environment=/);
   assert.match(response.text, /getJson\("\/api\/etoro\/watchlist\/default"\)/);
   assert.match(response.text, /\/api\/etoro\/market\/chart\?symbol=/);
   assert.equal(response.text.includes("/api/v1/market-data"), false);
   assert.equal(response.text.includes("instrumentIds="), false);
-  assert.match(response.text, /Partial provider read/);
+  assert.match(response.text, /No synthetic portfolio fallback/);
   assert.match(response.text, /existing rows are retained in memory only/);
 });
 
@@ -521,7 +542,7 @@ test("browser data and contract bundles load before rendering without provider r
   ]);
 
   assert.equal(shell.status, 200);
-  assert.ok(shell.text.indexOf("browser-fixtures.js") < shell.text.indexOf("browser-contracts.js"));
+  assert.equal(shell.text.includes("browser-fixtures.js"), false);
   assert.ok(shell.text.indexOf("browser-contracts.js") < shell.text.indexOf("app.js"));
   assert.equal(fixtures.status, 200);
   assert.equal(contracts.status, 200);
@@ -556,121 +577,6 @@ test("offline browser launcher denies provider capability despite ambient creden
   assert.equal(status.json.credentialStatus.configured, false);
   assert.equal(portfolio.status, 503);
   assert.equal(fetchCount, 0);
-});
-
-test("browser portfolio contract exposes freshness, omissions, and incomplete values without ids", async () => {
-  const { normalizePortfolioViewPayload, portfolioPeriodValue, portfolioTotalsFor } = await readBrowserChartContracts();
-  const view = normalizePortfolioViewPayload({
-    data: {
-      currency: "USD",
-      positionCount: 3,
-      instrumentCount: 2,
-      omittedPositionCount: 1,
-      incompleteValuePositionCount: 1,
-      providerUpdatedAt: "2026-07-12T00:00:00.000Z",
-      instruments: [
-        { symbol: "AAPL", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: 5, valueStatus: "complete" },
-        { symbol: "BTC", positionCount: 1, investedUsd: null, unrealizedPnlUsd: null, valueStatus: "incomplete" },
-      ],
-    },
-    cache: { state: "hit", cachedAt: "2026-07-12T00:00:01.000Z", expiresAt: "2026-07-12T00:00:16.000Z", ttlMs: 15000 },
-    provider: { requestId: "public-request-id" },
-  });
-
-  assert.equal(view.omittedPositionCount, 1);
-  assert.equal(view.incompleteValuePositionCount, 1);
-  assert.equal(view.instruments[0].netValueUsd, 105);
-  assert.equal(view.instruments[0].pnlPercent, 5);
-  assert.equal(view.instruments[1].netValueUsd, null);
-  assert.equal(view.provider, undefined);
-  assert.equal(view.cache.state, "hit");
-  assert.deepEqual(portfolioTotalsFor(view.instruments), {
-    investedUsd: 100,
-    unrealizedPnlUsd: 5,
-    netValueUsd: 105,
-  });
-  assert.equal(portfolioPeriodValue("provider-normalized", "BTC", "24h"), "Unavailable");
-  assert.equal(portfolioPeriodValue("fixture", "BTC", "24h"), "-0.6%");
-  assert.equal(JSON.stringify(view).includes("positionId"), false);
-  assert.equal(JSON.stringify(view).includes("accountId"), false);
-});
-
-test("all-incomplete portfolio totals stay unavailable instead of fabricating zero", async () => {
-  const { normalizePortfolioViewPayload, portfolioTotalsFor } = await readBrowserChartContracts();
-  const view = normalizePortfolioViewPayload({
-    data: {
-      currency: "USD",
-      positionCount: 1,
-      instrumentCount: 1,
-      omittedPositionCount: 0,
-      incompleteValuePositionCount: 1,
-      providerUpdatedAt: null,
-      instruments: [
-        { symbol: "BTC", positionCount: 1, investedUsd: null, unrealizedPnlUsd: null, valueStatus: "incomplete" },
-      ],
-    },
-    cache: { state: "miss", cachedAt: "2026-07-12T00:00:00.000Z", expiresAt: "2026-07-12T00:00:15.000Z", ttlMs: 15000 },
-  });
-
-  assert.deepEqual(portfolioTotalsFor(view.instruments), {
-    investedUsd: null,
-    unrealizedPnlUsd: null,
-    netValueUsd: null,
-  });
-});
-
-test("browser portfolio contract rejects malformed or identifier-shaped data", async () => {
-  const { normalizePortfolioViewPayload } = await readBrowserChartContracts();
-  const base = {
-    currency: "USD",
-    positionCount: 1,
-    instrumentCount: 1,
-    omittedPositionCount: 0,
-    incompleteValuePositionCount: 0,
-    providerUpdatedAt: null,
-  };
-
-  assert.throws(() => normalizePortfolioViewPayload({
-    data: {
-      ...base,
-      instruments: [{ symbol: "AAPL/<id>", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: 1, valueStatus: "complete" }],
-    },
-  }), /Portfolio data is unavailable/);
-  assert.throws(() => normalizePortfolioViewPayload({
-    data: {
-      ...base,
-      instruments: [{ symbol: "AAPL", positionCount: 1, investedUsd: null, unrealizedPnlUsd: 1, valueStatus: "complete" }],
-    },
-  }), /Portfolio data is unavailable/);
-  assert.throws(() => normalizePortfolioViewPayload({
-    data: {
-      ...base,
-      positionCount: -1,
-      instruments: [{ symbol: "AAPL", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: 1, valueStatus: "complete" }],
-    },
-    cache: { state: "hit", cachedAt: "2026-07-12T00:00:00.000Z", expiresAt: "2026-07-12T00:00:15.000Z", ttlMs: 15000 },
-  }), /Portfolio data is unavailable/);
-  assert.throws(() => normalizePortfolioViewPayload({
-    data: {
-      ...base,
-      instruments: [{ symbol: "AAPL", positionCount: 1, investedUsd: -100, unrealizedPnlUsd: 1, valueStatus: "complete" }],
-    },
-    cache: { state: "hit", cachedAt: "2026-07-12T00:00:00.000Z", expiresAt: "2026-07-12T00:00:15.000Z", ttlMs: 15000 },
-  }), /Portfolio data is unavailable/);
-  assert.throws(() => normalizePortfolioViewPayload({
-    data: {
-      ...base,
-      instruments: [{ symbol: "AAPL", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: 1, valueStatus: "complete" }],
-    },
-    cache: { state: "unexpected", cachedAt: "bad", expiresAt: "also-bad", ttlMs: -1 },
-  }), /Portfolio data is unavailable/);
-  assert.throws(() => normalizePortfolioViewPayload({
-    data: {
-      ...base,
-      instruments: [{ symbol: "AAPL", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: 1, valueStatus: "complete", positionId: "private" }],
-    },
-    cache: { state: "hit", cachedAt: "2026-07-12T00:00:00.000Z", expiresAt: "2026-07-12T00:00:15.000Z", ttlMs: 15000 },
-  }), /Portfolio data is unavailable/);
 });
 
 test("bot config returns default server-side simulation controls without secrets", async () => {
@@ -2139,6 +2045,24 @@ test("read-only provider timeout and 5xx failures are backoff cached, but 4xx fa
   assert.equal(timeoutFetchCount, 1);
   assert.equal(serverErrorFetchCount, 1);
   assert.equal(clientErrorFetchCount, 2);
+});
+
+test("cached portfolio snapshots serve stale last-good data during backoff then recover", async () => {
+  let nowMs = Date.parse("2026-08-30T00:00:00.000Z");
+  const config = { baseUrl: "https://public-api.etoro.com", apiKey: "server-api-secret", userKey: "server-user-secret", credentialSource: "profile:real", credentialFileLoaded: true };
+  const cache = createReadOnlyProviderCache({ ttlMs: 10, failureBackoffMs: 100, now: () => nowMs });
+  const first = await cache.fetch("portfolio:real", config, async () => ({ data: { environment: "real" } }));
+  assert.equal(first.cache.state, "miss");
+  nowMs += 11;
+  const stale = await cache.fetch("portfolio:real", config, async () => {
+    throw providerError("temporary upstream failure", { code: "ETORO_PROVIDER_ERROR", status: 503, requestId: "internal-only" });
+  });
+  assert.equal(stale.cache.state, "stale");
+  assert.equal(JSON.stringify(stale).includes("requestId"), false);
+  nowMs += 100;
+  const recovered = await cache.fetch("portfolio:real", config, async () => ({ data: { environment: "real", recovered: true } }));
+  assert.equal(recovered.cache.state, "miss");
+  assert.equal(recovered.data.recovered, true);
 });
 
 test("concurrent read-only provider requests are coalesced", async () => {

@@ -2,6 +2,8 @@ export const offlineEtoroConfig = Object.freeze({
   baseUrl: new URL("https://public-api.etoro.com"),
   apiKey: null,
   userKey: null,
+  defaultEnvironment: "real",
+  profiles: Object.freeze({ real: null, demo: null }),
   configured: false,
   readCacheTtlMs: 15_000,
   demoTradePreviewEnabled: false,

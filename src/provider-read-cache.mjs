@@ -73,7 +73,6 @@ function serializeProviderError(error, config) {
     message: publicProviderErrorMessage(error),
     redactedDetail: redactProviderErrorMessage(error?.message, config),
     status: error?.status ?? undefined,
-    requestId: error?.requestId ?? undefined,
     retryAfterMs: Number.isFinite(error?.retryAfterMs) ? error.retryAfterMs : undefined,
   };
 }
@@ -82,7 +81,6 @@ function providerErrorWithCacheMetadata(serializedError, cacheState, entry) {
   const error = new Error(serializedError.message);
   error.code = serializedError.code;
   error.status = serializedError.status;
-  error.requestId = serializedError.requestId;
   error.cache = {
     state: cacheState,
     cachedAt: entry.cachedAt,
@@ -98,7 +96,6 @@ function publicProviderError(error, config) {
   const publicError = new Error(serializedError.message);
   publicError.code = serializedError.code;
   publicError.status = serializedError.status;
-  publicError.requestId = serializedError.requestId;
   return publicError;
 }
 
@@ -125,6 +122,7 @@ export function createReadOnlyProviderCache({
         return withCacheMetadata(existing.value, "hit", existing);
       }
       if (existing?.error && existing.expiresAtMs > nowMs) {
+        if (existing.lastGood) return withCacheMetadata(existing.lastGood, "stale", existing);
         throw providerErrorWithCacheMetadata(existing.error, "backoff", existing);
       }
       if (existing?.inflight) {
@@ -138,12 +136,14 @@ export function createReadOnlyProviderCache({
         expiresAt: new Date(nowMs + resolvedTtlMs).toISOString(),
         expiresAtMs: nowMs + resolvedTtlMs,
         ttlMs: resolvedTtlMs,
+        lastGood: existing?.value ?? existing?.lastGood,
       };
 
       entry.inflight = fetchEndpoint(endpointName, { credentials: config })
         .then((value) => {
           const cachedAtMs = now();
           entry.value = cloneJson(value);
+          entry.lastGood = entry.value;
           entry.cachedAt = new Date(cachedAtMs).toISOString();
           entry.expiresAtMs = cachedAtMs + resolvedTtlMs;
           entry.expiresAt = new Date(entry.expiresAtMs).toISOString();
@@ -169,11 +169,17 @@ export function createReadOnlyProviderCache({
           entry.ttlMs = effectiveBackoffMs;
           delete entry.inflight;
           entries.set(key, entry);
+          if (entry.lastGood) {
+            return withCacheMetadata(entry.lastGood, "stale", entry);
+          }
           throw providerErrorWithCacheMetadata(entry.error, "error", entry);
         });
 
       entries.set(key, entry);
       const value = await entry.inflight;
+      if (value?.cache?.state === "stale") {
+        return value;
+      }
       return withCacheMetadata(value, "miss", entry);
     },
   };

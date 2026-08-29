@@ -2,7 +2,7 @@
   "use strict";
 
 const portfolioForbiddenKeys = /^(?:account|position|order|instrument|cid|gcId|rawPayload|providerPayload)(?:Id|Ids|ID|IDs)?$/i;
-const portfolioCacheStates = new Set(["miss", "hit", "coalesced"]);
+const portfolioCacheStates = new Set(["miss", "hit", "coalesced", "stale"]);
 const marketPeriodIntervals = Object.freeze({
   "24h": "OneHour",
   "1w": "FourHours",
@@ -259,10 +259,41 @@ function normalizeMarketChartPayload(payload, expectedSymbol, expectedPeriod) {
   return { ...data, displayName: data.displayName.trim(), points, cache: normalizeReadCache(payload.cache, "Market chart data is unavailable.") };
 }
 
+function portfolioNumber(value, { negative = false } = {}) {
+  return value === null || (Number.isFinite(value) && Math.abs(value) <= 1_000_000_000_000 && (negative || value >= 0));
+}
+
+function normalizeLivePortfolioPayload(payload) {
+  const data = payload?.data;
+  const dataKeys = ["environment", "currency", "equity", "availableCash", "totalInvested", "unrealizedPnl", "realizedPnl", "openPositionCount", "instrumentCount", "mirrorCount", "pendingOrderCount", "providerUpdatedAt", "omittedRowCount", "incompleteRowCount", "instruments"];
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) || containsForbiddenPortfolioKey(payload) ||
+    !hasExactKeys(payload, ["ok", "mode", "data", "cache"]) || payload.ok !== true || payload.mode !== "read-only" || !data || !hasExactKeys(data, dataKeys) ||
+    !["real", "demo"].includes(data.environment) || data.currency !== "USD" || !Array.isArray(data.instruments) || data.instruments.length > 500 ||
+    ![data.equity, data.availableCash, data.totalInvested].every(portfolioNumber) || ![data.unrealizedPnl, data.realizedPnl].every((value) => portfolioNumber(value, { negative: true })) ||
+    ![data.openPositionCount, data.instrumentCount, data.omittedRowCount, data.incompleteRowCount].every((value) => Number.isInteger(value) && value >= 0) ||
+    (data.mirrorCount !== null && (!Number.isInteger(data.mirrorCount) || data.mirrorCount < 0)) ||
+    (data.pendingOrderCount !== null && (!Number.isInteger(data.pendingOrderCount) || data.pendingOrderCount < 0)) ||
+    (data.providerUpdatedAt !== null && !isIsoInstant(data.providerUpdatedAt))) throw new Error("Portfolio data is unavailable.");
+  const symbols = new Set();
+  const instruments = data.instruments.map((instrument) => {
+    const keys = ["symbol", "displayName", "positionCount", "units", "averageOpenPrice", "currentPrice", "investedValue", "netValue", "unrealizedPnl", "unrealizedPnlPercent", "allocationPercent", "completeness"];
+    if (!instrument || !hasExactKeys(instrument, keys) || typeof instrument.symbol !== "string" || !/^[A-Z0-9][A-Z0-9._:/-]{0,31}$/.test(instrument.symbol) || symbols.has(instrument.symbol) ||
+      typeof instrument.displayName !== "string" || !instrument.displayName.trim() || instrument.displayName.length > 120 || /[\u0000-\u001F\u007F]/.test(instrument.displayName) ||
+      !Number.isInteger(instrument.positionCount) || instrument.positionCount < 1 || !["complete", "partial"].includes(instrument.completeness) ||
+      ![instrument.units, instrument.averageOpenPrice, instrument.currentPrice, instrument.investedValue, instrument.netValue, instrument.allocationPercent].every(portfolioNumber) ||
+      ![instrument.unrealizedPnl, instrument.unrealizedPnlPercent].every((value) => portfolioNumber(value, { negative: true }))) throw new Error("Portfolio data is unavailable.");
+    symbols.add(instrument.symbol); return { ...instrument, displayName: instrument.displayName.trim() };
+  });
+  if (instruments.length !== data.instrumentCount || instruments.reduce((total, item) => total + item.positionCount, 0) + data.omittedRowCount !== data.openPositionCount) throw new Error("Portfolio data is unavailable.");
+  const cache = normalizeReadCache(payload.cache, "Portfolio data is unavailable.");
+  return { ...data, instruments, cache };
+}
+
   globalThis.EtoroBrowserContracts = Object.freeze({
     hasExactKeys,
     isIsoInstant,
     normalizeMarketChartPayload,
+    normalizeLivePortfolioPayload,
     normalizePortfolioViewPayload,
     normalizeWatchlistViewPayload,
   });

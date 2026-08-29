@@ -28,9 +28,19 @@ export const READ_ONLY_ENDPOINTS = Object.freeze({
     path: "/api/v1/trading/info/demo/pnl",
     normalize: normalizeDemoPnl,
   }),
+  realPnl: Object.freeze({
+    method: "GET",
+    path: "/api/v1/trading/info/real/pnl",
+    normalize: normalizeDemoPnl,
+  }),
   demoPortfolio: Object.freeze({
     method: "GET",
     path: "/api/v1/trading/info/demo/portfolio",
+    normalize: normalizeDemoPortfolio,
+  }),
+  realPortfolio: Object.freeze({
+    method: "GET",
+    path: "/api/v1/trading/info/portfolio",
     normalize: normalizeDemoPortfolio,
   }),
   defaultWatchlist: Object.freeze({
@@ -116,6 +126,21 @@ function arrayOrEmpty(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function requiredArray(value) {
+  return Array.isArray(value) ? value : null;
+}
+
+function flattenRequiredCollections(items, field) {
+  if (!Array.isArray(items)) return null;
+  const flattened = [];
+  for (const item of items) {
+    const nested = requiredArray(item?.[field]);
+    if (nested === null) return null;
+    flattened.push(...nested);
+  }
+  return flattened;
+}
+
 function firstNumber(...values) {
   for (const value of values) {
     const number = numberOrNull(value);
@@ -128,18 +153,24 @@ function firstNumber(...values) {
   return null;
 }
 
+function sumRequired(items, valueForItem) {
+  if (!Array.isArray(items)) return null;
+  let total = 0;
+  for (const item of items) {
+    const value = valueForItem(item);
+    if (value === null || !Number.isFinite(value)) return null;
+    total += value;
+    if (!Number.isFinite(total)) return null;
+  }
+  return total;
+}
+
 function sumAmounts(items) {
-  return items.reduce((total, item) => {
-    const amount = firstNumber(item?.amount, item?.invested, item?.currentInvestment);
-    return total + (amount ?? 0);
-  }, 0);
+  return sumRequired(items, (item) => firstNumber(item?.amount, item?.invested, item?.currentInvestment));
 }
 
 function sumExternalCosts(items) {
-  return items.reduce((total, item) => {
-    const amount = firstNumber(item?.totalExternalCosts, item?.totalExternalCost);
-    return total + (amount ?? 0);
-  }, 0);
+  return sumRequired(items, (item) => firstNumber(item?.totalExternalCosts, item?.totalExternalCost));
 }
 
 function pnlAmount(value) {
@@ -151,10 +182,7 @@ function pnlAmount(value) {
 }
 
 function sumPositionPnl(items) {
-  return items.reduce((total, item) => {
-    const amount = pnlAmount(item?.unrealizedPnL ?? item?.unrealizedPnl ?? item?.pnL);
-    return total + (amount ?? 0);
-  }, 0);
+  return sumRequired(items, (item) => pnlAmount(item?.unrealizedPnL ?? item?.unrealizedPnl ?? item?.pnL));
 }
 
 function roundCurrency(value) {
@@ -215,31 +243,26 @@ function normalizeDemoPnl(payload) {
   }
 
   const portfolio = payload.clientPortfolio;
-  const positions = arrayOrEmpty(
+  const positions = requiredArray(
     portfolio.positions ??
       portfolio.openPositions ??
       portfolio.instrumentPositions ??
       portfolio.trades,
   );
-  const mirrors = arrayOrEmpty(portfolio.mirrors);
-  const mirrorPositions = mirrors.flatMap((mirror) => arrayOrEmpty(mirror?.positions));
-  const orders = arrayOrEmpty(portfolio.orders);
-  const ordersForOpen = arrayOrEmpty(portfolio.ordersForOpen);
-  const ordersForClose = arrayOrEmpty(portfolio.ordersForClose);
-  const ordersForCloseMultiple = arrayOrEmpty(portfolio.ordersForCloseMultiple);
-  const mirrorOrdersForOpen = mirrors.flatMap((mirror) => arrayOrEmpty(mirror?.ordersForOpen));
-  const mirrorOrdersForClose = mirrors.flatMap((mirror) => arrayOrEmpty(mirror?.ordersForClose));
-  const mirrorOrdersForCloseMultiple = mirrors.flatMap((mirror) =>
-    arrayOrEmpty(mirror?.ordersForCloseMultiple),
-  );
-  const allOrdersForOpen = [...ordersForOpen, ...mirrorOrdersForOpen];
-  const allOrdersForClose = [
-    ...ordersForClose,
-    ...ordersForCloseMultiple,
-    ...mirrorOrdersForClose,
-    ...mirrorOrdersForCloseMultiple,
-  ];
-  const manualOrdersForOpen = ordersForOpen.filter((order) => {
+  const mirrors = requiredArray(portfolio.mirrors);
+  const mirrorPositions = flattenRequiredCollections(mirrors, "positions");
+  const orders = requiredArray(portfolio.orders);
+  const ordersForOpen = requiredArray(portfolio.ordersForOpen);
+  const ordersForClose = requiredArray(portfolio.ordersForClose);
+  const ordersForCloseMultiple = requiredArray(portfolio.ordersForCloseMultiple);
+  const mirrorOrdersForOpen = flattenRequiredCollections(mirrors, "ordersForOpen");
+  const mirrorOrdersForClose = flattenRequiredCollections(mirrors, "ordersForClose");
+  const mirrorOrdersForCloseMultiple = flattenRequiredCollections(mirrors, "ordersForCloseMultiple");
+  const allOrdersForOpen = ordersForOpen && mirrorOrdersForOpen ? [...ordersForOpen, ...mirrorOrdersForOpen] : null;
+  const allOrdersForClose = ordersForClose && ordersForCloseMultiple && mirrorOrdersForClose && mirrorOrdersForCloseMultiple
+    ? [...ordersForClose, ...ordersForCloseMultiple, ...mirrorOrdersForClose, ...mirrorOrdersForCloseMultiple]
+    : null;
+  const manualOrdersForOpen = ordersForOpen?.filter((order) => {
     const mirrorId = firstNumber(order?.mirrorID, order?.mirrorId, order?.mirrorid);
     return mirrorId === 0;
   });
@@ -251,26 +274,33 @@ function normalizeDemoPnl(payload) {
   );
   const pendingManualAmount = sumAmounts(manualOrdersForOpen);
   const pendingOrderAmount = sumAmounts(orders);
-  const availableCash =
-    credit === null ? null : Number((credit - pendingManualAmount - pendingOrderAmount).toFixed(2));
-  const mirrorAvailableNet = mirrors.reduce((total, mirror) => {
-    const availableAmount = firstNumber(mirror?.availableAmount) ?? 0;
-    const closedProfit = firstNumber(mirror?.closedPositionsNetProfit) ?? 0;
-    return total + availableAmount - closedProfit;
-  }, 0);
-  const totalInvested = roundCurrency(
-    sumAmounts(positions) +
-      sumAmounts(mirrorPositions) +
-      mirrorAvailableNet +
-      pendingManualAmount +
-      pendingOrderAmount +
-      sumExternalCosts(manualOrdersForOpen),
-  );
-  const calculatedUnrealizedPnL = roundCurrency(
-    sumPositionPnl(positions) +
-      sumPositionPnl(mirrorPositions) +
-      mirrors.reduce((total, mirror) => total + (firstNumber(mirror?.closedPositionsNetProfit) ?? 0), 0),
-  );
+  const availableCash = credit !== null && pendingManualAmount !== null && pendingOrderAmount !== null
+    ? roundCurrency(credit - pendingManualAmount - pendingOrderAmount)
+    : null;
+  const mirrorAvailableNet = sumRequired(mirrors, (mirror) => {
+    const availableAmount = firstNumber(mirror?.availableAmount);
+    const closedProfit = firstNumber(mirror?.closedPositionsNetProfit);
+    return availableAmount === null || closedProfit === null ? null : availableAmount - closedProfit;
+  });
+  const totalInvestedComponents = [
+    sumAmounts(positions),
+    sumAmounts(mirrorPositions),
+    mirrorAvailableNet,
+    pendingManualAmount,
+    pendingOrderAmount,
+    sumExternalCosts(manualOrdersForOpen),
+  ];
+  const totalInvested = totalInvestedComponents.every((value) => value !== null)
+    ? roundCurrency(totalInvestedComponents.reduce((total, value) => total + value, 0))
+    : null;
+  const calculatedUnrealizedComponents = [
+    sumPositionPnl(positions),
+    sumPositionPnl(mirrorPositions),
+    sumRequired(mirrors, (mirror) => firstNumber(mirror?.closedPositionsNetProfit)),
+  ];
+  const calculatedUnrealizedPnL = calculatedUnrealizedComponents.every((value) => value !== null)
+    ? roundCurrency(calculatedUnrealizedComponents.reduce((total, value) => total + value, 0))
+    : null;
   const unrealizedPnL = firstNumber(
     portfolio.unrealizedPnL,
     portfolio.unrealizedPnl,
@@ -299,10 +329,12 @@ function normalizeDemoPnl(payload) {
     availableCash,
     totalInvested,
     calculatedUnrealizedPnL,
-    positionCount: positions.length + mirrorPositions.length,
-    mirrorCount: mirrors.length,
-    pendingOrderCount: orders.length + allOrdersForOpen.length + allOrdersForClose.length,
-    manualPendingOrderCount: manualOrdersForOpen.length,
+    positionCount: positions !== null && mirrorPositions !== null ? positions.length + mirrorPositions.length : null,
+    mirrorCount: mirrors?.length ?? null,
+    pendingOrderCount: orders !== null && allOrdersForOpen !== null && allOrdersForClose !== null
+      ? orders.length + allOrdersForOpen.length + allOrdersForClose.length
+      : null,
+    manualPendingOrderCount: manualOrdersForOpen?.length ?? null,
     providerUpdatedAt: normalizeTimestamp(
       portfolio.updatedAt ??
         portfolio.lastUpdatedAt ??
@@ -349,6 +381,10 @@ function normalizeDemoPortfolio(payload) {
       position?.invested,
       position?.currentInvestment,
     );
+    const units = firstNumber(position?.units, position?.amountInUnits, position?.unitsAmount);
+    const averageOpenPrice = firstNumber(position?.openRate, position?.averageOpenPrice, position?.openPrice);
+    const currentPrice = firstNumber(position?.currentRate, position?.currentPrice, position?.rate);
+    const displayName = safeDisplayText(position?.displayName ?? position?.instrumentDisplayName ?? position?.name, symbol);
     const unrealizedPnlUsd = pnlAmount(
       position?.unrealizedPnL ?? position?.unrealizedPnl ?? position?.pnL,
     );
@@ -363,6 +399,13 @@ function normalizeDemoPortfolio(payload) {
       positionCount: 0,
       investedUsd: 0,
       unrealizedPnlUsd: 0,
+      units: 0,
+      averageOpenPrice: null,
+      currentPrice: null,
+      weightedOpenTotal: 0,
+      weightedOpenUnits: 0,
+      displayName,
+      marketValuesComplete: true,
       valuesComplete: true,
     };
     const nextInvestedUsd = current.investedUsd + (
@@ -377,10 +420,19 @@ function normalizeDemoPortfolio(payload) {
 
     current.positionCount += 1;
     current.valuesComplete &&= hasCompleteValues && totalsComplete;
+    const usableMarketValues = units !== null && units > 0 && averageOpenPrice !== null && averageOpenPrice >= 0 && currentPrice !== null && currentPrice >= 0;
+    current.marketValuesComplete &&= usableMarketValues;
     current.investedUsd = Number.isFinite(nextInvestedUsd) ? nextInvestedUsd : 0;
     current.unrealizedPnlUsd = Number.isFinite(nextUnrealizedPnlUsd)
       ? nextUnrealizedPnlUsd
       : 0;
+    if (usableMarketValues) {
+      current.units = Number.isFinite(current.units + units) ? current.units + units : 0;
+      current.weightedOpenTotal += units * averageOpenPrice;
+      current.weightedOpenUnits += units;
+      if (current.currentPrice === null) current.currentPrice = currentPrice;
+      else if (current.currentPrice !== currentPrice) current.marketValuesComplete = false;
+    }
     instruments.set(symbol, current);
   }
 
@@ -391,10 +443,13 @@ function normalizeDemoPortfolio(payload) {
     omittedPositionCount,
     incompleteValuePositionCount,
     instruments: [...instruments.values()]
-      .map(({ valuesComplete, ...instrument }) => ({
+      .map(({ valuesComplete, marketValuesComplete, weightedOpenTotal, weightedOpenUnits, ...instrument }) => ({
         ...instrument,
         investedUsd: valuesComplete ? roundCurrency(instrument.investedUsd) : null,
         unrealizedPnlUsd: valuesComplete ? roundCurrency(instrument.unrealizedPnlUsd) : null,
+        units: marketValuesComplete && weightedOpenUnits > 0 ? instrument.units : null,
+        averageOpenPrice: marketValuesComplete && weightedOpenUnits > 0 ? roundCurrency(weightedOpenTotal / weightedOpenUnits) : null,
+        currentPrice: marketValuesComplete ? instrument.currentPrice : null,
         valueStatus: valuesComplete ? "complete" : "incomplete",
       }))
       .sort((left, right) => left.symbol.localeCompare(right.symbol)),
@@ -725,6 +780,68 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function finiteDisplayNumber(value, allowNegative = false) {
+  const number = numberOrNull(value);
+  return number !== null && (allowNegative || number >= 0) && Math.abs(number) <= 1_000_000_000_000 ? roundCurrency(number) : null;
+}
+
+/** Compose the only account-linked DTO permitted to cross the browser boundary. */
+export async function fetchPortfolioSnapshot(environment, options = {}) {
+  if (!["real", "demo"].includes(environment)) {
+    throw new EtoroApiError("Requested eToro environment is invalid", { code: "ETORO_INVALID_ENVIRONMENT", status: 400 });
+  }
+  const endpointPrefix = environment === "real" ? "real" : "demo";
+  const read = options.fetchEndpoint
+    ? (endpointName) => options.fetchEndpoint(endpointName, { credentials: options.credentials })
+    : (endpointName) => fetchReadOnlyEndpoint(endpointName, options);
+  const [identity, pnl, portfolio] = await Promise.all([
+    read("identity"), read(`${endpointPrefix}Pnl`), read(`${endpointPrefix}Portfolio`),
+  ]);
+  if (!identity.data?.authenticated) throw new EtoroApiError("Identity response was not authenticated", { code: "ETORO_INVALID_IDENTITY_RESPONSE" });
+  const normalizedInstruments = portfolio.data.instruments.map((instrument) => {
+    const investedValue = finiteDisplayNumber(instrument.investedUsd);
+    const unrealizedPnl = finiteDisplayNumber(instrument.unrealizedPnlUsd, true);
+    const netValue = investedValue !== null && unrealizedPnl !== null ? finiteDisplayNumber(investedValue + unrealizedPnl, true) : null;
+    const allocationPercent = pnl.data.totalInvested !== null && pnl.data.totalInvested > 0 && investedValue !== null
+      ? finiteDisplayNumber((investedValue / pnl.data.totalInvested) * 100)
+      : null;
+    return {
+      symbol: instrument.symbol,
+      displayName: safeDisplayText(instrument.displayName, instrument.symbol),
+      positionCount: instrument.positionCount,
+      units: finiteDisplayNumber(instrument.units),
+      averageOpenPrice: finiteDisplayNumber(instrument.averageOpenPrice),
+      currentPrice: finiteDisplayNumber(instrument.currentPrice),
+      investedValue,
+      netValue,
+      unrealizedPnl,
+      unrealizedPnlPercent: investedValue && unrealizedPnl !== null ? finiteDisplayNumber((unrealizedPnl / investedValue) * 100, true) : null,
+      allocationPercent,
+      completeness: instrument.valueStatus === "complete" ? "complete" : "partial",
+    };
+  });
+  return {
+    data: {
+      environment,
+      currency: "USD",
+      equity: finiteDisplayNumber(pnl.data.equity),
+      availableCash: finiteDisplayNumber(pnl.data.availableCash),
+      totalInvested: finiteDisplayNumber(pnl.data.totalInvested),
+      unrealizedPnl: finiteDisplayNumber(pnl.data.unrealizedPnL, true),
+      realizedPnl: finiteDisplayNumber(pnl.data.realizedPnL, true),
+      openPositionCount: portfolio.data.positionCount,
+      instrumentCount: portfolio.data.instrumentCount,
+      mirrorCount: pnl.data.mirrorCount,
+      pendingOrderCount: pnl.data.pendingOrderCount,
+      providerUpdatedAt: portfolio.data.providerUpdatedAt ?? pnl.data.providerUpdatedAt,
+      omittedRowCount: portfolio.data.omittedPositionCount,
+      incompleteRowCount: portfolio.data.incompleteValuePositionCount,
+      instruments: normalizedInstruments,
+    },
+    provider: { endpoint: "portfolioSnapshot", method: "GET", status: 200, receivedAt: new Date().toISOString(), durationMs: 0 },
+  };
 }
 
 export function readOnlyEndpointSummary() {
