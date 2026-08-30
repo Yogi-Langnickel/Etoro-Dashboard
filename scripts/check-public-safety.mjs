@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { lstat, open, readlink } from "node:fs/promises";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const SYNTHETIC_FIXTURE_PREFIX = "test/fixtures/synthetic/";
@@ -141,6 +143,44 @@ export function inspectPublicSafetyEntries(entries) {
   return findings;
 }
 
+export async function readRegularFileWithoutFollowingSymlink(fileUrl) {
+  const handle = await open(fileUrl, constants.O_RDONLY | constants.O_NOFOLLOW);
+
+  try {
+    return await handle.readFile();
+  } finally {
+    await handle.close();
+  }
+}
+
+function resolveWorktreePath(root, path) {
+  const filePath = resolve(root, path);
+  const relativePath = relative(root, filePath);
+
+  if (isAbsolute(path) || relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) {
+    throw new Error(`Git path escapes repository root: ${path}`);
+  }
+
+  return filePath;
+}
+
+async function assertNoSymbolicLinkAncestor(root, filePath) {
+  let ancestor = dirname(filePath);
+
+  while (ancestor !== root) {
+    const metadata = await lstat(ancestor);
+    if (metadata.isSymbolicLink()) {
+      throw new Error(`Git path has symbolic-link ancestor: ${filePath}`);
+    }
+
+    const parent = dirname(ancestor);
+    if (parent === ancestor) {
+      throw new Error(`Git path ancestor escaped repository root: ${filePath}`);
+    }
+    ancestor = parent;
+  }
+}
+
 export async function loadTrackedEntries({ cwd = process.cwd() } = {}) {
   const output = execFileSync("git", [
     "ls-files",
@@ -153,10 +193,17 @@ export async function loadTrackedEntries({ cwd = process.cwd() } = {}) {
     encoding: "utf8",
   });
   const paths = output.split("\0").filter(Boolean);
-  const worktreeEntries = await Promise.all(paths.map(async (path) => ({
-    path,
-    content: await readFile(new URL(path, pathToFileURL(`${cwd}/`))),
-  })));
+  const root = resolve(cwd);
+  const worktreeEntries = await Promise.all(paths.map(async (path) => {
+    const filePath = resolveWorktreePath(root, path);
+    await assertNoSymbolicLinkAncestor(root, filePath);
+    const metadata = await lstat(filePath);
+    const content = metadata.isSymbolicLink()
+      ? Buffer.from(await readlink(filePath), "utf8")
+      : await readRegularFileWithoutFollowingSymlink(filePath);
+
+    return { path, content };
+  }));
   const worktreeContentByPath = new Map(
     worktreeEntries.map((entry) => [entry.path, entry.content]),
   );
