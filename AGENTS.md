@@ -73,3 +73,23 @@ These repo-local financial rules are hard overrides over workspace-level general
 - After fixing, record what changed in the durable location that future agents will read: incident review for incidents, `/Users/yogi/Coding/docs/projects/etoro-dashboard/memory/bug-learning.md` for recurring non-incident bugs, and focused memory files for domain-specific rules.
 - In closeout, state whether any new learning is transferable and list suggested propagation targets, even when the answer is `local-only`.
 - Keep the worktree clean at handoff. If unrelated user changes remain, identify them clearly instead of reverting them.
+
+## Workspace Agent Bootstrap
+
+This project participates in the Coding workspace orchestration policy.
+Read `/Users/yogi/Coding/AGENTS.md` to resolve the accepted local `develop`
+version of `codex-workspace-orchestration/AGENTS.md` and its compact workspace
+memory, then apply this file and task-relevant project memory and skills.
+Do not treat the branch occupying the named orchestration directory as accepted
+policy without verifying its Git identity and selected authority.
+
+Preserve the assigned role: the main assistant coordinates and delegates;
+a named developer mutates only its explicitly assigned authorized surface;
+a reviewer stays read-only. Opening workspace instructions does not change a
+worker's role. The handoff must supply the checkout, baseline, file scope,
+relevant context paths, delivery authority, validation, and stop conditions.
+
+For a linked or relocated checkout, use `git rev-parse --git-common-dir` to
+identify the primary repository and workspace. If the workspace adapter or
+required context is unavailable, report that gap to the parent/user before
+dependent changes. Never guess missing policy or broaden your own authority.
