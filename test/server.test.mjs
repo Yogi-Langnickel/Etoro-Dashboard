@@ -1,12 +1,9 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import test, { after, before } from "node:test";
+import { verifyProducerContract } from "../scripts/check-money-maker-contract.mjs";
 import {
   ALLOWED_BOT_CADENCES,
   ALLOWED_BOT_INSTRUMENT_CLASSES,
@@ -40,6 +37,9 @@ import {
 } from "../src/offline-config.mjs";
 
 const BOT_CONFIG_CSRF_RESPONSE_HEADER = "x-etoro-dashboard-config-token";
+const originalFetch = globalThis.fetch;
+before(() => { globalThis.fetch = async () => { throw new Error("Provider network access is denied in server unit tests"); }; });
+after(() => { globalThis.fetch = originalFetch; });
 
 async function callHandler(handler, { method = "GET", url = "/api/health", body = "", headers = {} } = {}) {
   const response = {
@@ -75,8 +75,6 @@ function parseJsonBody(body) {
     return null;
   }
 }
-
-const execFileAsync = promisify(execFile);
 
 async function readMoneyMakerContractSnapshot() {
   return JSON.parse(
@@ -140,8 +138,11 @@ function localDemoPreviewHeaders(overrides = {}) {
 async function configuredConfig() {
   return {
     baseUrl: "https://public-api.etoro.com",
-    apiKey: "server-api-secret",
-    userKey: "server-user-secret",
+    defaultEnvironment: "demo",
+    profiles: {
+      real: { apiKey: "server-api-secret", userKey: "server-user-secret-real", configured: true, missing: [] },
+      demo: { apiKey: "server-api-secret", userKey: "server-user-secret", configured: true, missing: [] },
+    },
     configured: true,
     credentialFileLoaded: true,
     credentialSource: "file",
@@ -498,10 +499,11 @@ test("portfolio view keeps unavailable enrichment and risk context redacted", as
   assert.equal(response.status, 200);
   assert.match(response.text, /context-only enrichment receipts/);
   assert.match(response.text, /No synthetic market context is shown/);
-  assert.match(response.text, /Performance breakdown/);
-  assert.match(response.text, /Portfolio risk/);
-  assert.match(response.text, /Dividend expectations/);
-  assert.match(response.text, /Unavailable without provider evidence/);
+  assert.match(response.text, /Descriptive Statistics/);
+  assert.match(response.text, /Cash \/ equity/);
+  assert.match(response.text, /Largest displayed holding by invested capital/);
+  assert.match(response.text, /Unavailable: account history required/);
+  assert.match(response.text, /Unavailable: distribution evidence required/);
   assert.match(response.text, /No write actions|No writes|No orders|Read only/);
   assert.match(response.text, /Submit disabled/);
   assert.equal(response.text.includes("server-api-secret"), false);
@@ -520,7 +522,9 @@ test("watchlist tab exposes compact read-only rows and selected context", async 
   const periods = [...response.text.matchAll(/data-watchlist-period="([^"]+)"/g)].map(([, period]) => period);
 
   assert.equal(response.status, 200);
-  assert.deepEqual(symbols, ["AAPL", "GLD", "QQQ", "USOIL"]);
+  assert.deepEqual(symbols, []);
+  assert.match(response.text, /Open this tab to load the selected profile/);
+  assert.match(response.text, /id="watchlist-performance-line" points=""/);
   assert.equal(new Set(symbols).size, symbols.length);
   assert.deepEqual(periods, ["24h", "1w", "1m", "1y", "5y", "max"]);
   assert.match(response.text, /Symbol/);
@@ -545,8 +549,9 @@ test("browser bundle requests only normalized read-only portfolio, watchlist, an
   assert.equal(response.status, 200);
   assert.equal(response.text.includes("/api/etoro/identity"), false);
   assert.equal(response.text.includes("/api/etoro/demo/pnl"), false);
-  assert.match(response.text, /\/api\/etoro\/portfolio\?environment=/);
-  assert.match(response.text, /getJson\("\/api\/etoro\/watchlist\/default"\)/);
+  assert.match(response.text, /getProfileJson\("\/api\/etoro\/portfolio", environment\)/);
+  assert.match(response.text, /getProfileJson\("\/api\/etoro\/watchlist\/default", environment\)/);
+  assert.match(response.text, /environment=\$\{environment\}/);
   assert.match(response.text, /\/api\/etoro\/market\/chart\?symbol=/);
   assert.equal(response.text.includes("/api/v1/market-data"), false);
   assert.equal(response.text.includes("instrumentIds="), false);
@@ -663,31 +668,14 @@ test("bot config consumes the generated Money-maker simulation contract", async 
   assert.equal(Object.isFrozen(BOT_STRATEGY_CONFIG_RULES["dca-cash-reserve"].parameterSchema), true);
 });
 
-test("bot config snapshot matches local Money-maker Python contract when available", async (context) => {
-  const moneyMakerSrc = fileURLToPath(new URL("../../Money-maker-3000/src", import.meta.url));
-  const contractPath = fileURLToPath(
-    new URL("../../Money-maker-3000/src/money_maker_3000/contracts.py", import.meta.url),
-  );
-
-  if (!existsSync(contractPath)) {
-    context.skip("Money-maker-3000 sibling repo is not available");
+test("bot config artifact matches its pinned producer revision when locally available", async (context) => {
+  const result = await verifyProducerContract();
+  if (result.status === "unavailable") {
+    context.skip(`Optional producer verification unavailable: ${result.reason}; mandatory artifact checks remain active`);
     return;
   }
-
-  const python = `
-import json
-from money_maker_3000.contract_manifest import build_dashboard_contract_manifest
-
-print(json.dumps(build_dashboard_contract_manifest(), sort_keys=True))
-`;
-  const { stdout } = await execFileAsync("python3", ["-c", python], {
-    env: {
-      ...process.env,
-      PYTHONPATH: moneyMakerSrc,
-    },
-  });
-
-  assert.deepEqual(await readMoneyMakerContractSnapshot(), JSON.parse(stdout));
+  assert.equal(result.status, "verified");
+  assert.equal(result.producerCommit, MONEY_MAKER_CONTRACT_PROVENANCE.producerCommit);
 });
 
 test("bot config update persists validated server-side config and redacts storage path", async () => {
@@ -1323,12 +1311,7 @@ test("demo trade preview rejects non-local or non-json requests before ticket pa
 test("enabled demo trade preview returns a redacted non-executing ticket", async () => {
   const response = await callHandler(createRequestHandler({
     loadConfig: async () => ({
-      baseUrl: "https://public-api.etoro.com",
-      apiKey: "server-api-secret",
-      userKey: "server-user-secret",
-      configured: true,
-      credentialFileLoaded: true,
-      credentialSource: "file",
+      ...await configuredConfig(),
       demoTradePreviewEnabled: true,
       missing: [],
     }),
@@ -1703,13 +1686,7 @@ test("status route never returns configured secret values", async () => {
 test("status route reports configured read cache policy without secrets", async () => {
   const response = await callHandler(createRequestHandler({
     loadConfig: async () => ({
-      baseUrl: "https://public-api.etoro.com",
-      apiKey: "server-api-secret",
-      userKey: "server-user-secret",
-      configured: true,
-      credentialFileLoaded: true,
-      credentialSource: "file",
-      missing: [],
+      ...await configuredConfig(),
       readCacheTtlMs: 30_000,
     }),
   }), { url: "/api/etoro/status" });
@@ -2092,15 +2069,7 @@ test("cached portfolio snapshots serve stale last-good data during backoff then 
 test("concurrent read-only provider requests are coalesced", async () => {
   let fetchCount = 0;
   const handler = createRequestHandler({
-    loadConfig: async () => ({
-      baseUrl: "https://public-api.etoro.com",
-      apiKey: "server-api-secret",
-      userKey: "server-user-secret",
-      configured: true,
-      credentialFileLoaded: true,
-      credentialSource: "file",
-      missing: [],
-    }),
+    loadConfig: configuredConfig,
     providerCache: createReadOnlyProviderCache({ ttlMs: 60_000 }),
     fetchEndpoint: async (endpointName) => {
       fetchCount += 1;
@@ -2154,12 +2123,8 @@ test("read-only provider cache uses profile generation invalidation without cred
   let credentialGeneration = "credential-file:1:1:1:1";
   const handler = createRequestHandler({
     loadConfig: async () => ({
-      baseUrl: "https://public-api.etoro.com",
-      apiKey: "server-api-secret",
-      userKey,
-      configured: true,
-      credentialFileLoaded: true,
-      credentialSource: "file",
+      ...await configuredConfig(),
+      profiles: { demo: { apiKey: "server-api-secret", userKey, configured: true, missing: [] } },
       credentialGeneration,
       missing: [],
     }),

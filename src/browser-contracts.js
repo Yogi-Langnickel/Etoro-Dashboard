@@ -177,7 +177,8 @@ function normalizeReadCache(cache, message) {
   return { state: cache.state, cachedAt: cache.cachedAt, expiresAt: cache.expiresAt, ttlMs: cache.ttlMs };
 }
 
-function normalizeWatchlistViewPayload(payload) {
+function normalizeWatchlistViewPayload(payload, expectedEnvironment) {
+  if (expectedEnvironment && payload?.environment !== expectedEnvironment) throw new Error("Watchlist data is unavailable.");
   const data = payload?.data;
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || containsForbiddenWatchlistKey(payload) ||
     !data || !hasExactKeys(data, [
@@ -215,8 +216,8 @@ function normalizeWatchlistViewPayload(payload) {
   });
   const unavailable = items.filter(({ rateStatus }) => rateStatus === "unavailable").length;
   if (items.length !== data.itemCount || unavailable !== data.unavailableRateCount ||
-    (data.providerState === "complete" && (unavailable > 0 || data.partialFailure !== null)) ||
-    (data.providerState === "partial" && unavailable === 0 && data.partialFailure === null) ||
+    (data.providerState === "complete" && (unavailable > 0 || data.omittedItemCount > 0 || data.partialFailure !== null)) ||
+    (data.providerState === "partial" && unavailable === 0 && data.omittedItemCount === 0 && data.partialFailure === null) ||
     (data.partialFailure !== null && data.providerState !== "partial")) {
     throw new Error("Watchlist data is unavailable.");
   }
@@ -230,7 +231,8 @@ function normalizeWatchlistViewPayload(payload) {
   };
 }
 
-function normalizeMarketChartPayload(payload, expectedSymbol, expectedPeriod) {
+function normalizeMarketChartPayload(payload, expectedSymbol, expectedPeriod, expectedEnvironment) {
+  if (expectedEnvironment && payload?.environment !== expectedEnvironment) throw new Error("Market chart data is unavailable.");
   const data = payload?.data;
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || containsForbiddenWatchlistKey(payload) ||
     !data || !hasExactKeys(data, [
@@ -280,8 +282,8 @@ function normalizeLivePortfolioPayload(payload) {
     if (!instrument || !hasExactKeys(instrument, keys) || typeof instrument.symbol !== "string" || !/^[A-Z0-9][A-Z0-9._:/-]{0,31}$/.test(instrument.symbol) || symbols.has(instrument.symbol) ||
       typeof instrument.displayName !== "string" || !instrument.displayName.trim() || instrument.displayName.length > 120 || /[\u0000-\u001F\u007F]/.test(instrument.displayName) ||
       !Number.isInteger(instrument.positionCount) || instrument.positionCount < 1 || !["complete", "partial"].includes(instrument.completeness) ||
-      ![instrument.units, instrument.averageOpenPrice, instrument.currentPrice, instrument.investedValue, instrument.netValue, instrument.allocationPercent].every(portfolioNumber) ||
-      ![instrument.unrealizedPnl, instrument.unrealizedPnlPercent].every((value) => portfolioNumber(value, { negative: true }))) throw new Error("Portfolio data is unavailable.");
+      ![instrument.units, instrument.averageOpenPrice, instrument.currentPrice, instrument.investedValue, instrument.allocationPercent].every(portfolioNumber) ||
+      ![instrument.netValue, instrument.unrealizedPnl, instrument.unrealizedPnlPercent].every((value) => portfolioNumber(value, { negative: true }))) throw new Error("Portfolio data is unavailable.");
     symbols.add(instrument.symbol); return { ...instrument, displayName: instrument.displayName.trim() };
   });
   if (instruments.length !== data.instrumentCount || instruments.reduce((total, item) => total + item.positionCount, 0) + data.omittedRowCount !== data.openPositionCount) throw new Error("Portfolio data is unavailable.");

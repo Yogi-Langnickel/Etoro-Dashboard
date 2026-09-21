@@ -5,7 +5,7 @@ Security-first dashboard for viewing and interacting with eToro API data.
 ## Status
 
 The local read-only dashboard keeps eToro credentials server-side, exposes
-normalized demo portfolio and default-watchlist views to the browser, resolves
+normalized selected-profile Real/Demo portfolio and default-watchlist views to the browser, resolves
 market symbols by verified exact match, batches current-rate reads, and loads
 selected-period close-price charts. It includes a gated demo trading tab with
 no execution routes, briefly caches provider responses, applies short backoff
@@ -15,6 +15,22 @@ Browser watchlist and market DTOs never include provider instrument, watchlist,
 price-rate, account, position, or order identifiers. Partial rate failures and
 failed chart reads remain explicit; the browser does not silently substitute
 fixture charts for failed provider market data.
+
+The workspace environment selector applies to Portfolio, Watchlist, market
+charts, and descriptive Statistics. Switching profiles clears account-linked
+state and invalidates pending requests. Same-profile last-good rows may remain
+visible after a failed refresh, explicitly marked stale. Missing credentials,
+authentication rejection, provider failures, empty data and partial coverage
+remain distinct; a configured profile rejected with HTTP 401 is not described
+as unconfigured.
+
+Statistics reuse the selected portfolio snapshot. Cash percentage divides
+available cash by positive equity. Largest holding ranks displayed instruments
+by invested capital and divides by provider total invested; omitted or incomplete
+positions may change that ranking. Invested capital is not complete leveraged
+risk exposure. Instrument price history is not portfolio return history;
+historical performance, drawdown and dividends remain unavailable without the
+required evidence.
 
 The dashboard does not durably store account-linked provider data. Short
 in-memory cache/backoff metadata is allowed for freshness and rate-limit
@@ -45,21 +61,30 @@ User-Agent contact value are configured.
   policy; `src/server.mjs` retains local request checks, bounded body parsing,
   and response dispatch. No provider mutation is introduced by this split.
 
-## Local Demo Credentials
+## Local Real/Demo Credentials
 
-Do not paste eToro keys into chat or commit them to the repo. Store your demo/read credentials at `${HOME}/.config/etoro/credentials.json`:
+Do not paste eToro keys into chat or commit them to the repo. Store your read-only named profiles at `${HOME}/.config/etoro/credentials.json`.
 
-The current Portfolio View uses explicit named profiles. A normal server reads no repo-local `.env` file and never sends credentials to the browser:
+The workspace uses explicit named profiles. A normal server reads no repo-local `.env` file and never sends credentials to the browser.
 
-The file declares the official base URL, a `real` or `demo` default, and a `profiles` object. Each configured profile contains its server-only eToro public API key and environment-specific user key. Create the containing directory with mode `0700` and the file with mode `0600`. Demo is optional; an absent Demo profile is shown as **Demo not configured**, never as a provider failure or fixture portfolio.
+The file declares the official base URL, a `real` or `demo` default, and a `profiles` object. Each configured profile contains its server-only eToro public API key and environment-specific user key. Create the containing directory with mode `0700` and the file with mode `0600`. Either profile may be omitted; an absent profile is shown as **not configured**. There is no fallback to the other profile. The following values are synthetic placeholders, not usable credentials:
 
 The exported `migrateLegacyRealProfile` helper is deliberately value-blind. Use it only with the owner-only legacy source, preserve an existing differing profile, then run the normal-server Real identity, P&L, and portfolio smoke checks. Call its explicit source-removal callback only after those checks and a normal `npm run start` browser smoke succeed. Do not print, hash, or paste either source or destination value.
 
 ```json
 {
   "baseUrl": "https://public-api.etoro.com",
-  "publicApiKey": "YOUR_PUBLIC_API_KEY",
-  "userKey": "YOUR_DEMO_READ_USER_KEY"
+  "defaultEnvironment": "demo",
+  "profiles": {
+    "real": {
+      "publicApiKey": "SYNTHETIC_REAL_PUBLIC_API_KEY",
+      "userKey": "SYNTHETIC_REAL_READ_USER_KEY"
+    },
+    "demo": {
+      "publicApiKey": "SYNTHETIC_DEMO_PUBLIC_API_KEY",
+      "userKey": "SYNTHETIC_DEMO_READ_USER_KEY"
+    }
+  }
 }
 ```
 
@@ -86,6 +111,13 @@ npm run start:offline
 ```
 
 Then open `http://localhost:4173`. The app also accepts `ETORO_CREDENTIALS_FILE` if you want a different credential path.
+
+Generic read routes accept one `environment=real|demo` parameter and otherwise
+use `defaultEnvironment` (overridable with `ETORO_DEFAULT_ENVIRONMENT`). Explicit
+`/api/etoro/demo/*` read routes always use Demo and reject a conflicting
+environment. Invalid or repeated environment parameters fail closed. Browser
+requests always send the selected environment. Cache, coalescing and failure
+backoff are separated by profile and credential-file generation.
 
 The server is intentionally loopback-only. Setting `HOST` to a LAN or public
 address fails closed because account-linked portfolio and watchlist reads do
@@ -120,8 +152,35 @@ Start with a read-only dashboard:
 
 ## Security
 
-Prefer `${HOME}/.config/etoro/credentials.json` for local credentials. `.env.local` is still ignored if environment overrides are needed. Do not commit real `.env` files or credential JSON files.
+Prefer `${HOME}/.config/etoro/credentials.json` for local credentials. `.env.local` is ignored by Git but is not loaded by the normal server. Do not commit real `.env` files or credential JSON files.
 
 Credential rules and AI coding instructions live in `AGENTS.md`. Repository security policy lives in `SECURITY.md`.
 
 Incident review and durable bug-learning workflow lives in `docs/incidents/README.md` and `docs/memory/bug-learning.md`. New incident and qualifying bug lessons include transferability notes so the orchestrator can promote broadly useful learnings to workspace memory or affected repositories.
+
+## Validation And Producer Portability
+
+Run `npm run check`, `npm run safety:public`, `npm audit --audit-level=moderate`
+and `git diff --check`. The current `typecheck` command performs JavaScript
+syntax checking, not static type checking. Use `npm run start:offline` for
+synthetic browser, error and race checks; it denies provider access despite
+ambient credentials. Live acceptance uses the normal server and reports only
+redacted assertions, without retained financial screenshots, traces or responses.
+
+Generated Money-maker schema, immutable provenance and artifact SHA-256 checks
+are mandatory, including in standalone checkouts. Optional producer verification
+reads the committed artifact at the exact pinned producer revision through Git;
+it does not import Python, inspect arbitrary working-branch code, regenerate
+contracts or modify Money-maker. The default location is the sibling
+`Money-maker-3000`; select a relocated or linked worktree explicitly:
+
+```sh
+MONEY_MAKER_PRODUCER_CHECKOUT=/absolute/path/to/producer npm run contract:check
+```
+
+A missing checkout or absent pinned revision reports the optional check as
+unavailable while mandatory artifact checks still run. A wrong repository
+origin, missing artifact at an available pinned revision, or hash mismatch fails
+closed. Dirty working files and the checked-out branch do not replace immutable
+provenance. Verification performs no fetches and does not claim that the current
+producer implementation was rebuilt or tested.

@@ -4,4 +4,4 @@ The application is a dependency-light Node.js dashboard with a server-side eToro
 
 Provider credentials remain server-only. Browser-facing routes expose normalized read-only DTOs, redact provider metadata, and cache provider reads with bounded rate-limit-aware backoff. Demo trading execution remains disabled; the preview route validates proposed inputs without placing orders.
 
-Run `npm run safety:public` before public handoff, then `npm run check` for syntax, type-shape, and test validation. See the repository README and central project memory for configuration and security requirements.
+Run `npm run safety:public` before public handoff, then `npm run check` for syntax, generated-contract integrity, and test validation. The current `typecheck` command checks syntax only; it does not perform static type checking. See the repository README and central project memory for named Real/Demo configuration and security requirements.

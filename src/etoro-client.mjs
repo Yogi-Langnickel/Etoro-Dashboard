@@ -48,6 +48,12 @@ export const READ_ONLY_ENDPOINTS = Object.freeze({
     path: "/api/v1/watchlists/default-watchlists/items?itemsLimit=100&itemsPerPage=100",
     normalize: normalizeDefaultWatchlist,
   }),
+  instrumentDisplay: Object.freeze({
+    method: "GET",
+    path: ({ instrumentIds }) =>
+      `/api/v1/market-data/instruments?instrumentIds=${validatedInstrumentIds(instrumentIds).join(",")}`,
+    normalize: normalizeInstrumentDisplay,
+  }),
   instrumentSearch: Object.freeze({
     method: "GET",
     path: ({ symbol: rawSymbol }) => {
@@ -478,6 +484,7 @@ function normalizeDemoPortfolio(payload) {
 }
 
 function positiveInstrumentId(value) {
+  if ((typeof value !== "number" && typeof value !== "string") || value === "") return null;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 && parsed <= 2_147_483_647 ? parsed : null;
 }
@@ -516,6 +523,73 @@ function safeDisplayText(value, fallback) {
 function normalizedSymbol(value) {
   const symbol = typeof value === "string" ? value.trim().toUpperCase() : "";
   return SAFE_INSTRUMENT_SYMBOL.test(symbol) ? symbol : null;
+}
+
+function normalizeInstrumentDisplay(payload, params) {
+  if (!payload || !Array.isArray(payload.instrumentDisplayDatas)) {
+    throw new EtoroApiError("Instrument display response did not match expected shape", {
+      code: "ETORO_INVALID_INSTRUMENT_DISPLAY_RESPONSE",
+    });
+  }
+  const requested = new Set(validatedInstrumentIds(params.instrumentIds));
+  const byId = new Map();
+  const ambiguous = new Set();
+  const symbols = new Map();
+  const ambiguousSymbols = new Set();
+  for (const item of payload.instrumentDisplayDatas) {
+    const instrumentId = positiveInstrumentId(item?.instrumentID ?? item?.instrumentId);
+    if (!requested.has(instrumentId)) continue;
+    if (byId.has(instrumentId)) ambiguous.add(instrumentId);
+    const symbol = normalizedSymbol(item?.symbolFull);
+    if (symbol && symbols.has(symbol) && symbols.get(symbol) !== instrumentId) ambiguousSymbols.add(symbol);
+    if (symbol) symbols.set(symbol, instrumentId);
+    byId.set(instrumentId, symbol ? {
+      instrumentId, symbol, displayName: safeDisplayText(item?.instrumentDisplayName, symbol),
+    } : null);
+  }
+  return { instruments: [...byId.entries()].flatMap(([id, item]) =>
+    item && !ambiguous.has(id) && !ambiguousSymbols.has(item.symbol) ? [item] : []) };
+}
+
+/** Resolve documented ID-only rows before the public normalizer discards IDs.
+ * One request covers at most 100 distinct instruments. Unresolved/overflow
+ * rows retain missing symbols and are counted by the normalizer as omitted.
+ */
+async function enrichMissingDisplaySymbols(endpointName, payload, options) {
+  const watchlist = endpointName === "defaultWatchlist";
+  if (!watchlist && !["realPortfolio", "demoPortfolio"].includes(endpointName)) return payload;
+  const portfolio = payload?.clientPortfolio;
+  const positionKey = portfolio?.positions != null ? "positions" :
+    portfolio?.openPositions != null ? "openPositions" : "instrumentPositions";
+  const rows = watchlist ? payload : portfolio?.[positionKey];
+  if (!Array.isArray(rows)) return payload;
+  const considered = watchlist ? rows.slice(0, 100) : rows;
+  const idFor = (row) => positiveInstrumentId(watchlist ? row?.itemId ?? row?.ItemId :
+    row?.instrumentID ?? row?.instrumentId ?? row?.InstrumentID);
+  const needsSymbol = (row) => watchlist
+    ? (row?.itemType ?? row?.ItemType) === "Instrument" &&
+      !normalizedSymbol(row?.market?.symbolName ?? row?.market?.internalSymbolFull)
+    : !normalizedSymbol(row?.instrumentSymbol ?? row?.symbol ?? row?.internalSymbolFull);
+  const instrumentIds = [...new Set(considered.filter(needsSymbol).map(idFor).filter((id) => id !== null))].slice(0, 100);
+  if (instrumentIds.length === 0) return payload;
+  let display;
+  try {
+    display = await fetchReadOnlyEndpoint("instrumentDisplay", {
+      ...options, requestId: undefined, params: { instrumentIds },
+    });
+  } catch (error) {
+    if (error?.status === 401 || error?.status === 403) throw error;
+    return payload;
+  }
+  const byId = new Map(display.data.instruments.map((item) => [item.instrumentId, item]));
+  const enriched = rows.map((row) => {
+    const item = needsSymbol(row) ? byId.get(idFor(row)) : null;
+    if (!item) return row;
+    return watchlist
+      ? { ...row, market: { symbolName: item.symbol, displayName: item.displayName } }
+      : { ...row, instrumentSymbol: item.symbol, displayName: item.displayName };
+  });
+  return watchlist ? enriched : { ...payload, clientPortfolio: { ...portfolio, [positionKey]: enriched } };
 }
 
 function normalizeDefaultWatchlist(payload) {
@@ -765,9 +839,10 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
     }
 
     const payload = await parseProviderJson(response, requestId, secrets);
+    const displayReadyPayload = await enrichMissingDisplaySymbols(endpointName, payload, options);
 
     return {
-      data: endpoint.normalize(payload, params),
+      data: endpoint.normalize(displayReadyPayload, params),
       provider: {
         endpoint: endpointName,
         method: endpoint.method,

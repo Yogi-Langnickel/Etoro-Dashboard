@@ -31,9 +31,18 @@ test("live portfolio DOM renders only exact provider DTO rows and never provider
   assert.match(document.getElementById("portfolio-read-state").textContent, /provider Hit/);
   assert.equal(document.getElementById("chart-request").textContent, "Provider request ID: hidden");
 });
-test("empty live portfolio provides an explicit no-open-positions state", async () => {
+test("empty direct portfolio provides an explicit no-direct-positions state", async () => {
   const document = new Document(); const { renderProviderPortfolio } = await renderer(document); renderProviderPortfolio(payload([]));
-  assert.equal(document.getElementById("portfolio-table-body").children[0].children[0].textContent, "No open positions");
+  assert.equal(document.getElementById("portfolio-table-body").children[0].children[0].textContent, "No direct positions");
+});
+
+test("copy-only snapshot does not claim that the whole account has no positions", async () => {
+  const document = new Document(); const { renderProviderPortfolio } = await renderer(document);
+  const copyOnly = payload([]); copyOnly.data.mirrorCount = 2; copyOnly.data.pendingOrderCount = 1;
+  renderProviderPortfolio(copyOnly);
+  assert.equal(document.getElementById("portfolio-table-body").children[0].children[0].textContent, "No direct positions");
+  assert.match(document.getElementById("portfolio-stat-coverage").textContent, /Copy allocations: 2; pending orders: 1/);
+  assert.match(document.getElementById("portfolio-stat-coverage").textContent, /outside the displayed instrument coverage/);
 });
 
 test("loaded Real to unavailable Demo transition clears every portfolio-bound browser value", async () => {
@@ -62,7 +71,7 @@ test("portfolio failure states distinguish malformed, timeout, rate-limit/backof
   renderPortfolioReadFailure({ payload: { error: { code: "ETORO_TIMEOUT", status: 504 } } });
   assert.equal(document.getElementById("portfolio-read-state").textContent, "Portfolio: provider timeout");
   renderPortfolioReadFailure({ payload: { error: { code: "ETORO_PROVIDER_ERROR", status: 429 }, cache: { state: "backoff", cachedAt: "2026-08-30T00:00:00.000Z", expiresAt: "2026-08-30T00:00:15.000Z", ttlMs: 15000, reason: "ETORO_PROVIDER_ERROR" } } });
-  assert.equal(document.getElementById("portfolio-read-state").textContent, "Portfolio: provider backoff");
+  assert.equal(document.getElementById("portfolio-read-state").textContent, "Portfolio: provider rate-limited (backoff)");
   renderPortfolioReadFailure({ payload: { error: { code: "ETORO_PROVIDER_ERROR", status: 503 } } });
   assert.equal(document.getElementById("portfolio-read-state").textContent, "Portfolio: provider unavailable");
 });
@@ -72,4 +81,41 @@ test("Portfolio refresh has a request sequence guard against stale environment r
   assert.match(source, /let etoroRefreshRequestSequence = 0/);
   assert.match(source, /sequence !== etoroRefreshRequestSequence \|\| environment !== selectedPortfolioEnvironment/);
   assert.match(source, /etoroRefreshRequestSequence \+= 1;/);
+});
+
+
+test("descriptive statistics use the same snapshot, explicit denominators and incomplete coverage", async () => {
+  const document = new Document(); const { renderProviderPortfolio, clearPortfolioBoundState } = await renderer(document);
+  const view = payload();
+  view.data.equity = 1000; view.data.availableCash = 250; view.data.totalInvested = 800;
+  view.data.realizedPnl = -12; view.data.omittedRowCount = 2; view.data.openPositionCount = 3; view.data.incompleteRowCount = 1;
+  renderProviderPortfolio(view);
+  assert.equal(document.getElementById("portfolio-stat-cash").textContent, "25.00% of equity");
+  assert.equal(document.getElementById("portfolio-stat-largest").textContent, "AAPL: $200.00 (25.00% of total invested)");
+  assert.equal(document.getElementById("portfolio-stat-realized").textContent, "-$12.00");
+  assert.match(document.getElementById("portfolio-stat-coverage").textContent, /3 direct positions; 1 displayed instruments; 2 omitted direct positions; 1 incomplete/);
+  assert.match(document.getElementById("portfolio-stat-basis").textContent, /Omitted or incomplete holdings may change the ranking/);
+  view.data.equity = 0; view.data.totalInvested = null; view.data.realizedPnl = null;
+  renderProviderPortfolio(view);
+  assert.match(document.getElementById("portfolio-stat-cash").textContent, /Unavailable/);
+  assert.match(document.getElementById("portfolio-stat-largest").textContent, /percentage unavailable/);
+  assert.equal(document.getElementById("portfolio-stat-realized").textContent, "Unavailable");
+  clearPortfolioBoundState();
+  assert.match(document.getElementById("portfolio-stat-coverage").textContent, /Unavailable/);
+});
+
+test("negative provider net value remains displayable without fabricating a nonnegative value", async () => {
+  const document = new Document(); const { renderProviderPortfolio } = await renderer(document);
+  const view = payload(); view.data.instruments[0].netValue = -20;
+  renderProviderPortfolio(view);
+  assert.equal(document.querySelectorAll("[data-instrument-row]")[0].children[8].textContent, "-$20.00");
+});
+
+
+test("omitted provider positions are not presented as an empty account", async () => {
+  const document = new Document(); const { renderProviderPortfolio } = await renderer(document);
+  const view = payload([]); view.data.openPositionCount = 2; view.data.omittedRowCount = 2;
+  renderProviderPortfolio(view);
+  assert.match(document.getElementById("portfolio-table-body").children[0].children[0].textContent, /No displayable holdings/);
+  assert.match(document.getElementById("portfolio-partial").textContent, /Partial coverage.*2 omitted/);
 });

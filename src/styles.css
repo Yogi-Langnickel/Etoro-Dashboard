@@ -1198,3 +1198,23 @@ td span {
     padding: 0 12px 14px;
   }
 }
+
+.workspace-profile-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-block: 1rem;
+}
+
+#portfolio-stat-basis, #portfolio-stat-source {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.portfolio-context-panel .readiness-list li {
+  align-items: start;
+  flex-wrap: wrap;
+}

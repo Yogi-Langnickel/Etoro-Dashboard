@@ -458,6 +458,7 @@ test("read-only endpoint allow-list excludes mutation routes", async () => {
     "demoPnl",
     "demoPortfolio",
     "identity",
+    "instrumentDisplay",
     "instrumentSearch",
     "marketCandles",
     "marketRates",

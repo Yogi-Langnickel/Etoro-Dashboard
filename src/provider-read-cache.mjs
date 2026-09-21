@@ -3,6 +3,10 @@ import { DEFAULT_READ_CACHE_TTL_MS } from "./etoro-config.mjs";
 export const DEFAULT_PROVIDER_FAILURE_BACKOFF_MS = 5_000;
 const MAX_PROVIDER_RETRY_AFTER_MS = 60_000;
 
+// Server-only failure metadata survives a stale read without extending the
+// browser cache DTO. JSON serialization intentionally omits symbol properties.
+export const PROVIDER_CACHE_FAILURE = Symbol("provider-cache-failure");
+
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -47,6 +51,9 @@ function readOnlyCacheKey(endpointName, config) {
 function withCacheMetadata(result, cacheState, entry) {
   return {
     ...cloneJson(result),
+    ...(cacheState === "stale" && entry.error ? {
+      [PROVIDER_CACHE_FAILURE]: { code: entry.error.code, status: entry.error.status },
+    } : {}),
     cache: {
       state: cacheState,
       cachedAt: entry.cachedAt,

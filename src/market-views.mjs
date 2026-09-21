@@ -51,6 +51,22 @@ function combinedProviderMetadata(endpoint, results) {
   };
 }
 
+export async function marketResolveView(config, fetchEndpoint, symbol) {
+  const resolution = await resolveExactSymbol(fetchEndpoint, config, symbol);
+  return {
+    data: {
+      symbol: resolution.data.symbol,
+      displayName: resolution.data.displayName,
+      resolution: "exact",
+    },
+    provider: combinedProviderMetadata("marketResolve", [resolution]),
+  };
+}
+
+function rethrowAuthenticationFailure(error) {
+  if (error?.status === 401 || error?.status === 403) throw error;
+}
+
 export async function defaultWatchlistView(config, fetchEndpoint) {
   const watchlist = await fetchEndpoint("defaultWatchlist", { credentials: config });
   const internalItems = watchlist.data.items;
@@ -63,7 +79,8 @@ export async function defaultWatchlistView(config, fetchEndpoint) {
         credentials: config,
         params: { instrumentIds: internalItems.map(({ instrumentId }) => instrumentId) },
       });
-    } catch {
+    } catch (error) {
+      rethrowAuthenticationFailure(error);
       rateFailure = true;
     }
   }
@@ -90,7 +107,7 @@ export async function defaultWatchlistView(config, fetchEndpoint) {
       itemCount: items.length,
       omittedItemCount: watchlist.data.omittedItemCount,
       unavailableRateCount,
-      providerState: rateFailure || unavailableRateCount > 0 ? "partial" : "complete",
+      providerState: rateFailure || unavailableRateCount > 0 || watchlist.data.omittedItemCount > 0 ? "partial" : "complete",
       partialFailure: rateFailure ? { component: "rates", state: "unavailable" } : null,
       items,
     },
@@ -102,7 +119,8 @@ export async function marketRatesView(config, fetchEndpoint, symbols) {
   const resolutions = await Promise.all(symbols.map(async (symbol) => {
     try {
       return { symbol, ...(await resolveExactSymbol(fetchEndpoint, config, symbol)), resolution: "exact" };
-    } catch {
+    } catch (error) {
+      rethrowAuthenticationFailure(error);
       return { symbol, data: null, provider: null, resolution: "unresolved" };
     }
   }));
@@ -115,7 +133,8 @@ export async function marketRatesView(config, fetchEndpoint, symbols) {
         credentials: config,
         params: { instrumentIds: exact.map(({ data }) => data.instrumentId) },
       });
-    } catch {
+    } catch (error) {
+      rethrowAuthenticationFailure(error);
       rateFailure = true;
     }
   }

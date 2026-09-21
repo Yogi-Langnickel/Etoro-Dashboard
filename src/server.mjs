@@ -16,6 +16,7 @@ import {
   marketChartView,
   marketInputError,
   marketRatesView,
+  marketResolveView,
   MARKET_PERIODS,
   normalizeRequestedSymbol,
   requestedSymbols,
@@ -23,6 +24,7 @@ import {
 import {
   createReadOnlyProviderCache,
   DEFAULT_PROVIDER_FAILURE_BACKOFF_MS,
+  PROVIDER_CACHE_FAILURE,
   publicProviderErrorMessage,
 } from "./provider-read-cache.mjs";
 import {
@@ -330,18 +332,6 @@ async function getConfig(loadConfig) {
   return loadConfig();
 }
 
-function credentialsMissingResponse(config) {
-  return {
-    ok: false,
-    mode: "read-only",
-    credentialStatus: publicCredentialStatus(config),
-    error: {
-      code: "ETORO_CREDENTIALS_MISSING",
-      message: "eToro credentials are not configured on the server",
-    },
-  };
-}
-
 function readOnlyCachePolicy(config) {
   return {
     readOnlyTtlMs: config.readCacheTtlMs ?? DEFAULT_READ_CACHE_TTL_MS,
@@ -363,9 +353,11 @@ function publicProviderMetadata(provider = {}) {
   };
 }
 
-function requestedEnvironment(searchParams, defaultEnvironment) {
+function requestedEnvironment(searchParams, defaultEnvironment, requiredEnvironment) {
   const environment = searchParams?.get("environment") ?? defaultEnvironment;
-  if (!ETORO_ENVIRONMENTS.includes(environment)) {
+  if (!ETORO_ENVIRONMENTS.includes(environment) ||
+    (searchParams?.getAll("environment").length ?? 0) > 1 ||
+    (requiredEnvironment && environment !== requiredEnvironment)) {
     const error = new Error("Requested environment is invalid");
     error.code = "ETORO_INVALID_ENVIRONMENT";
     error.status = 400;
@@ -378,16 +370,19 @@ function profileFailureState(error) {
   if (error?.code === "ETORO_PROFILE_NOT_CONFIGURED") return "not-configured";
   if (error?.status === 401) return "unauthorized-or-expired";
   if (error?.status === 403) return "wrong-environment";
+  if (error?.status === 429) return "rate-limited";
+  if (error?.code === "ETORO_TIMEOUT") return "timeout";
+  if (typeof error?.code === "string" && /^ETORO_INVALID_(?:JSON|.+_RESPONSE)$/.test(error.code)) return "malformed";
   return "provider-unavailable";
 }
 
 async function profileReadiness(environment, config, providerCache, fetchEndpoint) {
   try {
     const credentials = credentialsForEnvironment(config, environment);
-    await providerCache.fetch(`portfolio:${environment}`, credentials, () =>
+    const result = await providerCache.fetch(`portfolio:${environment}`, credentials, () =>
       fetchPortfolioSnapshot(environment, { credentials, fetchEndpoint }),
     );
-    return { environment, state: "ready" };
+    return { environment, state: result.cache?.state === "stale" ? profileFailureState(result[PROVIDER_CACHE_FAILURE]) : "ready" };
   } catch (error) {
     return { environment, state: profileFailureState(error) };
   }
@@ -706,20 +701,24 @@ async function handleApiRoute(pathname, response, options) {
       return;
     }
 
-    if (!config.configured) {
-      sendJson(response, 503, credentialsMissingResponse(config));
-      return;
-    }
+    // Generic reads use only the explicitly selected profile or configured
+    // default. Legacy Demo read routes remain pinned to Demo, even if Real is
+    // the default. Configuration of another profile never authorizes fallback.
+    const demoRoute = pathname.startsWith("/api/etoro/demo/");
+    const environment = requestedEnvironment(options.searchParams,
+      demoRoute ? "demo" : config.defaultEnvironment, demoRoute ? "demo" : undefined);
+    const credentials = credentialsForEnvironment(config, environment);
 
     if (pathname === "/api/etoro/watchlist/default") {
       const result = await providerCache.fetch(
         "defaultWatchlistView",
-        config,
-        () => defaultWatchlistView(config, fetchEndpoint),
+        credentials,
+        () => defaultWatchlistView(credentials, fetchEndpoint),
       );
       sendJson(response, 200, {
         ok: true,
         mode: "read-only",
+        environment,
         ...result,
         provider: publicProviderMetadata(result.provider),
       });
@@ -730,20 +729,10 @@ async function handleApiRoute(pathname, response, options) {
       const symbol = normalizeRequestedSymbol(options.searchParams?.get("symbol"));
       const result = await providerCache.fetch(
         `marketResolve:${symbol}`,
-        config,
-        async () => {
-          const resolution = await resolveExactSymbol(fetchEndpoint, config, symbol);
-          return {
-            data: {
-              symbol: resolution.data.symbol,
-              displayName: resolution.data.displayName,
-              resolution: "exact",
-            },
-            provider: combinedProviderMetadata("marketResolve", [resolution]),
-          };
-        },
+        credentials,
+        () => marketResolveView(credentials, fetchEndpoint, symbol),
       );
-      sendJson(response, 200, { ok: true, mode: "read-only", ...result, provider: publicProviderMetadata(result.provider) });
+      sendJson(response, 200, { ok: true, mode: "read-only", environment, ...result, provider: publicProviderMetadata(result.provider) });
       return;
     }
 
@@ -751,10 +740,10 @@ async function handleApiRoute(pathname, response, options) {
       const symbols = requestedSymbols(options.searchParams);
       const result = await providerCache.fetch(
         `marketRatesView:${symbols.join(",")}`,
-        config,
-        () => marketRatesView(config, fetchEndpoint, symbols),
+        credentials,
+        () => marketRatesView(credentials, fetchEndpoint, symbols),
       );
-      sendJson(response, 200, { ok: true, mode: "read-only", ...result, provider: publicProviderMetadata(result.provider) });
+      sendJson(response, 200, { ok: true, mode: "read-only", environment, ...result, provider: publicProviderMetadata(result.provider) });
       return;
     }
 
@@ -764,10 +753,10 @@ async function handleApiRoute(pathname, response, options) {
       if (!MARKET_PERIODS[period]) throw marketInputError();
       const result = await providerCache.fetch(
         `marketChartView:${symbol}:${period}`,
-        config,
-        () => marketChartView(config, fetchEndpoint, symbol, period),
+        credentials,
+        () => marketChartView(credentials, fetchEndpoint, symbol, period),
       );
-      sendJson(response, 200, { ok: true, mode: "read-only", ...result, provider: publicProviderMetadata(result.provider) });
+      sendJson(response, 200, { ok: true, mode: "read-only", environment, ...result, provider: publicProviderMetadata(result.provider) });
       return;
     }
 
@@ -776,15 +765,18 @@ async function handleApiRoute(pathname, response, options) {
       "/api/etoro/demo/pnl": "demoPnl",
       "/api/etoro/demo/portfolio": "demoPortfolio",
     }[pathname];
-    const result = await providerCache.fetch(endpointName, config, fetchEndpoint);
+    const result = await providerCache.fetch(endpointName, credentials, fetchEndpoint);
     sendJson(response, 200, {
       ok: true,
       mode: "read-only",
+      environment,
       ...result,
       provider: publicProviderMetadata(result.provider),
     });
   } catch (error) {
-    sendJson(response, error?.status && error.status >= 400 ? error.status : 500, {
+    const status = error?.code === "ETORO_PROFILE_NOT_CONFIGURED" ? 503 :
+      (error?.status && error.status >= 400 ? error.status : 500);
+    sendJson(response, status, {
       ok: false,
       mode: "read-only",
       error: safeErrorPayload(error),
