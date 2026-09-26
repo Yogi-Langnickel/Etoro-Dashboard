@@ -45,6 +45,27 @@ These repo-local financial rules are hard overrides over workspace-level general
 - The orchestrating assistant owns final integration quality: maintain a touched-repository inventory, review each agent's diff, run appropriate validation, commit scoped completed work, complete the two-pass review gate, merge reviewed implementation work into `develop`, review new incident and bug learnings after agent closeout, promote transferable learnings to workspace memory or affected repositories, and verify every touched worktree is clean before ending the task.
 - End every task with a free, clean workstation: `git status --short --branch` must be clean in each touched repository. Exceptions are allowed only for explicit user clarifications or genuine user-resolved blockers, and the final report must state the exact question or action needed.
 
+## Official eToro Contract References
+
+Use the [Developer Portal](https://api-portal.etoro.com/), its
+[documentation index](https://api-portal.etoro.com/llms.txt), and the official
+[Agent Skill landing page](https://api-portal.etoro.com/core/ai-agents/etoro-skill)
+as the current source of truth. As checked directly from the official skill URL
+on 2026-09-22, `https://mcp.public-api.etoro.com/skill` identifies
+`etoro-public-api-operations` version `1.20.0`; the landing page links to it.
+Its MCP server is `https://mcp.public-api.etoro.com`.
+
+The reference does not authorize installing the MCP server, making provider
+requests, handling credentials, persisting data, or trading. Never ask a user
+to paste credentials into chat. For a separately authorized integration,
+dynamically discover the operation's tags, route, specification, scopes,
+rate-limit group, and deprecation/replacement. Authenticate with either the
+`x-api-key`/`x-user-key` pair or OAuth Bearer authentication, never both.
+
+Treat the repository's existing `/api/v1` endpoint references as dated local
+implementation contracts. They are not authority to select a current route;
+the official replacement may be `v2`.
+
 ## Recommended Architecture
 
 - Use a server-side API boundary for all eToro requests.

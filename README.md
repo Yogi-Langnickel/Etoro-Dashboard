@@ -42,6 +42,27 @@ companyfacts normalizer. It exposes normalized coverage fields only and keeps
 live SEC fetching blocked until a server-side cache/rate-limit policy and SEC
 User-Agent contact value are configured.
 
+## Official eToro API Reference
+
+The current source of truth is the [eToro Developer Portal](https://api-portal.etoro.com/),
+its [documentation index](https://api-portal.etoro.com/llms.txt), and the
+[Agent Skill landing page](https://api-portal.etoro.com/core/ai-agents/etoro-skill).
+As checked directly from the official skill URL on 2026-09-22,
+`https://mcp.public-api.etoro.com/skill` identifies
+`etoro-public-api-operations` version `1.20.0`; the landing page links to it.
+Its MCP server is `https://mcp.public-api.etoro.com`.
+
+Those references do not authorize MCP installation, credential use, provider
+requests, persistence, or trading. Never paste credentials into chat. For a
+separately authorized future integration, discover the current tags, route,
+specification, scopes, rate-limit group, and deprecation/replacement from the
+official catalog. Use exactly one authentication mode: the
+`x-api-key`/`x-user-key` pair or OAuth Bearer authentication, never both.
+
+The current server's `/api/v1` paths and pinned base URL are dated local
+implementation contracts, not current route authority; the applicable official
+operation may have a replacement or use `v2`.
+
 ## Contract Boundaries
 
 - `src/server.mjs` owns HTTP dispatch, static allowlisting, and local mutation
