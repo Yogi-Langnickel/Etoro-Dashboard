@@ -4,6 +4,9 @@ const formatter = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   style: "currency",
 });
+const integerFormatter = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 0,
+});
 const portfolioTabId = "portfolio-view";
 const botConfigCsrfResponseHeader = "x-etoro-dashboard-config-token";
 const loadedTabIds = new Set();
@@ -57,6 +60,31 @@ function setTile(id, state, title, detail) {
 
 function money(value) {
   return typeof value === "number" && Number.isFinite(value) ? formatter.format(value) : "Unavailable";
+}
+
+function price(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "Unavailable";
+  return Number.isInteger(value) ? formatter.format(value) : `$${formatExactDecimal(value)}`;
+}
+
+function quantity(value) {
+  return typeof value === "number" && Number.isFinite(value) ? formatExactDecimal(value) : "Unavailable";
+}
+
+function formatExactDecimal(value) {
+  const sign = value < 0 ? "-" : "";
+  const serialized = String(Math.abs(value));
+  const [coefficient, rawExponent] = serialized.toLowerCase().split("e");
+  const exponent = rawExponent === undefined ? 0 : Number(rawExponent);
+  const digits = coefficient.replace(".", "");
+  const decimalIndex = (coefficient.indexOf(".") === -1 ? coefficient.length : coefficient.indexOf(".")) + exponent;
+  const decimal = decimalIndex <= 0
+    ? `0.${"0".repeat(-decimalIndex)}${digits}`
+    : decimalIndex >= digits.length
+      ? `${digits}${"0".repeat(decimalIndex - digits.length)}`
+      : `${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`;
+  const [integer, fraction] = decimal.split(".");
+  return `${sign}${integerFormatter.format(Number(integer))}${fraction === undefined ? "" : `.${fraction}`}`;
 }
 
 function signedMoney(value) {
@@ -459,11 +487,11 @@ function renderProviderPortfolio(payload) {
     assetCell.append(symbol, detail);
     row.append(assetCell);
 
-    appendPortfolioCell(row, money(instrument.currentPrice));
+    appendPortfolioCell(row, price(instrument.currentPrice));
     const periodCell = appendPortfolioCell(row, "Unavailable", "neutral-text");
     periodCell.dataset.periodValue = "";
-    appendPortfolioCell(row, instrument.units === null ? "Unavailable" : String(instrument.units));
-    appendPortfolioCell(row, money(instrument.averageOpenPrice));
+    appendPortfolioCell(row, quantity(instrument.units));
+    appendPortfolioCell(row, price(instrument.averageOpenPrice));
     appendPortfolioCell(row, signedMoney(instrument.unrealizedPnl), signedClass(signedMoney(instrument.unrealizedPnl)));
     appendPortfolioCell(row, signedPercent(instrument.unrealizedPnlPercent), signedClass(signedPercent(instrument.unrealizedPnlPercent)));
     appendPortfolioCell(row, money(instrument.investedValue));

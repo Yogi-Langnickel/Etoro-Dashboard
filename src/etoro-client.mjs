@@ -120,12 +120,7 @@ export function buildEtoroHeaders(credentials, requestId = randomUUID()) {
 }
 
 function numberOrNull(value) {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function arrayOrEmpty(value) {
@@ -174,6 +169,10 @@ function firstNumber(...values) {
   return null;
 }
 
+function hasMalformedNumber(values) {
+  return values.some((value) => value !== null && value !== undefined && numberOrNull(value) === null);
+}
+
 function sumRequired(items, valueForItem) {
   if (!Array.isArray(items)) return null;
   let total = 0;
@@ -207,7 +206,9 @@ function sumPositionPnl(items) {
 }
 
 function roundCurrency(value) {
-  return Number.isFinite(value) ? Number(value.toFixed(2)) : null;
+  if (!Number.isFinite(value)) return null;
+  const rounded = Number(value.toFixed(2));
+  return rounded === 0 ? 0 : rounded;
 }
 
 function normalizeTimestamp(value) {
@@ -388,7 +389,6 @@ function normalizeDemoPortfolio(payload) {
   const positions = rawPositions;
   const instruments = new Map();
   let omittedPositionCount = 0;
-  let incompleteValuePositionCount = 0;
 
   for (const position of positions) {
     const rawSymbol =
@@ -405,22 +405,23 @@ function normalizeDemoPortfolio(payload) {
       position?.invested,
       position?.currentInvestment,
     );
-    const units = firstNumber(position?.units, position?.amountInUnits, position?.unitsAmount);
-    const averageOpenPrice = firstNumber(position?.openRate, position?.averageOpenPrice, position?.openPrice);
-    const currentPrice = firstNumber(position?.currentRate, position?.currentPrice, position?.rate);
+    const unitValues = [position?.units, position?.amountInUnits, position?.unitsAmount];
+    const openPriceValues = [position?.openRate, position?.averageOpenPrice, position?.openPrice];
+    const currentPriceValues = [position?.currentRate, position?.currentPrice, position?.rate];
+    const units = firstNumber(...unitValues);
+    const averageOpenPrice = firstNumber(...openPriceValues);
+    const currentPrice = firstNumber(...currentPriceValues);
+    const marketInputMalformed = [unitValues, openPriceValues, currentPriceValues].some(hasMalformedNumber);
     const displayName = safeDisplayText(position?.displayName ?? position?.instrumentDisplayName ?? position?.name, symbol);
     const unrealizedPnlUsd = pnlAmount(
       position?.unrealizedPnL ?? position?.unrealizedPnl ?? position?.pnL,
     );
     const hasCompleteValues = investedUsd !== null && investedUsd >= 0 && unrealizedPnlUsd !== null;
 
-    if (!hasCompleteValues) {
-      incompleteValuePositionCount += 1;
-    }
-
     const current = instruments.get(symbol) ?? {
       symbol,
       positionCount: 0,
+      incompletePositionCount: 0,
       investedUsd: 0,
       unrealizedPnlUsd: 0,
       units: 0,
@@ -430,32 +431,51 @@ function normalizeDemoPortfolio(payload) {
       weightedOpenUnits: 0,
       displayName,
       marketValuesComplete: true,
+      marketValuesIncomplete: false,
+      marketAggregateOverflow: false,
       valuesComplete: true,
     };
+    current.positionCount += 1;
     const nextInvestedUsd = current.investedUsd + (
       investedUsd !== null && investedUsd >= 0 ? investedUsd : 0
     );
     const nextUnrealizedPnlUsd = current.unrealizedPnlUsd + (unrealizedPnlUsd ?? 0);
     const totalsComplete = Number.isFinite(nextInvestedUsd) && Number.isFinite(nextUnrealizedPnlUsd);
-
-    if (hasCompleteValues && !totalsComplete) {
-      incompleteValuePositionCount += 1;
+    const positionValuesComplete = hasCompleteValues && totalsComplete;
+    if (!positionValuesComplete) {
+      current.incompletePositionCount = totalsComplete
+        ? current.incompletePositionCount + 1
+        : current.positionCount;
     }
-
-    current.positionCount += 1;
-    current.valuesComplete &&= hasCompleteValues && totalsComplete;
+    current.valuesComplete &&= positionValuesComplete;
     const usableMarketValues = units !== null && units > 0 && averageOpenPrice !== null && averageOpenPrice >= 0 && currentPrice !== null && currentPrice >= 0;
+    if (marketInputMalformed && positionValuesComplete) {
+      current.marketValuesIncomplete = true;
+      current.incompletePositionCount += 1;
+    }
     current.marketValuesComplete &&= usableMarketValues;
     current.investedUsd = Number.isFinite(nextInvestedUsd) ? nextInvestedUsd : 0;
-    current.unrealizedPnlUsd = Number.isFinite(nextUnrealizedPnlUsd)
-      ? nextUnrealizedPnlUsd
-      : 0;
-    if (usableMarketValues) {
-      current.units = Number.isFinite(current.units + units) ? current.units + units : 0;
-      current.weightedOpenTotal += units * averageOpenPrice;
-      current.weightedOpenUnits += units;
+    current.unrealizedPnlUsd = Number.isFinite(nextUnrealizedPnlUsd) ? nextUnrealizedPnlUsd : 0;
+    if (usableMarketValues && current.marketValuesComplete) {
+      const nextUnits = current.units + units;
+      const nextWeightedOpenTotal = current.weightedOpenTotal + (units * averageOpenPrice);
+      const nextWeightedOpenUnits = current.weightedOpenUnits + units;
+      const aggregatesFinite = Number.isFinite(nextUnits) && Number.isFinite(nextWeightedOpenTotal) &&
+        Number.isFinite(nextWeightedOpenUnits) && nextWeightedOpenUnits > 0;
+      current.marketValuesComplete &&= aggregatesFinite;
+      current.marketAggregateOverflow ||= !aggregatesFinite;
+      if (!aggregatesFinite) current.incompletePositionCount = current.positionCount;
+      if (aggregatesFinite) {
+        current.units = nextUnits;
+        current.weightedOpenTotal = nextWeightedOpenTotal;
+        current.weightedOpenUnits = nextWeightedOpenUnits;
+      }
       if (current.currentPrice === null) current.currentPrice = currentPrice;
-      else if (current.currentPrice !== currentPrice) current.marketValuesComplete = false;
+      else if (current.currentPrice !== currentPrice) {
+        current.marketValuesComplete = false;
+        current.marketValuesIncomplete = true;
+        current.incompletePositionCount = current.positionCount;
+      }
     }
     instruments.set(symbol, current);
   }
@@ -465,16 +485,22 @@ function normalizeDemoPortfolio(payload) {
     positionCount: positions.length,
     instrumentCount: instruments.size,
     omittedPositionCount,
-    incompleteValuePositionCount,
+    incompleteValuePositionCount: [...instruments.values()].reduce(
+      (count, instrument) => count + instrument.incompletePositionCount,
+      0,
+    ),
     instruments: [...instruments.values()]
-      .map(({ valuesComplete, marketValuesComplete, weightedOpenTotal, weightedOpenUnits, ...instrument }) => ({
+      .map(({ valuesComplete, marketValuesComplete, marketValuesIncomplete, marketAggregateOverflow, weightedOpenTotal, weightedOpenUnits, incompletePositionCount, ...instrument }) => ({
         ...instrument,
         investedUsd: valuesComplete ? roundCurrency(instrument.investedUsd) : null,
         unrealizedPnlUsd: valuesComplete ? roundCurrency(instrument.unrealizedPnlUsd) : null,
         units: marketValuesComplete && weightedOpenUnits > 0 ? instrument.units : null,
-        averageOpenPrice: marketValuesComplete && weightedOpenUnits > 0 ? roundCurrency(weightedOpenTotal / weightedOpenUnits) : null,
+        // Prices and quantities are not monetary totals. Keep their provider
+        // precision through the browser DTO so fractional holdings and small
+        // instrument prices remain meaningful.
+        averageOpenPrice: marketValuesComplete && weightedOpenUnits > 0 ? weightedOpenTotal / weightedOpenUnits : null,
         currentPrice: marketValuesComplete ? instrument.currentPrice : null,
-        valueStatus: valuesComplete ? "complete" : "incomplete",
+        valueStatus: valuesComplete && !marketValuesIncomplete && !marketAggregateOverflow ? "complete" : "incomplete",
       }))
       .sort((left, right) => left.symbol.localeCompare(right.symbol)),
     providerUpdatedAt: normalizeTimestamp(
@@ -507,9 +533,7 @@ function validatedInstrumentIds(values) {
 }
 
 function marketNumberOrNull(value) {
-  if ((typeof value !== "number" && typeof value !== "string") || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return numberOrNull(value);
 }
 
 function safeDisplayText(value, fallback) {
@@ -875,9 +899,14 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
   }
 }
 
-function finiteDisplayNumber(value, allowNegative = false) {
+function finiteMonetaryTotal(value, allowNegative = false) {
   const number = numberOrNull(value);
   return number !== null && (allowNegative || number >= 0) && Math.abs(number) <= 1_000_000_000_000 ? roundCurrency(number) : null;
+}
+
+function finitePrecisionNumber(value, allowNegative = false) {
+  const number = numberOrNull(value);
+  return number !== null && (allowNegative || number >= 0) && Math.abs(number) <= 1_000_000_000_000 ? number : null;
 }
 
 /** Compose the only account-linked DTO permitted to cross the browser boundary. */
@@ -894,23 +923,23 @@ export async function fetchPortfolioSnapshot(environment, options = {}) {
   ]);
   if (!identity.data?.authenticated) throw new EtoroApiError("Identity response was not authenticated", { code: "ETORO_INVALID_IDENTITY_RESPONSE" });
   const normalizedInstruments = portfolio.data.instruments.map((instrument) => {
-    const investedValue = finiteDisplayNumber(instrument.investedUsd);
-    const unrealizedPnl = finiteDisplayNumber(instrument.unrealizedPnlUsd, true);
-    const netValue = investedValue !== null && unrealizedPnl !== null ? finiteDisplayNumber(investedValue + unrealizedPnl, true) : null;
+    const investedValue = finiteMonetaryTotal(instrument.investedUsd);
+    const unrealizedPnl = finiteMonetaryTotal(instrument.unrealizedPnlUsd, true);
+    const netValue = investedValue !== null && unrealizedPnl !== null ? finiteMonetaryTotal(investedValue + unrealizedPnl, true) : null;
     const allocationPercent = pnl.data.totalInvested !== null && pnl.data.totalInvested > 0 && investedValue !== null
-      ? finiteDisplayNumber((investedValue / pnl.data.totalInvested) * 100)
+      ? finiteMonetaryTotal((investedValue / pnl.data.totalInvested) * 100)
       : null;
     return {
       symbol: instrument.symbol,
       displayName: safeDisplayText(instrument.displayName, instrument.symbol),
       positionCount: instrument.positionCount,
-      units: finiteDisplayNumber(instrument.units),
-      averageOpenPrice: finiteDisplayNumber(instrument.averageOpenPrice),
-      currentPrice: finiteDisplayNumber(instrument.currentPrice),
+      units: finitePrecisionNumber(instrument.units),
+      averageOpenPrice: finitePrecisionNumber(instrument.averageOpenPrice),
+      currentPrice: finitePrecisionNumber(instrument.currentPrice),
       investedValue,
       netValue,
       unrealizedPnl,
-      unrealizedPnlPercent: investedValue && unrealizedPnl !== null ? finiteDisplayNumber((unrealizedPnl / investedValue) * 100, true) : null,
+      unrealizedPnlPercent: investedValue && unrealizedPnl !== null ? finiteMonetaryTotal((unrealizedPnl / investedValue) * 100, true) : null,
       allocationPercent,
       completeness: instrument.valueStatus === "complete" ? "complete" : "partial",
     };
@@ -919,11 +948,11 @@ export async function fetchPortfolioSnapshot(environment, options = {}) {
     data: {
       environment,
       currency: "USD",
-      equity: finiteDisplayNumber(pnl.data.equity),
-      availableCash: finiteDisplayNumber(pnl.data.availableCash),
-      totalInvested: finiteDisplayNumber(pnl.data.totalInvested),
-      unrealizedPnl: finiteDisplayNumber(pnl.data.unrealizedPnL, true),
-      realizedPnl: finiteDisplayNumber(pnl.data.realizedPnL, true),
+      equity: finiteMonetaryTotal(pnl.data.equity),
+      availableCash: finiteMonetaryTotal(pnl.data.availableCash),
+      totalInvested: finiteMonetaryTotal(pnl.data.totalInvested),
+      unrealizedPnl: finiteMonetaryTotal(pnl.data.unrealizedPnL, true),
+      realizedPnl: finiteMonetaryTotal(pnl.data.realizedPnL, true),
       openPositionCount: portfolio.data.positionCount,
       instrumentCount: portfolio.data.instrumentCount,
       mirrorCount: pnl.data.mirrorCount,

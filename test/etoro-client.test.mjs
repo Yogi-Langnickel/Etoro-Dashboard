@@ -4,6 +4,7 @@ import {
   EtoroApiError,
   READ_ONLY_ENDPOINTS,
   buildEtoroHeaders,
+  fetchPortfolioSnapshot,
   fetchReadOnlyEndpoint,
   readOnlyEndpointSummary,
   redactSecrets,
@@ -161,6 +162,104 @@ test("portfolio aggregation uses a units-weighted open price or marks mixed mark
   assert.equal(result.data.instruments[0].currentPrice, 12);
 });
 
+test("portfolio aggregation preserves fractional quantities and weighted small-price precision", async () => {
+  const result = await fetchReadOnlyEndpoint("demoPortfolio", {
+    credentials,
+    fetchImpl: async () => new Response(JSON.stringify({ clientPortfolio: { positions: [
+      { symbol: "PENNY", amount: 0.01, unrealizedPnL: -0.001, units: 0.125, openRate: 0.00012345, currentRate: 0.00023456 },
+      { symbol: "PENNY", amount: 0.02, unrealizedPnL: 0, units: 0.875, openRate: 0.00022345, currentRate: 0.00023456 },
+    ] } }), { status: 200 }),
+  });
+
+  assert.equal(result.data.instruments[0].units, 1);
+  assert.equal(result.data.instruments[0].averageOpenPrice, 0.00021095);
+  assert.equal(result.data.instruments[0].currentPrice, 0.00023456);
+  assert.equal(result.data.instruments[0].unrealizedPnlUsd, 0);
+});
+
+test("portfolio aggregation marks finite market-value overflow incomplete instead of fabricating zeroes", async () => {
+  const result = await fetchReadOnlyEndpoint("demoPortfolio", {
+    credentials,
+    fetchImpl: async () => new Response(JSON.stringify({ clientPortfolio: { positions: [
+      { symbol: "AAPL", amount: 1, unrealizedPnL: -1, units: 1e308, openRate: 1, currentRate: 1 },
+      { symbol: "AAPL", amount: 1, unrealizedPnL: 1, units: 1e308, openRate: 1, currentRate: 1 },
+    ] } }), { status: 200 }),
+  });
+
+  assert.deepEqual(result.data.instruments[0], {
+    symbol: "AAPL", positionCount: 2, investedUsd: 2, unrealizedPnlUsd: 0,
+    units: null, averageOpenPrice: null, currentPrice: null, displayName: "AAPL", valueStatus: "incomplete",
+  });
+  assert.equal(result.data.incompleteValuePositionCount, 2);
+});
+
+test("Real and Demo portfolio normalizers reject numeric strings without losing valid zero or negative PnL", async () => {
+  for (const endpoint of ["demoPortfolio", "realPortfolio"]) {
+    const malformed = await fetchReadOnlyEndpoint(endpoint, {
+      credentials,
+      fetchImpl: async () => new Response(JSON.stringify({ clientPortfolio: { positions: [
+        { symbol: "AAPL", amount: "100", unrealizedPnL: "-2", units: "0.25", openRate: "0.0001", currentRate: "0.0002" },
+      ] } }), { status: 200 }),
+    });
+    assert.deepEqual(malformed.data.instruments[0], {
+      symbol: "AAPL", positionCount: 1, investedUsd: null, unrealizedPnlUsd: null,
+      units: null, averageOpenPrice: null, currentPrice: null, displayName: "AAPL", valueStatus: "incomplete",
+    });
+
+    const valid = await fetchReadOnlyEndpoint(endpoint, {
+      credentials,
+      fetchImpl: async () => new Response(JSON.stringify({ clientPortfolio: { positions: [
+        { symbol: "AAPL", amount: 0, unrealizedPnL: -0.25, units: 0.25, openRate: 0.0001, currentRate: 0.0002 },
+      ] } }), { status: 200 }),
+    });
+    assert.equal(valid.data.instruments[0].investedUsd, 0);
+    assert.equal(valid.data.instruments[0].unrealizedPnlUsd, -0.25);
+    assert.equal(valid.data.instruments[0].units, 0.25);
+    assert.equal(valid.data.instruments[0].averageOpenPrice, 0.0001);
+  }
+});
+
+test("Real and Demo portfolio normalizers count malformed market numeric types as incomplete", async () => {
+  for (const endpoint of ["demoPortfolio", "realPortfolio"]) {
+    const result = await fetchReadOnlyEndpoint(endpoint, {
+      credentials,
+      fetchImpl: async () => new Response(JSON.stringify({ clientPortfolio: { positions: [
+        { symbol: "AAPL", amount: 100, unrealizedPnL: -1, units: "0.25", openRate: 0.0001, currentRate: 0.0002 },
+      ] } }), { status: 200 }),
+    });
+    assert.deepEqual(result.data.instruments[0], {
+      symbol: "AAPL", positionCount: 1, investedUsd: 100, unrealizedPnlUsd: -1,
+      units: null, averageOpenPrice: null, currentPrice: null, displayName: "AAPL", valueStatus: "incomplete",
+    });
+    assert.equal(result.data.incompleteValuePositionCount, 1);
+  }
+});
+
+test("Real and Demo portfolio DTOs retain fractional quantities and prices while rounding totals and percentages", async () => {
+  for (const environment of ["real", "demo"]) {
+    const snapshot = await fetchPortfolioSnapshot(environment, {
+      fetchEndpoint: async (endpoint) => {
+        if (endpoint === "identity") return { data: { authenticated: true } };
+        if (endpoint.endsWith("Pnl")) return { data: {
+          equity: 1.2345, availableCash: 0, totalInvested: 0.015, unrealizedPnL: -0.0049, realizedPnL: 0,
+          mirrorCount: 0, pendingOrderCount: 0, providerUpdatedAt: null,
+        } };
+        return { data: {
+          positionCount: 1, instrumentCount: 1, omittedPositionCount: 0, incompleteValuePositionCount: 0, providerUpdatedAt: null,
+          instruments: [{ symbol: "PENNY", displayName: "Penny", positionCount: 1, units: 0.125, averageOpenPrice: 0.00012345, currentPrice: 0.00023456, investedUsd: 0.015, unrealizedPnlUsd: -0.0049, valueStatus: "complete" }],
+        } };
+      },
+    });
+    const instrument = snapshot.data.instruments[0];
+    assert.equal(instrument.units, 0.125);
+    assert.equal(instrument.averageOpenPrice, 0.00012345);
+    assert.equal(instrument.currentPrice, 0.00023456);
+    assert.equal(instrument.investedValue, 0.01);
+    assert.equal(instrument.unrealizedPnl, 0);
+    assert.equal(instrument.allocationPercent, 66.67);
+  }
+});
+
 test("demo portfolio omits unsafe symbols and marks incomplete financial values", async () => {
   const result = await fetchReadOnlyEndpoint("demoPortfolio", {
     credentials,
@@ -310,7 +409,7 @@ test("demo portfolio marks overflowing aggregate values as incomplete", async ()
       displayName: "AAPL",
       valueStatus: "incomplete",
   }]);
-  assert.equal(result.data.incompleteValuePositionCount, 1);
+  assert.equal(result.data.incompleteValuePositionCount, 2);
 });
 
 test("demo portfolio rejects malformed position collections", async () => {
