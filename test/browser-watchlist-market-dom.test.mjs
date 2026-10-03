@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+class FixtureDate extends Date { static now() { return Date.parse("2026-07-12T01:00:01.000Z"); } }
+
 class FakeClassList {
   constructor(element) { this.element = element; }
   add(...names) {
@@ -80,13 +82,13 @@ async function watchlistRenderer(document) {
   const contractSource = await readFile(new URL("../src/browser-contracts.js", import.meta.url), "utf8");
   const appSource = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
   const source = appSource.slice(0, appSource.indexOf("function renderFixtureWatermark"));
-  return Function("document", `${fixtureSource}\n${contractSource}\n${source}; return {
+  return Function("document", "Date", `${fixtureSource}\n${contractSource}\n${source}; return {
     normalizeWatchlistViewPayload,
     normalizeMarketChartPayload,
     renderProviderWatchlist,
     renderMarketChart,
     renderWatchlistReadFailure
-  };`)(document);
+  };`)(document, FixtureDate);
 }
 
 function cache() {
@@ -258,14 +260,14 @@ async function workspace(document, fetch) {
   const contracts = await readFile(new URL("../src/browser-contracts.js", import.meta.url), "utf8");
   const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
   const source = app.slice(0, app.indexOf('document.getElementById("refresh-etoro")?.addEventListener'));
-  return Function("document", "fetch", `${contracts}\n${source}; return {
+  return Function("document", "fetch", "Date", `${contracts}\n${source}; return {
     selectEnvironment, refreshResearchStatus, renderProviderWatchlist, renderPortfolioStatistics,
     renderSelectedPortfolioInstrument, renderWatchlistReadFailure,
     setEnvironment: value => { selectedPortfolioEnvironment = value; },
     selectWatchlist: value => { selectedWatchlistSymbol = value; },
     selectPortfolio: value => { selectedPortfolioSymbol = value; portfolioDataSource = "provider-normalized"; },
     refreshSelectedWatchlistMarket,
-  };`)(document, fetch);
+  };`)(document, fetch, FixtureDate);
 }
 function deferred() { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; }
 function response(payload) { return { ok: true, json: async () => payload }; }
@@ -286,7 +288,7 @@ test("stale watchlist chart labels the retained history and its selected-period 
   renderMarketChart(staleChart, "AAPL", "24h");
   assert.match(document.getElementById("watchlist-chart-source").textContent, /provider stale/);
   assert.match(document.getElementById("watchlist-chart-freshness").textContent, /Stale history/);
-  assert.match(document.getElementById("watchlist-chart-shell").attributes["aria-label"], /stale provider/);
+  assert.match(document.getElementById("watchlist-chart-shell").attributes["aria-label"], /stale history/);
   assert.equal(document.querySelectorAll("[data-watchlist-row]")[0].children[3].textContent, "+5.00% (stale)");
   renderWatchlistReadFailure({ status: 503 });
   assert.equal(document.querySelectorAll("[data-watchlist-row]")[0].children[3].textContent, "Unavailable");
@@ -327,8 +329,8 @@ test("obsolete same-symbol chart failure cannot replace a newer successful chart
   obsolete.resolve({ ok: false, status: 503, json: async () => ({ ok: false, error: { code: "ETORO_PROVIDER_ERROR", status: 503 } }) });
   await previous;
   assert.equal(document.querySelectorAll("[data-watchlist-row]")[0].children[3].textContent, "+5.00%");
-  assert.match(document.getElementById("watchlist-chart-source").textContent, /provider normalized/);
-  assert.match(document.getElementById("watchlist-chart-shell").attributes["aria-label"], /normalized provider/);
+  assert.match(document.getElementById("watchlist-chart-source").textContent, /provider current/);
+  assert.match(document.getElementById("watchlist-chart-shell").attributes["aria-label"], /current history/);
   assert.notEqual(document.getElementById("watchlist-performance-line").attributes.points, "");
 });
 

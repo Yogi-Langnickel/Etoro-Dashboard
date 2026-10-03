@@ -28,6 +28,23 @@ let profileGeneration = 0;
 const profileRequests = new Set();
 let watchlistChartRequestSequence = 0;
 const watchlistItemsBySymbol = new Map();
+const investmentFreshness = {
+  portfolio: { view: null, pending: false, failed: false },
+  watchlist: { view: null, pending: false, failed: false },
+};
+const chartFreshness = { portfolio: null, watchlist: null };
+const tableRows = { portfolio: [], watchlist: [] };
+const tableReview = {
+  portfolio: { search: "", coverage: "all", sort: "symbol", direction: "asc" },
+  watchlist: { search: "", coverage: "all", sort: "rank", direction: "asc" },
+};
+let operationsPayload = null;
+let operationsPending = false;
+const pendingOperations = new Set();
+let operationsFailed = false;
+let operationsRequestSequence = 0;
+let operationsMutationProtection = null;
+let retryOperation = null;
 
 const {
   hasExactKeys,
@@ -35,6 +52,8 @@ const {
   normalizeMarketChartPayload,
   normalizeLivePortfolioPayload,
   normalizeWatchlistViewPayload,
+  normalizeOfflineOperationsPayload,
+  normalizeDraftBotConfig,
 } = globalThis.EtoroBrowserContracts;
 
 function text(id, value) {
@@ -54,8 +73,160 @@ function setTile(id, state, title, detail) {
 
   tile.classList.remove("ok", "warn", "neutral", "danger");
   tile.classList.add(state);
-  tile.querySelector("strong").textContent = title;
-  tile.querySelector("small").textContent = detail;
+  const strong = tile.querySelector("strong");
+  const small = tile.querySelector("small");
+  if (strong) strong.textContent = title;
+  if (small) small.textContent = detail;
+}
+
+function freshnessState(record, now = Date.now()) {
+  if (record.pending) return "pending";
+  if (record.failed) return record.view ? "stale" : "failed";
+  if (!record.view) return "unavailable";
+  if (record.view.cache.state === "stale") return "stale";
+  if (now >= Date.parse(record.view.cache.expiresAt)) return "expired";
+  const view = record.view;
+  return view.providerState === "partial" || view.omittedRowCount > 0 || view.incompleteRowCount > 0 ? "partial" : "current";
+}
+
+function freshnessDetail(record, now = Date.now()) {
+  const state = freshnessState(record, now);
+  if (!record.view) return `Freshness: ${state}; no provider rows loaded`;
+  const cache = record.view.cache;
+  const age = Math.max(0, Math.floor((now - Date.parse(cache.cachedAt)) / 1000));
+  return `Freshness: ${state}${state === "stale" ? "; last-good provider rows retained" : ""} · fetched ${cache.cachedAt} · age ${age}s · expires ${cache.expiresAt}`;
+}
+
+function applyInvestmentFreshness(now = Date.now()) {
+  for (const kind of ["portfolio", "watchlist"]) {
+    const record = investmentFreshness[kind];
+    const state = freshnessState(record, now);
+    const retained = record.view !== null;
+    const degraded = !["current", "partial"].includes(state);
+    const detail = freshnessDetail(record, now);
+    const ids = kind === "portfolio"
+      ? ["portfolio-view", "portfolio-table-body", "mock-equity", "cash-buffer", "unrealized-pnl", "exposure", "stale-data", "portfolio-stat-cash", "portfolio-stat-largest", "portfolio-stat-realized", "portfolio-stat-coverage"]
+      : ["watchlist-table-body", "watchlist-provider-state"];
+    for (const id of ids) {
+      const node = document.getElementById(id);
+      if (node) { node.dataset.freshness = state; node.setAttribute("aria-busy", String(state === "pending")); node.setAttribute("title", detail); }
+    }
+    for (const { row, item } of tableRows[kind]) {
+      row.dataset.freshness = state;
+      row.dataset.source = degraded ? `provider-${state}` : "provider-normalized";
+      row.setAttribute("title", detail);
+      if (kind === "portfolio") {
+        const cell = row.children[9];
+        if (cell) { cell.textContent = `${labelize(item.completeness)}${degraded ? ` · ${state}` : ""}`; cell.className = degraded ? "warn-text" : item.completeness === "complete" ? "good-text" : "warn-text"; }
+      } else {
+        const badge = row.children[4]?.children[0];
+        if (badge) { badge.textContent = `${degraded ? `${labelize(state)} · ` : ""}${item.rateUpdatedAt ?? "Rate unavailable"}`; badge.className = degraded || item.rateStatus !== "available" ? "pill warn" : "pill ok"; }
+        if (row.children[5]) row.children[5].textContent = degraded ? `Provider ${state}` : item.rateStatus === "available" ? "Provider normalized" : "Partial provider read";
+      }
+    }
+    if (kind === "portfolio") {
+      text("portfolio-freshness", detail);
+      const descriptions = {
+        "equity-detail": "Provider-normalized equity", "cash-buffer-detail": "Provider-normalized available cash",
+        "unrealized-pnl-detail": "Provider-normalized unrealized P/L", "exposure-detail": "Provider-normalized total invested",
+        "stale-data-detail": record.view ? `${record.view.instrumentCount} instrument aggregates` : "Provider positions unavailable",
+      };
+      for (const [id, label] of Object.entries(descriptions)) text(id, `${retained ? label : "Awaiting provider data"} · ${state}`);
+      setTile("last-sync", degraded ? "warn" : "ok", `Last sync · ${state}`, retained ? detail.replace("Freshness: ", "") : `No provider snapshot · ${state}`);
+      if (retained) text("portfolio-stat-source", `${labelize(record.view.environment)} snapshot · ${state === "current" || state === "partial" ? "provider normalized" : state} · fetched ${record.view.cache.cachedAt} · provider observation ${record.view.providerUpdatedAt ?? "unavailable"}`);
+    } else {
+      if (retained && !record.failed) text("watchlist-provider-state", `Provider ${state}${record.view.items.length === 0 && record.view.omittedItemCount === 0 ? " · watchlist empty" : ""}`);
+      text("watchlist-source-policy", retained ? `Read-only provider · ${state} · fetched ${record.view.cache.cachedAt}` : `Provider ${state}`);
+      const node = document.getElementById("watchlist-provider-state");
+      node?.classList.toggle("ok", !degraded && state === "current");
+      node?.classList.toggle("warn", degraded || state === "partial");
+    }
+    const chart = chartFreshness[kind];
+    if (!chart) continue;
+    const ownChartState = freshnessState({ view: chart, pending: false, failed: false }, now);
+    const chartState = ownChartState === "stale" ? "stale" : ["stale", "pending", "failed"].includes(state) ? state : ownChartState;
+    const chartDetail = `${labelize(chartState)} history · fetched ${chart.cache.cachedAt} · age ${Math.max(0, Math.floor((now - Date.parse(chart.cache.cachedAt)) / 1000))}s · last candle start ${chart.points.at(-1).at}; completion unverified`;
+    const chartNode = document.getElementById(kind === "portfolio" ? "portfolio-chart-shell" : "watchlist-chart-shell");
+    chartNode?.setAttribute("aria-label", `${chart.symbol} ${chartState} history, ${chart.pointCount} candle starts; ${chartDetail}`);
+    if (chartNode) { chartNode.dataset.freshness = chartState; chartNode.setAttribute("aria-busy", String(chartState === "pending")); }
+    text(kind === "portfolio" ? "chart-cache" : "watchlist-chart-freshness", chartDetail);
+    if (kind === "watchlist") {
+      text("watchlist-chart-source", `Source: provider ${chartState} · ${signedPercent(chart.changePercent)}${!["current", "partial"].includes(chartState) ? ` (${chartState})` : ""}`);
+      text("watchlist-context-freshness", chartDetail);
+      for (const { row, item } of tableRows.watchlist) if (item.symbol === chart.symbol) {
+        const cell = row.querySelector("[data-watchlist-period-value]");
+        if (cell) cell.textContent = `${signedPercent(chart.changePercent)}${!["current", "partial"].includes(chartState) ? ` (${chartState})` : ""}`;
+      }
+    }
+  }
+}
+
+function tableItemValue(kind, item, key) {
+  if (key === "price") return kind === "portfolio" ? item.currentPrice : item.rateStatus === "available" ? item.lastExecution ?? item.bid / 2 + item.ask / 2 : null;
+  return item[key] ?? null;
+}
+
+function applyTableReview(kind, { refreshSelection = true } = {}) {
+  const review = tableReview[kind];
+  const rows = tableRows[kind];
+  const body = document.getElementById(kind === "portfolio" ? "portfolio-table-body" : "watchlist-table-body");
+  const selectedBefore = kind === "portfolio" ? selectedPortfolioSymbol : selectedWatchlistSymbol;
+  const entries = rows.map((entry, index) => ({ ...entry, index }));
+  entries.sort((a, b) => {
+    const x = tableItemValue(kind, a.item, review.sort), y = tableItemValue(kind, b.item, review.sort);
+    if (x === null && y !== null) return 1;
+    if (y === null && x !== null) return -1;
+    const compared = typeof x === "number" && typeof y === "number" ? x - y : String(x ?? "").localeCompare(String(y ?? ""));
+    return (review.direction === "desc" ? -compared : compared) || a.index - b.index;
+  });
+  const visible = [];
+  for (const entry of entries) {
+    const { row, item } = entry;
+    const covered = kind === "portfolio" ? item.completeness === "complete" : item.rateStatus === "available";
+    const match = `${item.symbol} ${item.displayName}`.toLowerCase().includes(review.search.toLowerCase()) &&
+      (review.coverage === "all" || (review.coverage === "complete" ? covered : !covered));
+    row.hidden = !match;
+    row.tabIndex = match ? 0 : -1;
+    if (match) visible.push(entry);
+  }
+  // Reordering existing rows retains their listeners and precise displayed values.
+  const focusedRow = rows.find(({ row }) => row === document.activeElement)?.row;
+  if (rows.length && body) body.replaceChildren(...entries.map(({ row }) => row));
+  const selected = visible.find(({ item }) => item.symbol === selectedBefore) ?? visible[0];
+  const symbol = selected?.item.symbol ?? null;
+  if (focusedRow) (focusedRow.hidden ? selected?.row : focusedRow)?.focus?.();
+  if (kind === "portfolio") selectedPortfolioSymbol = symbol; else selectedWatchlistSymbol = symbol;
+  for (const { row } of rows) { const active = row === selected?.row; row.classList.toggle("active", active); row.setAttribute("aria-selected", String(active)); }
+  const complete = visible.filter(({ item }) => kind === "portfolio" ? item.completeness === "complete" : item.rateStatus === "available").length;
+  text(`${kind}-review-count`, `${visible.length} of ${rows.length} instruments shown · ${complete} with ${kind === "portfolio" ? "complete values" : "rates"} · ${visible.length - complete} incomplete${visible.length === 0 && rows.length ? " · No instruments match" : ""}; snapshot omitted ${investmentFreshness[kind].view?.[kind === "portfolio" ? "omittedRowCount" : "omittedItemCount"] ?? "unavailable"}`);
+  if (symbol !== selectedBefore && refreshSelection) {
+    if (kind === "portfolio") void renderSelectedPortfolioInstrument(); else renderSelectedWatchlistInstrument();
+  }
+}
+
+function renderChartEvidence(kind, chart) {
+  const low = Math.min(...chart.points.map(({ close }) => close));
+  const high = Math.max(...chart.points.map(({ close }) => close));
+  const prefix = kind === "portfolio" ? "portfolio" : "watchlist";
+  text(`${prefix}-chart-price-axis`, `Close price: ${price(low)} — ${price(high)} · listing currency unverified`);
+  text(`${prefix}-chart-time-axis`, `${chart.points[0].at} — ${chart.points.at(-1).at} · UTC candle start`);
+  const body = document.getElementById(`${prefix}-chart-details-body`);
+  body?.replaceChildren();
+  for (const point of chart.points) {
+    const row = document.createElement("tr");
+    appendPortfolioCell(row, point.at);
+    appendPortfolioCell(row, price(point.close));
+    body?.append(row);
+  }
+  text(`${prefix}-chart-coverage`, `${chart.pointCount} returned samples · timestamp spacing preserves gaps · requested window ${periodLabel(chart.period)} uses a fixed candle count; calendar coverage is not guaranteed. Candle starts do not establish completion or session. Fetch time: ${chart.cache.cachedAt}.`);
+}
+
+function clearChartEvidence(kind) {
+  chartFreshness[kind] = null;
+  const shell = document.getElementById(`${kind}-chart-shell`);
+  if (shell) { shell.dataset.freshness = "unavailable"; shell.setAttribute("aria-busy", "false"); }
+  for (const suffix of ["price-axis", "time-axis", "coverage"]) text(`${kind}-chart-${suffix}`, "Unavailable");
+  document.getElementById(`${kind}-chart-details-body`)?.replaceChildren();
 }
 
 function money(value) {
@@ -129,6 +300,10 @@ async function getJson(path, options = {}) {
     throw error;
   }
 
+  if (path === "/api/etoro/bot/operations") {
+    const token = response.headers.get(botConfigCsrfResponseHeader);
+    if (token) operationsMutationProtection = { csrfHeader: "x-etoro-dashboard-csrf", csrfToken: token };
+  }
   if (payload?.mutationProtection?.csrfHeader) {
     const csrfToken = response.headers.get(botConfigCsrfResponseHeader);
     payload.mutationProtection = {
@@ -369,6 +544,10 @@ function appendPortfolioCell(row, value, className) {
 }
 
 function clearPortfolioBoundState() {
+  investmentFreshness.portfolio = { view: null, pending: false, failed: false };
+  tableRows.portfolio = [];
+  text("portfolio-review-count", "No provider rows loaded");
+  clearChartEvidence("portfolio");
   portfolioDataSource = "none";
   portfolioLastGoodEnvironment = null;
   selectedPortfolioSymbol = null;
@@ -406,6 +585,10 @@ function clearPortfolioBoundState() {
 }
 
 function clearWatchlistBoundState() {
+  investmentFreshness.watchlist = { view: null, pending: false, failed: false };
+  tableRows.watchlist = [];
+  text("watchlist-review-count", "No provider rows loaded");
+  clearChartEvidence("watchlist");
   watchlistDataSource = "none";
   watchlistLastGoodEnvironment = null;
   selectedWatchlistSymbol = null;
@@ -467,8 +650,11 @@ function renderProviderPortfolio(payload) {
 
   if (!body) return view;
 
+  investmentFreshness.portfolio = { view, pending: false, failed: false };
+  tableRows.portfolio = [];
   portfolioDataSource = "provider-normalized";
   portfolioLastGoodEnvironment = view.environment;
+  const focusedSymbol = document.activeElement?.dataset.instrumentRow !== undefined ? document.activeElement.dataset.symbol : null;
   body.replaceChildren();
   for (const instrument of view.instruments) {
     const row = document.createElement("tr");
@@ -497,6 +683,7 @@ function renderProviderPortfolio(payload) {
     appendPortfolioCell(row, money(instrument.netValue));
     appendPortfolioCell(row, instrument.completeness === "complete" ? "Complete" : "Partial", instrument.completeness === "complete" ? "good-text" : "warn-text");
     bindPortfolioRow(row);
+    tableRows.portfolio.push({ row, item: instrument });
     body.append(row);
   }
   if (view.instruments.length === 0) {
@@ -547,11 +734,15 @@ function renderProviderPortfolio(payload) {
   text("chart-cache", `Cache: ${labelize(cacheState)} (${view.cache?.ttlMs ?? 0} ms)`);
   text("source-detail", view.incompleteRowCount > 0 ? "Partial normalized provider values" : "Normalized provider portfolio");
   renderPortfolioStatistics(view);
+  applyTableReview("portfolio", { refreshSelection: false });
+  if (focusedSymbol) tableRows.portfolio.find(({ item, row }) => item.symbol === focusedSymbol && !row.hidden)?.row.focus?.();
+  applyInvestmentFreshness();
   updatePortfolioPeriod(selectedPortfolioPeriod);
   return view;
 }
 
 function renderPortfolioReadFailure(error, { retainLastGood = false } = {}) {
+  clearChartEvidence("portfolio");
   portfolioChartRequestSequence += 1;
   document.getElementById("performance-line")?.setAttribute("points", "");
   document.getElementById("performance-area")?.setAttribute("d", "");
@@ -564,16 +755,13 @@ function renderPortfolioReadFailure(error, { retainLastGood = false } = {}) {
   const payload = error?.payload ?? {};
   const cache = payload.cache;
   const validCache = cache &&
-    hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs", "reason"]) &&
-    new Set(["error", "backoff"]).has(cache.state) &&
-    isIsoInstant(cache.cachedAt) &&
-    isIsoInstant(cache.expiresAt) &&
-    Number.isInteger(cache.ttlMs) &&
-    cache.ttlMs > 0 &&
-    cache.ttlMs <= 300_000 &&
-    Date.parse(cache.expiresAt) - Date.parse(cache.cachedAt) === cache.ttlMs &&
-    typeof cache.reason === "string" &&
-    /^[A-Z0-9_]{1,80}$/.test(cache.reason);
+    (hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs", "reason", "retryAt", "failureAt"]) ||
+      hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs", "reason"])) &&
+    ["error", "backoff"].includes(cache.state) &&
+    ((cache.cachedAt === null && cache.expiresAt === null) || (isIsoInstant(cache.cachedAt) && isIsoInstant(cache.expiresAt) && Date.parse(cache.expiresAt) - Date.parse(cache.cachedAt) === cache.ttlMs)) &&
+    Number.isInteger(cache.ttlMs) && cache.ttlMs > 0 && cache.ttlMs <= 300_000 &&
+    (cache.retryAt === undefined || (isIsoInstant(cache.retryAt) && isIsoInstant(cache.failureAt) && Date.parse(cache.retryAt) >= Date.parse(cache.failureAt))) &&
+    typeof cache.reason === "string" && /^[A-Z0-9_]{1,80}$/.test(cache.reason);
   const failure = readFailureState(error);
   const state = validCache && cache.state === "backoff"
     ? `Portfolio: ${failure} (backoff)`
@@ -582,7 +770,10 @@ function renderPortfolioReadFailure(error, { retainLastGood = false } = {}) {
   if (retainLastGood) text("portfolio-stat-source", `${labelize(selectedPortfolioEnvironment)} snapshot · stale; refresh failed`);
   text("portfolio-freshness", retainLastGood ? "Freshness: stale; last-good provider rows retained" : "Freshness: unavailable; no provider rows loaded");
   text("portfolio-omitted", "Omitted rows: unavailable");
-  text("portfolio-partial", validCache ? `Provider read failed; retry window ${cache.ttlMs} ms` : "Provider read failed; no last-good provider response");
+  text("portfolio-partial", validCache ? `Provider read failed; ${cache.retryAt ? `retry after ${cache.retryAt}` : `retry window ${cache.ttlMs} ms`}` : "Provider read failed; no last-good provider response");
+  investmentFreshness.portfolio.pending = false;
+  investmentFreshness.portfolio.failed = true;
+  applyInvestmentFreshness();
 }
 
 function renderFulfilledProviderPortfolio(payload) {
@@ -605,6 +796,7 @@ function renderFulfilledProviderPortfolio(payload) {
 
 async function renderSelectedPortfolioInstrument() {
   const sequence = ++portfolioChartRequestSequence;
+  clearChartEvidence("portfolio");
   const line = document.getElementById("performance-line");
   const area = document.getElementById("performance-area");
   line?.setAttribute("points", ""); area?.setAttribute("d", "");
@@ -612,6 +804,8 @@ async function renderSelectedPortfolioInstrument() {
   if (!selectedPortfolioSymbol || portfolioDataSource !== "provider-normalized") {
     text("chart-title", "Select a live holding"); text("chart-period-label", "Market-price history unavailable"); return;
   }
+  const shell = document.getElementById("portfolio-chart-shell");
+  if (shell) { shell.dataset.freshness = "pending"; shell.setAttribute("aria-busy", "true"); shell.setAttribute("aria-label", `${selectedPortfolioSymbol} market history pending`); }
   text("chart-title", `${selectedPortfolioSymbol} market-price history`);
   text("chart-period-label", `Loading ${periodLabel(selectedPortfolioPeriod)} close points`);
   text("chart-provider", "Provider timestamp: unavailable");
@@ -626,12 +820,16 @@ async function renderSelectedPortfolioInstrument() {
     const environment = selectedPortfolioEnvironment;
     const chart = normalizeMarketChartPayload(await getProfileJson(`/api/etoro/market/chart?symbol=${encodeURIComponent(symbol)}&period=${encodeURIComponent(period)}`, environment), symbol, period, environment);
     if (sequence !== portfolioChartRequestSequence) return;
+    chartFreshness.portfolio = chart;
+    renderChartEvidence("portfolio", chart);
     setPerformanceChart(marketChartSvgPoints(chart.points));
     text("chart-period-label", `Instrument market-price history · ${chart.pointCount} close points · ${chart.points[0].at} to ${chart.points.at(-1).at}; available history only`);
-    text("chart-provider", `Provider updated: ${chart.providerUpdatedAt}`);
+    text("chart-provider", `Last candle start: ${chart.providerUpdatedAt} · completion unverified`);
     text("chart-cache", `Cache: ${labelize(chart.cache.state)} (${chart.cache.ttlMs} ms)`);
+    applyInvestmentFreshness();
   } catch (error) {
     if (sequence !== portfolioChartRequestSequence) return;
+    if (shell) { shell.dataset.freshness = "failed"; shell.setAttribute("aria-busy", "false"); shell.setAttribute("aria-label", "Market-price history failed; no provider history available"); }
     text("chart-period-label", `Instrument market-price history unavailable · ${readFailureState(error)}`);
     text("chart-cache", "Cache: unavailable");
   }
@@ -663,6 +861,7 @@ function selectPortfolioInstrument(row) {
 
   document.querySelectorAll("[data-instrument-row]").forEach((candidate) => {
     candidate.classList.toggle("active", candidate === row);
+    candidate.setAttribute("aria-selected", String(candidate === row));
   });
 
   renderSelectedPortfolioInstrument();
@@ -694,7 +893,7 @@ function bindWatchlistRow(row) {
 
 function watchlistPrice(item) {
   if (item.rateStatus !== "available") return "Unavailable";
-  const value = item.lastExecution ?? ((item.bid + item.ask) / 2);
+  const value = item.lastExecution ?? (item.bid / 2 + item.ask / 2);
   return price(value);
 }
 
@@ -712,7 +911,8 @@ function marketChartSvgPoints(points) {
   const high = Math.max(...values);
   const range = high - low;
   return points.map(({ close }, index) => {
-    const x = points.length === 1 ? 320 : (index / (points.length - 1)) * 640;
+    const elapsed = Date.parse(points.at(-1).at) - Date.parse(points[0].at);
+    const x = elapsed === 0 ? 320 : ((Date.parse(points[index].at) - Date.parse(points[0].at)) / elapsed) * 640;
     const y = range === 0 ? 130 : 20 + ((high - close) / range) * 220;
     return `${x.toFixed(2)},${y.toFixed(2)}`;
   }).join(" ");
@@ -723,9 +923,12 @@ function renderProviderWatchlist(payload, { refreshChart = true } = {}) {
   const body = document.getElementById("watchlist-table-body");
   if (!body) return view;
 
+  investmentFreshness.watchlist = { view, pending: false, failed: false };
+  tableRows.watchlist = [];
   watchlistDataSource = "provider-normalized";
   watchlistLastGoodEnvironment = selectedPortfolioEnvironment;
   watchlistItemsBySymbol.clear();
+  const focusedSymbol = document.activeElement?.dataset.watchlistRow !== undefined ? document.activeElement.dataset.watchlistSymbol : null;
   body.replaceChildren();
   for (const item of view.items) {
     watchlistItemsBySymbol.set(item.symbol, item);
@@ -752,6 +955,7 @@ function renderProviderWatchlist(payload, { refreshChart = true } = {}) {
     row.append(freshnessCell);
     appendWatchlistCell(row, item.rateStatus === "available" ? "Provider normalized" : "Partial provider read");
     bindWatchlistRow(row);
+    tableRows.watchlist.push({ row, item });
     body.append(row);
   }
 
@@ -788,6 +992,9 @@ function renderProviderWatchlist(payload, { refreshChart = true } = {}) {
     `${view.items.length} normalized instruments; ${view.omittedItemCount} omitted; ${view.unavailableRateCount} rates unavailable`,
     "research-audit-list",
   );
+  applyTableReview("watchlist", { refreshSelection: false });
+  if (focusedSymbol) tableRows.watchlist.find(({ item, row }) => item.symbol === focusedSymbol && !row.hidden)?.row.focus?.();
+  applyInvestmentFreshness();
   if (refreshChart) updateWatchlistPeriod(selectedWatchlistPeriod);
   return view;
 }
@@ -795,6 +1002,7 @@ function renderProviderWatchlist(payload, { refreshChart = true } = {}) {
 function renderWatchlistReadFailure(error) {
   const retained = watchlistDataSource === "provider-normalized" && watchlistLastGoodEnvironment === selectedPortfolioEnvironment;
   if (!retained) clearWatchlistBoundState();
+  clearChartEvidence("watchlist");
   watchlistChartRequestSequence += 1;
   document.querySelectorAll("[data-watchlist-row]").forEach((row) => {
     const value = row.querySelector("[data-watchlist-period-value]");
@@ -821,10 +1029,15 @@ function renderWatchlistReadFailure(error) {
     retained ? "Existing normalized rows remain in memory only" : "No account-linked watchlist data was retained",
     "research-audit-list",
   );
+  investmentFreshness.watchlist.pending = false;
+  investmentFreshness.watchlist.failed = true;
+  applyInvestmentFreshness();
 }
 
 function renderMarketChart(payload, expectedSymbol, expectedPeriod) {
   const chart = normalizeMarketChartPayload(payload, expectedSymbol, expectedPeriod, selectedPortfolioEnvironment);
+  chartFreshness.watchlist = chart;
+  renderChartEvidence("watchlist", chart);
   const svgPoints = marketChartSvgPoints(chart.points);
   setChartPath("watchlist-performance-line", "watchlist-performance-area", svgPoints);
   text("watchlist-chart-title", `${chart.symbol} selected-period market chart`);
@@ -850,11 +1063,13 @@ function renderMarketChart(payload, expectedSymbol, expectedPeriod) {
     periodCell.classList.remove("good-text", "bad-text", "neutral-text");
     periodCell.classList.add(signedClass(value));
   }
+  applyInvestmentFreshness();
   return chart;
 }
 
 async function refreshSelectedWatchlistMarket() {
   const requestSequence = ++watchlistChartRequestSequence;
+  clearChartEvidence("watchlist");
   const symbol = selectedWatchlistSymbol;
   const period = selectedWatchlistPeriod;
   const environment = selectedPortfolioEnvironment;
@@ -873,7 +1088,8 @@ async function refreshSelectedWatchlistMarket() {
   text("watchlist-context-source", "Awaiting provider response");
   text("watchlist-context-freshness", "Unavailable");
   text("watchlist-context-detail", "Loading exact-symbol market history");
-  document.getElementById("watchlist-chart-shell")?.setAttribute("aria-label", "Market-price history loading");
+  const shell = document.getElementById("watchlist-chart-shell");
+  if (shell) { shell.dataset.freshness = "pending"; shell.setAttribute("aria-busy", "true"); shell.setAttribute("aria-label", "Market-price history pending"); }
   text("watchlist-chart-period-label", `Selected period: ${periodLabel(period)} · loading`);
   document.getElementById("watchlist-performance-line")?.setAttribute("points", "");
   document.getElementById("watchlist-performance-area")?.setAttribute("d", "");
@@ -883,6 +1099,7 @@ async function refreshSelectedWatchlistMarket() {
     renderMarketChart(payload, symbol, period);
   } catch (error) {
     if (requestSequence !== watchlistChartRequestSequence || environment !== selectedPortfolioEnvironment || symbol !== selectedWatchlistSymbol || period !== selectedWatchlistPeriod) return;
+    if (shell) { shell.dataset.freshness = "failed"; shell.setAttribute("aria-busy", "false"); }
     text("watchlist-chart-title", `${symbol} market chart unavailable`);
     text("watchlist-chart-source", "Source: unavailable");
     text("watchlist-chart-period-label", `Selected period: ${periodLabel(period)} · ${readFailureState(error)}`);
@@ -897,6 +1114,7 @@ async function refreshSelectedWatchlistMarket() {
 function renderSelectedWatchlistInstrument() {
   if (watchlistDataSource === "provider-normalized") {
     if (!watchlistItemsBySymbol.has(selectedWatchlistSymbol)) {
+      clearChartEvidence("watchlist");
       watchlistChartRequestSequence += 1;
       text("watchlist-chart-title", "No watchlist instrument selected");
       text("watchlist-context-title", "Unavailable");
@@ -949,6 +1167,7 @@ function selectWatchlistInstrument(row) {
 
   document.querySelectorAll("[data-watchlist-row]").forEach((candidate) => {
     candidate.classList.toggle("active", candidate === row);
+    candidate.setAttribute("aria-selected", String(candidate === row));
   });
 
   renderSelectedWatchlistInstrument();
@@ -1065,6 +1284,7 @@ function setCheckboxGroup(name, values) {
 }
 
 function renderBotConfig(configPayload) {
+  normalizeDraftBotConfig(configPayload.config);
   const config = configPayload.config ?? {};
   const source = configPayload.persistence?.persisted ? "Persisted server-side" : "Default server config";
   botConfigMutationProtection = configPayload.mutationProtection ?? botConfigMutationProtection;
@@ -1614,6 +1834,8 @@ async function refreshResearchStatus() {
   const sequence = ++watchlistRequestSequence;
   const environment = selectedPortfolioEnvironment;
   if (!environment) return;
+  investmentFreshness.watchlist.pending = true;
+  applyInvestmentFreshness();
   text("watchlist-provider-state", watchlistDataSource === "provider-normalized" ? "Refreshing; previous rows stale" : "Loading watchlist");
   try {
     const payload = await getProfileJson("/api/etoro/watchlist/default", environment);
@@ -1636,21 +1858,120 @@ async function refreshRiskStatus() {
   }
 }
 
-async function refreshBotStatus() {
-  try {
-    const { status, strategies, config, runs, audit, events, tradeLog } = await getJson("/api/etoro/bot/snapshot");
-    renderBotStatus(status);
-    renderBotControlSelects(status, strategies, config);
-    renderBotStrategies(strategies);
-    renderBotRuns(runs);
-    renderBotAuditFeed(audit);
-    renderBotEvents(events);
-    renderBotTradeLog(tradeLog);
-  } catch (error) {
-    text("bot-enabled-state", "Unavailable");
-    text("bot-freshness-state", "Unavailable");
-    renderAudit("Bot status failed", error.message, "bot-audit-list");
+function setDraftControlsDisabled(disabled) {
+  document.querySelectorAll("#bot-config-form input, #bot-config-form select, #bot-config-form button").forEach((control) => { control.disabled = disabled; });
+}
+
+function applyOperationsFreshness(now = Date.now()) {
+  const payload = operationsPayload;
+  const expired = payload && now >= Date.parse(payload.expiresAt);
+  const state = operationsFailed ? payload ? "stale" : "failed" : expired ? "stale" : payload?.state ?? "unavailable";
+  const usable = payload && !operationsFailed && !expired && !["stale", "failed"].includes(payload.state);
+  text("operations-state", `${labelize(state)}${operationsPending ? " · refreshing" : ""}${pendingOperations.size ? " · action pending" : ""}`);
+  const panel = document.getElementById("operations-state");
+  if (panel) panel.dataset.freshness = state;
+  text("operations-observation", payload ? `${labelize(state)} · observed ${payload.observedAt} · expires ${payload.expiresAt}; ledger timestamps are not refresh evidence` : `${labelize(state)}; no authoritative telemetry observed`);
+  for (const id of ["operations-runtime", "operations-provenance", "operations-lease", "operations-ledger", "operations-identity", "operations-result", "operations-veto"]) {
+    const node = document.getElementById(id);
+    if (node) { node.dataset.freshness = state; node.setAttribute("title", `Observed telemetry: ${state}`); }
   }
+  const hasToken = Boolean(operationsMutationProtection?.csrfToken);
+  const run = document.getElementById("operations-run");
+  if (run) { run.disabled = !usable || !hasToken || !payload.capabilities.runOnce || payload.operation?.status === "pending" || operationsPending || pendingOperations.size > 0; run.textContent = retryOperation ? "Retry the same diagnostic request" : "Run approved synthetic diagnostic once"; }
+  const block = document.getElementById("operations-block");
+  // A running diagnostic can be fenced while its request is still pending.
+  if (block) block.disabled = !payload || !hasToken || !payload.runtime.verified || !payload.capabilities.block || pendingOperations.has("block") || pendingOperations.has("reenable");
+  const reenable = document.getElementById("operations-reenable");
+  if (reenable) reenable.disabled = !usable || !hasToken || !payload.capabilities.reenable || operationsPending || pendingOperations.size > 0;
+}
+
+function renderOfflineOperations(raw) {
+  const payload = normalizeOfflineOperationsPayload(raw);
+  operationsPayload = payload;
+  operationsFailed = false;
+  text("operations-runtime", payload.runtime.verified ? `${payload.runtime.fixture} · ${payload.runtime.strategyId} · budget ${money(payload.runtime.budgetUsd)} · allocation ${money(payload.runtime.botAllocationUsd)} · reserve ${money(payload.runtime.reservedUsd)} · order cap ${money(payload.runtime.maxOrderUsd)} · fixed approved runner` : "Unavailable; runtime verification failed");
+  text("operations-provenance", `${payload.runtime.verified ? "Verified immutable runtime" : "Unverified runtime"} · ${payload.runtime.producerCommit} · ${payload.runtime.manifestId}`);
+  text("operations-lease", `${labelize(payload.lease.workerState)} · integrity ${payload.lease.integrity} · completions ${payload.lease.completionCount ?? "unavailable"} · block reason ${payload.lease.killSwitchReason ?? "none"}`);
+  text("operations-ledger", `Integrity ${payload.ledger.integrity} · ${payload.ledger.recordCount} records · latest recorded ${payload.ledger.latestRecordedAt ?? "none"}`);
+  text("operations-identity", payload.operation ? `${payload.operation.id} · ${payload.operation.status} · original start ${payload.operation.startedAt}` : "None observed");
+  const result = payload.lastResult;
+  text("operations-result", result ? result.diagnostics ? `${result.status} · started ${result.startedAt} · ${result.diagnostics.fixtureRows} fixture rows · ${result.diagnostics.eventCount} events · ${result.diagnostics.blockedEventCount} blocked; history ${result.diagnostics.strategyHistoryState}, walk-forward ${result.diagnostics.walkForwardState}, sampling ${result.diagnostics.samplingState}` : `${result.status} · started ${result.startedAt}; diagnostics not run` : "No result observed");
+  text("operations-veto", result ? result.vetoReasons.join(", ") || "None returned" : "No result observed");
+  if (retryOperation && payload.operation?.id === retryOperation.operationId && ["completed", "already-completed"].includes(payload.operation.status)) retryOperation = null;
+  applyOperationsFreshness();
+  return payload;
+}
+
+async function refreshOfflineOperations() {
+  const sequence = ++operationsRequestSequence;
+  operationsPending = true;
+  applyOperationsFreshness();
+  try {
+    const payload = await getJson("/api/etoro/bot/operations");
+    if (sequence !== operationsRequestSequence) return;
+    renderOfflineOperations(payload);
+  } catch {
+    if (sequence !== operationsRequestSequence) return;
+    operationsFailed = true;
+    renderAudit("Diagnostic telemetry refresh failed", "Previous observation remains stale; refresh before running or re-enabling", "bot-audit-list");
+  } finally {
+    if (sequence === operationsRequestSequence) operationsPending = false;
+    applyOperationsFreshness();
+  }
+}
+
+async function operateOfflineDiagnostic(action) {
+  const controlId = { "run-once": "operations-run", block: "operations-block", reenable: "operations-reenable" }[action];
+  if (!controlId || document.getElementById(controlId)?.disabled || !operationsMutationProtection?.csrfToken) return;
+  const operation = action === "run-once" && retryOperation ? retryOperation : { action, operationId: crypto.randomUUID() };
+  if (action === "run-once") retryOperation = operation;
+  const sequence = ++operationsRequestSequence;
+  operationsPending = false;
+  pendingOperations.add(action);
+  applyOperationsFreshness();
+  text("operations-action-status", `${labelize(action)} requested; awaiting authoritative readback.`);
+  renderAudit("Diagnostic action requested", `${labelize(action)}; approved isolated synthetic runtime only`, "bot-audit-list");
+  try {
+    const protection = operationsMutationProtection;
+    const raw = await sendJsonWithMethod("POST", "/api/etoro/bot/operations", operation, { [protection.csrfHeader]: protection.csrfToken });
+    if (sequence !== operationsRequestSequence) return;
+    normalizeOfflineOperationsPayload(raw);
+    if (raw.action?.type !== action || raw.operation?.id !== operation.operationId) throw new Error("Offline action readback is unavailable.");
+    const payload = renderOfflineOperations(raw);
+    text("operations-action-status", `Authoritative readback: ${labelize(payload.action?.status ?? payload.operation?.status ?? payload.state)}. Observed ${payload.observedAt}.`);
+    renderAudit("Diagnostic action read back", `${labelize(action)}; ${payload.state}; no provider or account effects`, "bot-audit-list");
+  } catch {
+    if (sequence !== operationsRequestSequence) return;
+    operationsFailed = true;
+    text("operations-action-status", "Action outcome requires reconciliation; refreshing authoritative state. A diagnostic retry keeps the same operation identity and original server start.");
+    await refreshOfflineOperations();
+  } finally {
+    pendingOperations.delete(action);
+    applyOperationsFreshness();
+  }
+}
+
+async function refreshBotStatus() {
+  setDraftControlsDisabled(true);
+  await Promise.allSettled([
+    refreshOfflineOperations(),
+    (async () => {
+      try {
+        const { status, strategies, config } = await getJson("/api/etoro/bot/snapshot");
+        normalizeDraftBotConfig(config.config);
+        renderBotControlSelects(status, strategies, config);
+        renderBotStrategies(strategies);
+        text("bot-strategy-control-state", "Saved draft only; runner fixed");
+        setDraftControlsDisabled(false);
+        applyBotStrategyRuleControls(config);
+      } catch {
+        botConfigMutationProtection = null;
+        text("bot-config-source-state", "Unavailable or stale saved draft; refresh required");
+        setDraftControlsDisabled(true);
+        renderAudit("Draft preferences unavailable", "Saved draft cannot be edited until refreshed; observed runtime remains separate", "bot-audit-list");
+      }
+    })(),
+  ]);
 }
 
 async function refreshTradingStatus() {
@@ -1677,7 +1998,7 @@ async function refreshTabStatus(targetId, { force = false } = {}) {
       await refreshBotStatus();
       await refreshTradingStatus();
     },
-    "portfolio-view": refreshRiskStatus,
+    "portfolio-view": async () => {},
     "watchlist-view": refreshResearchStatus,
   };
   const generation = profileGeneration;
@@ -1701,6 +2022,7 @@ function activateTab(targetId) {
 
     button.classList.toggle("active", active);
     button.setAttribute("aria-selected", active ? "true" : "false");
+    button.tabIndex = active ? 0 : -1;
   });
 
   document.querySelectorAll("[data-tab-panel]").forEach((panel) => {
@@ -1712,6 +2034,8 @@ function activateTab(targetId) {
 
 async function refreshEtoro() {
   const sequence = ++etoroRefreshRequestSequence;
+  investmentFreshness.portfolio.pending = true;
+  applyInvestmentFreshness();
   const button = document.getElementById("refresh-etoro");
 
   if (button) {
@@ -1750,7 +2074,7 @@ async function refreshEtoro() {
       if (retainedProviderRows) text("portfolio-stat-source", `${labelize(environment)} snapshot · stale; ${labelize(selectedState)}`);
       text(
         "portfolio-freshness",
-        retainedProviderRows ? "Freshness: stale; last-good provider rows retained" : `Freshness: ${labelize(selectedState)}; no provider rows loaded`,
+        retainedProviderRows ? freshnessDetail(investmentFreshness.portfolio) : `Freshness: failed; ${labelize(selectedState)}; no provider rows loaded`,
       );
       if (!retainedProviderRows) {
         text("portfolio-omitted", "Omitted rows: unavailable until provider read");
@@ -1764,11 +2088,7 @@ async function refreshEtoro() {
       );
     } else if (portfolioResult.status === "fulfilled") {
       if (renderFulfilledProviderPortfolio(portfolioResult.value)) {
-        const cache = portfolioResult.value?.cache;
-        const detail = cache?.state === "stale"
-          ? `Stale provider data cached ${cache.cachedAt}`
-          : `Provider data cached ${cache?.cachedAt ?? "just now"}`;
-        setTile("last-sync", cache?.state === "stale" ? "warn" : "ok", "Last sync", detail);
+        applyInvestmentFreshness();
       }
     } else {
       renderPortfolioReadFailure(portfolioResult.reason, { retainLastGood: portfolioLastGoodEnvironment === environment });
@@ -1817,6 +2137,7 @@ function collectBotConfig() {
     allowedMarkets: checkedValues("bot-allowed-markets"),
     allowedInstrumentClasses: checkedValues("bot-instrument-classes"),
     cadence: ticketValue("bot-cadence-select"),
+    minimumEvaluationIntervalMinutes: 240,
   };
 }
 
@@ -1858,16 +2179,24 @@ document.getElementById("bot-budget-select")?.addEventListener("change", (event)
 document.getElementById("bot-config-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
 
+  setDraftControlsDisabled(true);
   try {
-    const saved = await putJson("/api/etoro/bot/config", collectBotConfig());
+    const candidate = collectBotConfig();
+    normalizeDraftBotConfig({ ...candidate, updatedAt: null });
+    const saved = await putJson("/api/etoro/bot/config", candidate);
     renderBotConfig(saved);
+    setDraftControlsDisabled(false);
+    applyBotStrategyRuleControls();
     renderAudit(
-      "Bot config persisted",
-      "Server-side simulation config saved; execution remains absent",
+      "Draft preferences saved",
+      "Draft preferences saved; approved runtime parameters remain fixed",
       "bot-audit-list",
     );
   } catch (error) {
-    renderAudit("Bot config rejected", error.message, "bot-audit-list");
+    botConfigMutationProtection = null;
+    text("bot-config-source-state", "Saved draft stale or unavailable; refresh before editing");
+    setDraftControlsDisabled(true);
+    renderAudit("Draft save requires refresh", "Saved draft outcome must be read back; approved runtime is unchanged", "bot-audit-list");
   }
 });
 document.querySelectorAll("[data-tab-target]").forEach((button) => {
@@ -1885,6 +2214,30 @@ document.querySelectorAll("[data-instrument-row]").forEach((row) => {
 document.querySelectorAll("[data-watchlist-row]").forEach((row) => {
   bindWatchlistRow(row);
 });
+for (const kind of ["portfolio", "watchlist"]) {
+  for (const key of ["search", "coverage", "sort", "direction"]) {
+    document.getElementById(`${kind}-review-${key}`)?.addEventListener(key === "search" ? "input" : "change", (event) => {
+      tableReview[kind][key] = event.target.value;
+      applyTableReview(kind);
+    });
+  }
+}
+for (const [id, action] of [["operations-run", "run-once"], ["operations-block", "block"], ["operations-reenable", "reenable"]]) {
+  document.getElementById(id)?.addEventListener("click", () => { void operateOfflineDiagnostic(action); });
+}
+document.getElementById("operations-refresh")?.addEventListener("click", () => { void refreshOfflineOperations(); });
+document.querySelectorAll("[data-tab-target]").forEach((button, index, buttons) => {
+  button.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const target = event.key === "Home" ? buttons[0] : event.key === "End" ? buttons[buttons.length - 1] : buttons[(index + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length];
+    activateTab(target.dataset.tabTarget);
+    target.focus();
+  });
+});
+renderAudit("Dashboard session started", "Read-only investments; account execution disabled");
+setInterval(() => { applyInvestmentFreshness(); applyOperationsFreshness(); }, 1000);
+
 updatePortfolioPeriod("24h");
 updateWatchlistPeriod("24h");
 refreshEtoro();

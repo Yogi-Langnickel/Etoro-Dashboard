@@ -63,14 +63,14 @@ async function refreshBoundary() {
   const localFetch = async (url) => {
     state.routes.push(url);
     const output = { status: 0, body: "", writeHead(status) { this.status = status; }, end(body) { this.body = body; } };
-    await handler({ method: "GET", url, headers: {} }, output);
+    await handler({ method: "GET", url, headers: { host: "localhost:4173", origin: "http://localhost:4173" } }, output);
     return new Response(output.body, { status: output.status });
   };
   const contracts = await readFile(new URL("../src/browser-contracts.js", import.meta.url), "utf8");
   const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
   const source = app.slice(0, app.indexOf('document.getElementById("refresh-etoro")?.addEventListener'));
   const document = new Document();
-  const refresh = Function("document", "fetch", `${contracts}\n${source}; return refreshEtoro;`)(document, localFetch);
+  const refresh = Function("document", "fetch", "Date", `${contracts}\n${source}; return refreshEtoro;`)(document, localFetch, class extends Date { static now() { return state.now; } });
   return { state, document, refresh };
 }
 

@@ -386,10 +386,8 @@ h2 {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   grid-template-areas:
-    "status safeguards"
-    "controls safeguards"
-    "strategies runs"
-    "events trade-log"
+    "operations operations"
+    "controls strategies"
     "audit audit";
   gap: 18px;
 }
@@ -1096,12 +1094,9 @@ td span {
 
   .bot-layout {
     grid-template-areas:
-      "status"
-      "safeguards"
+      "operations"
       "controls"
       "strategies"
-      "runs"
-      "events"
       "audit";
   }
 
@@ -1217,4 +1212,52 @@ td span {
 .portfolio-context-panel .readiness-list li {
   align-items: start;
   flex-wrap: wrap;
+}
+
+/* Review controls remain local; data age changes without provider polling. */
+.table-review-controls { display: flex; flex-wrap: wrap; gap: .7rem; padding: 0 1rem; }
+.table-review-controls label { display: grid; gap: .3rem; font-size: .78rem; flex: 1 1 9rem; }
+.table-review-controls input, .table-review-controls select { min-width: 0; width: 100%; border: 1px solid var(--border, #343b48); background: var(--surface, #171b22); color: inherit; border-radius: .35rem; padding: .55rem; }
+.review-count, .chart-coverage { padding: 0 1rem; overflow-wrap: anywhere; line-height: 1.5; }
+.chart-axes { display: grid; gap: .35rem; padding: .6rem 1rem; font-size: .78rem; color: var(--muted, #b0bac8); overflow-wrap: anywhere; }
+.chart-details { margin: .3rem 1rem 1rem; }
+.chart-details summary, .trading-planning > summary { cursor: pointer; padding: .6rem; }
+.chart-details .table-wrap { max-height: 17rem; overflow: auto; }
+.operations-panel { grid-area: operations; grid-column: 1 / -1; padding: 1rem; }
+.operations-panel > p { line-height: 1.5; }
+.operations-buttons { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0; }
+.operations-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.operations-facts > div { border-top: 1px solid var(--border, #343b48); padding-top: .6rem; }
+.operations-facts dt { color: var(--muted, #b0bac8); font-size: .78rem; margin-bottom: .3rem; }
+.operations-facts dd { margin: 0; overflow-wrap: anywhere; line-height: 1.5; }
+[data-freshness="pending"], [data-freshness="expired"], [data-freshness="stale"] { --freshness-color: #e7b66a; }
+.metric [data-freshness="pending"], .metric [data-freshness="expired"], .metric [data-freshness="stale"] { color: var(--freshness-color); }
+.chart-shell[data-freshness="expired"], .chart-shell[data-freshness="stale"], .chart-shell[data-freshness="pending"] { border: 1px dashed #e7b66a; opacity: .65; }
+:focus-visible { outline: 2px solid #8dbaff; outline-offset: 3px; }
+tr[hidden] { display: none; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.trading-planning { margin-top: 1rem; }
+.trading-planning .trading-layout { margin-top: 1rem; }
+@media (max-width: 720px) {
+  .operations-facts { grid-template-columns: 1fr; }
+  .operations-buttons { display: grid; }
+  .operations-buttons button { width: 100%; min-height: 44px; white-space: normal; }
+  .table-review-controls { gap: .5rem; }
+  .instrument-table th, .instrument-table td, .watchlist-table th, .watchlist-table td { padding: .6rem .45rem; }
+  .instrument-table th:first-child, .instrument-table td:first-child, .watchlist-table th:first-child, .watchlist-table td:first-child { position: sticky; left: 0; background: #171b22; z-index: 1; }
+  .safety-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .cockpit { padding: .65rem; }
+  .topbar { gap: .5rem; }
+  .identity h1 { font-size: 1.3rem; }
+  .identity .subtle { font-size: .73rem; margin: .25rem 0; }
+  .safety-strip { gap: .35rem; }
+  .status-tile { padding: .5rem; min-height: 0; }
+  .status-tile strong { font-size: .75rem; }
+  .status-tile small { font-size: .65rem; line-height: 1.25; }
+  .tabbar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .3rem; }
+  .tab-button { width: 100%; padding: .6rem .2rem; font-size: .78rem; white-space: normal; min-height: 44px; }
+  .operations-panel { padding: .7rem; }
+  .operations-panel > p { font-size: .78rem; margin: .5rem 0; }
 }

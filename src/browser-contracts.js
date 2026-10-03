@@ -13,6 +13,7 @@ const marketPeriodIntervals = Object.freeze({
 });
 
 function hasExactKeys(value, expectedKeys) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const actual = Object.keys(value).sort();
   return actual.length === expectedKeys.length && actual.every((key, index) => key === [...expectedKeys].sort()[index]);
 }
@@ -131,7 +132,7 @@ function normalizePortfolioViewPayload(payload) {
   const cache = payload.cache;
   if (
     !cache ||
-    !hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs"]) ||
+    !(hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs"]) || hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs", "retryAt", "failureAt"])) ||
     !portfolioCacheStates.has(cache.state) ||
     !isIsoInstant(cache.cachedAt) ||
     !isIsoInstant(cache.expiresAt) ||
@@ -168,13 +169,14 @@ function containsForbiddenWatchlistKey(value) {
 }
 
 function normalizeReadCache(cache, message) {
-  if (!cache || !hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs"]) ||
+  if (!cache || !(hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs"]) || hasExactKeys(cache, ["state", "cachedAt", "expiresAt", "ttlMs", "retryAt", "failureAt"])) ||
     !portfolioCacheStates.has(cache.state) || !isIsoInstant(cache.cachedAt) || !isIsoInstant(cache.expiresAt) ||
     !Number.isInteger(cache.ttlMs) || cache.ttlMs <= 0 || cache.ttlMs > 300_000 ||
-    Date.parse(cache.expiresAt) - Date.parse(cache.cachedAt) !== cache.ttlMs) {
+    Date.parse(cache.expiresAt) - Date.parse(cache.cachedAt) !== cache.ttlMs ||
+    (cache.retryAt !== undefined && (cache.state !== "stale" || !isIsoInstant(cache.retryAt) || !isIsoInstant(cache.failureAt) || Date.parse(cache.retryAt) < Date.parse(cache.failureAt)))) {
     throw new Error(message);
   }
-  return { state: cache.state, cachedAt: cache.cachedAt, expiresAt: cache.expiresAt, ttlMs: cache.ttlMs };
+  return { state: cache.state, cachedAt: cache.cachedAt, expiresAt: cache.expiresAt, ttlMs: cache.ttlMs, ...(cache.retryAt ? { retryAt: cache.retryAt, failureAt: cache.failureAt } : {}) };
 }
 
 function normalizeWatchlistViewPayload(payload, expectedEnvironment) {
@@ -291,8 +293,81 @@ function normalizeLivePortfolioPayload(payload) {
   return { ...data, instruments, cache };
 }
 
+const draftStrategies = ["dca-cash-reserve", "threshold-rebalance", "volatility-band-accumulator", "slow-trend-allocation", "news-aware-watchlist"];
+const operationStatuses = ["pending", "completed", "already-completed", "preflight-blocked", "lease-blocked", "completion-blocked"];
+const diagnosticStates = ["not-run", "sufficient-history", "insufficient-history", "invalid-history", "evaluated", "ready", "diagnostics-only", "sufficient-sampling", "limited-sampling", "completed", "sufficient-data", "sufficient", "limited", "supported", "not-evaluated", "available", "trend-confirmed", "trend-not-confirmed", "weekday-grid-covered", "weekday-grid-gaps", "diagnostic-only", "insufficient-data"];
+const vetoReasons = ["data-stale", "data-unavailable", "data-invalid", "execution-route-absent", "missing-loss-reconciliation", "missing-order-intent", "missing-reconciliation", "provider-not-connected", "unknown-provider-state", "insufficient-history", "insufficient-data", "risk-blocked", "allocation-unavailable", "allocation-invalid", "budget-exceeded", "reserved-funds", "max-order-exceeded", "strategy-context-only", "stale-data", "no-signal", "invalid-market-history", "market-not-allowed", "instrument-class-not-allowed", "strategy-not-allowed", "daily-decision-cap", "cooldown", "trend-not-confirmed", "position-cap", "turnover-cap"];
+function typedAllowedArray(value, allowed) {
+  return Array.isArray(value) && value.length > 0 && value.length <= allowed.length && new Set(value).size === value.length && value.every((item) => typeof item === "string" && allowed.includes(item));
+}
+function normalizeDraftBotConfig(config) {
+  const keys = ["runMode", "strategyId", "budgetUsd", "allowedMarkets", "allowedInstrumentClasses", "cadence", "minimumEvaluationIntervalMinutes", "updatedAt"];
+  if (!hasExactKeys(config, keys) || config.runMode !== "backtest" || !draftStrategies.includes(config.strategyId) ||
+    typeof config.budgetUsd !== "number" || ![500, 1000, 1500, 2500].includes(config.budgetUsd) ||
+    !typedAllowedArray(config.allowedMarkets, ["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"]) ||
+    !typedAllowedArray(config.allowedInstrumentClasses, ["EQUITY", "ETF", "FOREX", "COMMODITY"]) ||
+    !["daily", "weekly"].includes(config.cadence) || config.minimumEvaluationIntervalMinutes !== 240 ||
+    (config.updatedAt !== null && !isIsoInstant(config.updatedAt))) throw new Error("Draft configuration is unavailable.");
+  const strategies = {
+    "dca-cash-reserve": [["US_EQUITIES", "AU_EQUITIES"], ["EQUITY", "ETF"], "daily"],
+    "threshold-rebalance": [["US_EQUITIES", "AU_EQUITIES", "COMMODITIES"], ["EQUITY", "ETF", "COMMODITY"], "weekly"],
+    "volatility-band-accumulator": [["US_EQUITIES", "AU_EQUITIES"], ["EQUITY", "ETF"], "daily"],
+    "slow-trend-allocation": [["US_EQUITIES", "AU_EQUITIES"], ["EQUITY", "ETF"], "weekly"],
+    "news-aware-watchlist": [["US_EQUITIES", "AU_EQUITIES", "FOREX", "COMMODITIES"], ["EQUITY", "ETF", "FOREX", "COMMODITY"], "daily"],
+  };
+  const [markets, classes, cadence] = strategies[config.strategyId];
+  if (!config.allowedMarkets.every((value) => markets.includes(value)) || !config.allowedInstrumentClasses.every((value) => classes.includes(value)) || config.cadence !== cadence) throw new Error("Draft configuration is unavailable.");
+  const compatible = new Set(config.allowedMarkets.flatMap((market) => ({ US_EQUITIES: ["EQUITY", "ETF"], AU_EQUITIES: ["EQUITY", "ETF"], FOREX: ["FOREX"], COMMODITIES: ["COMMODITY", "ETF"] })[market]));
+  if (!config.allowedInstrumentClasses.every((value) => compatible.has(value))) throw new Error("Draft configuration is unavailable.");
+  return config;
+}
+function operationsInstant(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) &&
+    Number.isFinite(Date.parse(value)) && new Date(value).toISOString().replace(".000Z", "Z") === value.replace(".000Z", "Z");
+}
+function normalizeOfflineOperationsPayload(payload) {
+  const keys = ["ok", "dtoVersion", "adapterId", "state", "observedAt", "expiresAt", "source", "capabilities", "runtime", "lease", "ledger", "lastResult", "operation", "safety"];
+  const fail = () => { throw new Error("Offline diagnostic telemetry is unavailable."); };
+  const validCount = (value) => Number.isSafeInteger(value) && value >= 0;
+  if (!(hasExactKeys(payload, keys) || hasExactKeys(payload, [...keys, "action"])) || payload.ok !== true ||
+    payload.dtoVersion !== "dashboard-offline-operations.v1" || payload.adapterId !== "money-maker-3000" ||
+    !["ready", "stale", "blocked", "in-progress", "unavailable"].includes(payload.state) ||
+    !operationsInstant(payload.observedAt) || !operationsInstant(payload.expiresAt) || Date.parse(payload.expiresAt) - Date.parse(payload.observedAt) !== 30_000 ||
+    payload.source !== "isolated-synthetic-engine" || !hasExactKeys(payload.capabilities, ["runOnce", "block", "reenable"]) ||
+    Object.values(payload.capabilities).some((value) => typeof value !== "boolean")) fail();
+  const runtime = payload.runtime;
+  if (!hasExactKeys(runtime, ["verified", "producerCommit", "manifestId", "fixture", "strategyId", "budgetUsd", "botAllocationUsd", "reservedUsd", "maxOrderUsd"]) ||
+    runtime.verified !== true || runtime.producerCommit !== "c17248ce097c3ed03e1e262be972023f48e63636" || runtime.manifestId !== "approved-slow-trend-fixture-diagnostics" ||
+    runtime.fixture !== "SPY synthetic daily" || runtime.strategyId !== "slow-trend-allocation" || runtime.budgetUsd !== 1000 || runtime.botAllocationUsd !== 1000 || runtime.reservedUsd !== 100 || runtime.maxOrderUsd !== 250) fail();
+  const safety = { providerCalls: "blocked", credentials: "absent", accountData: "absent", executionRoutes: "absent", performanceClaims: "synthetic-diagnostics-no-investment-profit-evidence", blockBehavior: "fences-completion-does-not-terminate-process" };
+  if (!hasExactKeys(payload.safety, Object.keys(safety)) || Object.entries(safety).some(([key, value]) => payload.safety[key] !== value)) fail();
+  const lease = payload.lease, ledger = payload.ledger;
+  if (!hasExactKeys(lease, ["integrity", "workerState", "completionCount", "killSwitchReason"]) ||
+    !["clean", "uninitialized", "unavailable", "corrupted"].includes(lease.integrity) ||
+    !["available", "busy", "kill-switch-blocked", "completion-capacity-blocked", "blocked"].includes(lease.workerState) ||
+    (lease.completionCount !== null && !validCount(lease.completionCount)) || ![null, "operator-stop", "operator-reenable"].includes(lease.killSwitchReason) ||
+    !hasExactKeys(ledger, ["integrity", "recordCount", "latestRecordedAt"]) ||
+    !["clean", "missing", "corrupted", "recovered-with-warnings", "not-assessed"].includes(ledger.integrity) || !validCount(ledger.recordCount) ||
+    (ledger.latestRecordedAt !== null && !operationsInstant(ledger.latestRecordedAt))) fail();
+  if (payload.operation !== null && (!hasExactKeys(payload.operation, ["id", "startedAt", "status"]) || typeof payload.operation.id !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(payload.operation.id) || !operationsInstant(payload.operation.startedAt) || !operationStatuses.includes(payload.operation.status))) fail();
+  const result = payload.lastResult;
+  if (result !== null) {
+    if (!hasExactKeys(result, ["status", "startedAt", "diagnostics", "vetoReasons"]) || !operationStatuses.includes(result.status) || !operationsInstant(result.startedAt) ||
+      !Array.isArray(result.vetoReasons) || result.vetoReasons.length > vetoReasons.length || new Set(result.vetoReasons).size !== result.vetoReasons.length || result.vetoReasons.some((value) => !vetoReasons.includes(value))) fail();
+    const details = result.diagnostics;
+    if (details !== null && (!hasExactKeys(details, ["fixtureRows", "eventCount", "blockedEventCount", "strategyHistoryState", "walkForwardState", "samplingState"]) ||
+      ![details.fixtureRows, details.eventCount, details.blockedEventCount].every(validCount) || details.blockedEventCount > details.eventCount ||
+      ![details.strategyHistoryState, details.walkForwardState, details.samplingState].every((value) => diagnosticStates.includes(value)))) fail();
+  }
+  if (payload.action !== undefined && (!hasExactKeys(payload.action, ["type", "status"]) || !["run-once", "block", "reenable"].includes(payload.action.type) || !operationStatuses.includes(payload.action.status))) fail();
+  return payload;
+}
+
   globalThis.EtoroBrowserContracts = Object.freeze({
     hasExactKeys,
+    normalizeOfflineOperationsPayload,
+    normalizeDraftBotConfig,
     isIsoInstant,
     normalizeMarketChartPayload,
     normalizeLivePortfolioPayload,

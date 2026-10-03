@@ -21,8 +21,8 @@
           <div class="status-tile ok">
             <span class="status-dot" aria-hidden="true"></span>
             <span>
-              <strong>Demo gated</strong>
-              <small>No live routes</small>
+              <strong>Investments read only</strong>
+              <small>Trading and account execution disabled</small>
             </span>
           </div>
           <div class="status-tile warn" id="provider-status">
@@ -57,8 +57,8 @@
 
       <nav class="tabbar" aria-label="Dashboard sections" role="tablist">
         <button class="tab-button active" id="portfolio-tab" type="button" role="tab" aria-controls="portfolio-view" aria-selected="true" data-tab-target="portfolio-view">Portfolio View</button>
-        <button class="tab-button" id="watchlist-tab" type="button" role="tab" aria-controls="watchlist-view" aria-selected="false" data-tab-target="watchlist-view">Watchlist Items</button>
-        <button class="tab-button" id="bot-tab" type="button" role="tab" aria-controls="bot-view" aria-selected="false" data-tab-target="bot-view">Bot Control</button>
+        <button class="tab-button" id="watchlist-tab" type="button" role="tab" tabindex="-1" aria-controls="watchlist-view" aria-selected="false" data-tab-target="watchlist-view">Watchlist Items</button>
+        <button class="tab-button" id="bot-tab" type="button" role="tab" tabindex="-1" aria-controls="bot-view" aria-selected="false" data-tab-target="bot-view">Bot Control</button>
       </nav>
 
       <section class="kpi-grid tab-view" id="portfolio-view" role="tabpanel" aria-labelledby="portfolio-tab" data-tab-panel="portfolio-view" aria-label="Portfolio KPI summary">
@@ -117,8 +117,15 @@
             <span id="portfolio-omitted">Omitted rows: unavailable</span>
             <span id="portfolio-partial">Value coverage: unavailable</span>
           </div>
+          <div class="table-review-controls" aria-label="Portfolio review controls">
+            <label>Search <input id="portfolio-review-search" type="search" placeholder="Symbol or name" maxlength="120"></label>
+            <label>Coverage <select id="portfolio-review-coverage"><option value="all">All instruments</option><option value="complete">Complete values</option><option value="partial">Partial values</option></select></label>
+            <label>Sort <select id="portfolio-review-sort"><option value="symbol">Symbol</option><option value="displayName">Name</option><option value="price">Price</option><option value="investedValue">Invested</option><option value="unrealizedPnl">P/L</option><option value="allocationPercent">Allocation</option></select></label>
+            <label>Order <select id="portfolio-review-direction"><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
+          </div>
+          <p class="subtle review-count" id="portfolio-review-count" aria-live="polite">No provider rows loaded</p>
           <div class="table-wrap">
-            <table class="instrument-table">
+            <table class="instrument-table" aria-label="Portfolio instruments; Enter or Space selects a row">
               <thead>
                 <tr>
                   <th>Asset</th>
@@ -130,7 +137,7 @@
                   <th>P/L %</th>
                   <th>Invested</th>
                   <th>Net value</th>
-                  <th>Chart</th>
+                  <th>Value coverage</th>
                 </tr>
               </thead>
               <tbody id="portfolio-table-body">
@@ -148,13 +155,16 @@
             </div>
             <span class="pill warn" id="selected-period-pill">24h</span>
           </div>
-          <div class="chart-shell" role="img" aria-label="Selected instrument market-price history">
+          <div class="chart-shell" id="portfolio-chart-shell" role="img" aria-label="Selected instrument market-price history">
             <div class="chart-grid" aria-hidden="true"></div>
             <svg viewBox="0 0 640 260" preserveAspectRatio="none" aria-hidden="true" data-performance-svg>
               <polyline id="performance-line" points=""></polyline>
               <path id="performance-area" d=""></path>
             </svg>
           </div>
+          <div class="chart-axes"><span id="portfolio-chart-price-axis">Close price unavailable</span><span id="portfolio-chart-time-axis">UTC candle starts unavailable</span></div>
+          <p class="subtle chart-coverage" id="portfolio-chart-coverage">Coverage unavailable</p>
+          <details class="chart-details"><summary>Accessible candle values</summary><div class="table-wrap"><table><thead><tr><th>Candle start (UTC)</th><th>Close (listing currency unverified)</th></tr></thead><tbody id="portfolio-chart-details-body"></tbody></table></div></details>
           <div class="chart-meta">
             <span id="chart-provider">Provider timestamp: unavailable</span>
             <span id="chart-period-label">Selected period: 24h</span>
@@ -209,45 +219,129 @@
             </div>
             <span class="pill ok">Redacted</span>
           </div>
-          <ol class="audit-list" id="audit-list">
-            <li>
-              <span class="event-time">09:32:14</span>
-              <span>
-                <strong>Portfolio not yet loaded</strong>
-                <small>No fixture financial values are displayed</small>
-              </span>
-            </li>
-            <li>
-              <span class="event-time">09:32:13</span>
-              <span>
-                <strong>Credential check skipped</strong>
-                <small>No credential values present in browser context</small>
-              </span>
-            </li>
-            <li>
-              <span class="event-time">09:32:12</span>
-              <span>
-                <strong>Market tile marked stale</strong>
-                <small>Provider timestamp unavailable · raw response hidden</small>
-              </span>
-            </li>
-            <li>
-              <span class="event-time">09:32:11</span>
-              <span>
-                <strong>Mutation routes absent</strong>
-                <small>Orders, copy trading, and account changes unavailable</small>
-              </span>
-            </li>
-          </ol>
+          <ol class="audit-list" id="audit-list"></ol>
         </section>
       </div>
 
-      <section class="trading-layout tab-view" id="trading-view" aria-label="Demo trading posture" data-tab-panel="bot-view" hidden>
+      <section class="bot-layout tab-view" id="bot-view" role="tabpanel" aria-labelledby="bot-tab" data-tab-panel="bot-view" hidden>
+        <section class="panel operations-panel" aria-labelledby="operations-title">
+          <div class="panel-header"><div><p class="eyebrow">Money Maker 3000 · isolated offline diagnostics</p><h2 id="operations-title">Diagnostic operations</h2></div><span class="pill warn" id="operations-state">Unavailable</span></div>
+          <p>Actual engine execution on approved synthetic fixtures. No investment-profit evidence; no provider calls, account data or trading.</p>
+          <div class="operations-buttons"><button class="icon-button" id="operations-run" type="button" disabled>Run approved synthetic diagnostic once</button><button class="icon-button" id="operations-block" type="button" disabled>Block diagnostic runs</button><button class="icon-button" id="operations-reenable" type="button" disabled>Re-enable diagnostic runs</button><button class="icon-button" id="operations-refresh" type="button">Refresh operations</button></div>
+          <p id="operations-action-status" role="status" aria-live="polite">No operation requested in this session.</p>
+          <p class="subtle">Blocking fences completion of an active diagnostic. It does not immediately terminate its process or control an installed worker or scheduler.</p>
+          <dl class="operations-facts"><div><dt>Observation and freshness</dt><dd id="operations-observation">Unavailable</dd></div><div><dt>Applied runtime</dt><dd id="operations-runtime">Unavailable</dd></div><div><dt>Verified provenance</dt><dd id="operations-provenance">Unavailable</dd></div><div><dt>Lease and integrity</dt><dd id="operations-lease">Unavailable</dd></div><div><dt>Ledger</dt><dd id="operations-ledger">Unavailable</dd></div><div><dt>Operation identity and start</dt><dd id="operations-identity">None observed</dd></div><div><dt>Last result and diagnostics</dt><dd id="operations-result">No result observed</dd></div><div><dt>Veto reasons</dt><dd id="operations-veto">Unavailable</dd></div></dl>
+        </section>
+
+        <section class="panel bot-control-panel" aria-labelledby="bot-control-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Saved draft · separate from applied runtime</p>
+              <h2 id="bot-control-title">Draft preferences</h2>
+            </div>
+            <span class="pill lock">Draft</span>
+          </div>
+          <p class="subtle">These saved strategy, budget and cadence preferences do not reconfigure the approved diagnostic runner. Applied runtime parameters appear above.</p>
+          <form class="bot-config-form" id="bot-config-form">
+            <label class="control-row" for="bot-run-mode-select">
+              <span>Run mode</span>
+              <select id="bot-run-mode-select">
+                <option>Loading modes</option>
+              </select>
+              <small>Draft mode only; the approved runner remains fixed.</small>
+            </label>
+            <label class="control-row" for="bot-strategy-select">
+              <span>Draft strategy</span>
+              <select id="bot-strategy-select">
+                <option>Loading strategies</option>
+              </select>
+              <small>Predefined simulation strategies only.</small>
+            </label>
+            <label class="control-row" for="bot-budget-select">
+              <span>Draft budget</span>
+              <select id="bot-budget-select">
+                <option>Loading budgets</option>
+              </select>
+              <small>Budget choices are capped by server-side validation.</small>
+            </label>
+            <label class="control-row" for="bot-cadence-select">
+              <span>Draft cadence</span>
+              <select id="bot-cadence-select">
+                <option>Loading cadences</option>
+              </select>
+              <small>Intraday and high-frequency cadences are blocked.</small>
+            </label>
+            <fieldset class="control-fieldset">
+              <legend>Allowed markets</legend>
+              <div class="control-check-grid" id="bot-market-options"></div>
+            </fieldset>
+            <fieldset class="control-fieldset">
+              <legend>Instrument classes</legend>
+              <div class="control-check-grid" id="bot-instrument-class-options"></div>
+            </fieldset>
+            <button class="icon-button" type="submit">Save draft preferences</button>
+          </form>
+          <ul class="readiness-list">
+            <li>
+              <span>Strategy control</span>
+              <strong id="bot-strategy-control-state">Predefined disabled</strong>
+            </li>
+            <li>
+              <span>Draft source</span>
+              <strong id="bot-config-source-state">Default server config</strong>
+            </li>
+            <li>
+              <span>Saved draft budget</span>
+              <strong id="bot-budget-state">Unavailable</strong>
+            </li>
+
+            <li>
+              <span>Cadence</span>
+              <strong id="bot-cadence-state">Unavailable until draft loads</strong>
+            </li>
+
+            <li>
+              <span>Universe</span>
+              <strong id="bot-universe-state">Unavailable until draft loads</strong>
+            </li>
+            <li>
+              <span>Instrument classes</span>
+              <strong id="bot-instrument-class-state">Unavailable until draft loads</strong>
+            </li>
+
+          </ul>
+        </section>
+
+        <section class="panel bot-strategies-panel" aria-labelledby="bot-strategies-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Strategy registry</p>
+              <h2 id="bot-strategies-title">Draft strategy registry</h2>
+            </div>
+            <span class="pill lock">No execution</span>
+          </div>
+          <div class="strategy-grid" id="bot-strategies"></div>
+        </section>
+
+        <section class="panel bot-audit-panel" aria-labelledby="bot-audit-title">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Audit</p>
+              <h2 id="bot-audit-title">Session activity</h2>
+            </div>
+            <span class="pill ok">Redacted</span>
+          </div>
+          <ol class="audit-list" id="bot-audit-list"></ol>
+        </section>
+      </section>
+
+      <details class="panel trading-planning tab-view" data-tab-panel="bot-view" hidden><summary>Trading planning · unavailable · execution disabled</summary>
+        <section class="trading-layout tab-view" id="trading-view" aria-label="Demo trading posture">
         <section class="panel trading-ticket-panel" aria-labelledby="trading-title">
           <div class="panel-header">
             <div>
               <p class="eyebrow">Demo execution</p>
-              <h2 id="trading-title">Trade ticket</h2>
+              <h2 id="trading-title">Unavailable trading plan</h2>
             </div>
             <span class="pill warn" id="trade-route-status">Planning only</span>
           </div>
@@ -357,237 +451,11 @@
             </div>
             <span class="pill ok">Redacted</span>
           </div>
-          <ol class="audit-list" id="trading-audit-list">
-            <li>
-              <span class="event-time">--:--:--</span>
-              <span>
-                <strong>Execution routes absent</strong>
-                <small>Demo trade ticket is UI-only in this slice</small>
-              </span>
-            </li>
-          </ol>
+          <ol class="audit-list" id="trading-audit-list"></ol>
         </section>
       </section>
 
-      <section class="bot-layout tab-view" id="bot-view" role="tabpanel" aria-labelledby="bot-tab" data-tab-panel="bot-view" hidden>
-        <section class="panel bot-status-panel" aria-labelledby="bot-status-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Automation telemetry</p>
-              <h2 id="bot-status-title">Bot monitor</h2>
-            </div>
-            <span class="pill lock" id="bot-watermark-state">Synthetic fixture</span>
-            <span class="pill lock" id="bot-mode-pill">Disabled</span>
-          </div>
-          <div class="bot-hero">
-            <div>
-              <span>Bot state</span>
-              <strong id="bot-enabled-state">Disabled</strong>
-              <small>No automated decisions or execution routes are active.</small>
-            </div>
-            <div>
-              <span>Telemetry freshness</span>
-              <strong id="bot-freshness-state">Not connected</strong>
-              <small id="bot-telemetry-source">Synthetic disabled DTO</small>
-            </div>
-            <div>
-              <span>Pending execution</span>
-              <strong id="bot-pending-count">0</strong>
-              <small>Execution queue unavailable by design.</small>
-            </div>
-          </div>
-        </section>
-
-        <aside class="panel bot-safeguards-panel" aria-labelledby="bot-safeguards-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Controls</p>
-              <h2 id="bot-safeguards-title">Safeguards</h2>
-            </div>
-            <span class="pill warn">Planning only</span>
-          </div>
-          <ul class="readiness-list">
-            <li>
-              <span>Kill switch</span>
-              <strong id="bot-kill-switch">Locked disabled</strong>
-            </li>
-            <li>
-              <span>Execution routes</span>
-              <strong id="bot-execution-state">Absent</strong>
-            </li>
-            <li>
-              <span>Account identifiers</span>
-              <strong id="bot-account-id-state">Redacted</strong>
-            </li>
-            <li>
-              <span>Provider payloads</span>
-              <strong id="bot-payload-state">Hidden</strong>
-            </li>
-          </ul>
-        </aside>
-
-        <section class="panel bot-control-panel" aria-labelledby="bot-control-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Configuration</p>
-              <h2 id="bot-control-title">Money-maker-3000 controls</h2>
-            </div>
-            <span class="pill lock">Disabled</span>
-          </div>
-          <form class="bot-config-form" id="bot-config-form">
-            <label class="control-row" for="bot-run-mode-select">
-              <span>Run mode</span>
-              <select id="bot-run-mode-select">
-                <option>Loading modes</option>
-              </select>
-              <small>Backtest uses offline fixtures; execute remains disabled.</small>
-            </label>
-            <label class="control-row" for="bot-strategy-select">
-              <span>Strategy</span>
-              <select id="bot-strategy-select">
-                <option>Loading strategies</option>
-              </select>
-              <small>Predefined simulation strategies only.</small>
-            </label>
-            <label class="control-row" for="bot-budget-select">
-              <span>Simulation budget</span>
-              <select id="bot-budget-select">
-                <option>Loading budgets</option>
-              </select>
-              <small>Budget choices are capped by server-side validation.</small>
-            </label>
-            <label class="control-row" for="bot-cadence-select">
-              <span>Cadence</span>
-              <select id="bot-cadence-select">
-                <option>Loading cadences</option>
-              </select>
-              <small>Intraday and high-frequency cadences are blocked.</small>
-            </label>
-            <fieldset class="control-fieldset">
-              <legend>Allowed markets</legend>
-              <div class="control-check-grid" id="bot-market-options"></div>
-            </fieldset>
-            <fieldset class="control-fieldset">
-              <legend>Instrument classes</legend>
-              <div class="control-check-grid" id="bot-instrument-class-options"></div>
-            </fieldset>
-            <button class="icon-button" type="submit">Save simulation config</button>
-          </form>
-          <ul class="readiness-list">
-            <li>
-              <span>Strategy control</span>
-              <strong id="bot-strategy-control-state">Predefined disabled</strong>
-            </li>
-            <li>
-              <span>Config source</span>
-              <strong id="bot-config-source-state">Default server config</strong>
-            </li>
-            <li>
-              <span>Base budget</span>
-              <strong id="bot-budget-state">$1,000.00</strong>
-            </li>
-            <li>
-              <span>Daily loss stop</span>
-              <strong id="bot-daily-loss-state">$50.00</strong>
-            </li>
-            <li>
-              <span>Weekly loss stop</span>
-              <strong id="bot-weekly-loss-state">$150.00</strong>
-            </li>
-            <li>
-              <span>Max open positions</span>
-              <strong id="bot-open-position-state">3</strong>
-            </li>
-            <li>
-              <span>Profit reuse</span>
-              <strong id="bot-profit-state">Ledger only</strong>
-            </li>
-            <li>
-              <span>Cadence</span>
-              <strong id="bot-cadence-state">Daily</strong>
-            </li>
-            <li>
-              <span>High-frequency trading</span>
-              <strong id="bot-hft-state">Blocked</strong>
-            </li>
-            <li>
-              <span>Universe</span>
-              <strong id="bot-universe-state">US equities, AU equities, Forex, Commodities</strong>
-            </li>
-            <li>
-              <span>Instrument classes</span>
-              <strong id="bot-instrument-class-state">Equity, ETF</strong>
-            </li>
-            <li>
-              <span>Trade log export</span>
-              <strong id="bot-sheets-state">Planned</strong>
-            </li>
-          </ul>
-        </section>
-
-        <section class="panel bot-strategies-panel" aria-labelledby="bot-strategies-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Strategy registry</p>
-              <h2 id="bot-strategies-title">Simulation strategies</h2>
-            </div>
-            <span class="pill lock">No execution</span>
-          </div>
-          <div class="strategy-grid" id="bot-strategies"></div>
-        </section>
-
-        <section class="panel bot-runs-panel" aria-labelledby="bot-runs-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Why no trade</p>
-              <h2 id="bot-runs-title">Simulation ledger</h2>
-            </div>
-            <span class="pill warn">Fail closed</span>
-          </div>
-          <ul class="decision-list" id="bot-runs"></ul>
-        </section>
-
-        <section class="panel bot-events-panel" aria-labelledby="bot-events-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Signals</p>
-              <h2 id="bot-events-title">Event feed</h2>
-            </div>
-            <span class="pill ok">Synthetic</span>
-          </div>
-          <ul class="decision-list" id="bot-events"></ul>
-        </section>
-
-        <section class="panel bot-trade-log-panel" aria-labelledby="bot-trade-log-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Trade log</p>
-              <h2 id="bot-trade-log-title">Simulation ledger</h2>
-            </div>
-            <span class="pill lock" id="bot-trade-log-state">Synthetic</span>
-          </div>
-          <ul class="decision-list" id="bot-trade-log"></ul>
-        </section>
-
-        <section class="panel bot-audit-panel" aria-labelledby="bot-audit-title">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Audit</p>
-              <h2 id="bot-audit-title">Monitoring log</h2>
-            </div>
-            <span class="pill ok">Redacted</span>
-          </div>
-          <ol class="audit-list" id="bot-audit-list">
-            <li>
-              <span class="event-time">--:--:--</span>
-              <span>
-                <strong>Bot monitor disabled</strong>
-                <small>Telemetry is synthetic and contains no account identifiers</small>
-              </span>
-            </li>
-          </ol>
-        </section>
-      </section>
+</details>
 
       <section class="risk-layout tab-view" id="risk-view" aria-label="Synthetic risk planning" data-tab-panel="risk-planning" hidden>
         <section class="panel risk-status-panel" aria-labelledby="risk-status-title">
@@ -674,15 +542,7 @@
             </div>
             <span class="pill ok">Redacted</span>
           </div>
-          <ol class="audit-list" id="risk-audit-list">
-            <li>
-              <span class="event-time">--:--:--</span>
-              <span>
-                <strong>Risk radar waiting for read-only data</strong>
-                <small>No portfolio identifiers or provider payloads are stored in the browser</small>
-              </span>
-            </li>
-          </ol>
+          <ol class="audit-list" id="risk-audit-list"></ol>
         </section>
       </section>
 
@@ -704,8 +564,15 @@
             <button class="period-button" type="button" data-watchlist-period="5y" aria-pressed="false">5y</button>
             <button class="period-button" type="button" data-watchlist-period="max" aria-pressed="false">Max API window</button>
           </div>
+          <div class="table-review-controls" aria-label="Watchlist review controls">
+            <label>Search <input id="watchlist-review-search" type="search" placeholder="Symbol or name" maxlength="120"></label>
+            <label>Coverage <select id="watchlist-review-coverage"><option value="all">All instruments</option><option value="complete">Rates available</option><option value="partial">Rates unavailable</option></select></label>
+            <label>Sort <select id="watchlist-review-sort"><option value="symbol">Symbol</option><option value="displayName">Name</option><option value="price">Price</option><option value="rank" selected>Provider rank</option></select></label>
+            <label>Order <select id="watchlist-review-direction"><option value="asc">Ascending</option><option value="desc">Descending</option></select></label>
+          </div>
+          <p class="subtle review-count" id="watchlist-review-count" aria-live="polite">No provider rows loaded</p>
           <div class="table-wrap">
-            <table class="watchlist-table">
+            <table class="watchlist-table" aria-label="Watchlist instruments; Enter or Space selects a row">
               <thead>
                 <tr>
                   <th>Symbol</th>
@@ -738,6 +605,9 @@
               <path id="watchlist-performance-area" d=""></path>
             </svg>
           </div>
+          <div class="chart-axes"><span id="watchlist-chart-price-axis">Close price unavailable</span><span id="watchlist-chart-time-axis">UTC candle starts unavailable</span></div>
+          <p class="subtle chart-coverage" id="watchlist-chart-coverage">Coverage unavailable</p>
+          <details class="chart-details"><summary>Accessible candle values</summary><div class="table-wrap"><table><thead><tr><th>Candle start (UTC)</th><th>Close (listing currency unverified)</th></tr></thead><tbody id="watchlist-chart-details-body"></tbody></table></div></details>
           <div class="chart-meta">
             <span id="watchlist-chart-period-label">Selected period: 24h</span>
             <span id="watchlist-chart-source">Source: provider only</span>
@@ -819,15 +689,7 @@
             </div>
             <span class="pill ok">Redacted</span>
           </div>
-          <ol class="audit-list" id="research-audit-list">
-            <li>
-              <span class="event-time">--:--:--</span>
-              <span>
-                <strong>Research desk waiting for read-only data</strong>
-                <small>No watchlist writes, feed posts, or raw provider payloads are enabled</small>
-              </span>
-            </li>
-          </ol>
+          <ol class="audit-list" id="research-audit-list"></ol>
         </section>
       </section>
     </main>
