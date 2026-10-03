@@ -8,6 +8,7 @@ const server = createServer({
   moneyMakerRuntimeRoot: process.env.DASHBOARD_OFFLINE_RUNTIME_ROOT,
   moneyMakerStateRoot: process.env.DASHBOARD_OFFLINE_STATE_ROOT,
   fetchEndpoint: denyOfflineProviderFetch,
+  fetchFxReference: denyOfflineProviderFetch,
   loadConfig: loadOfflineEtoroConfig,
 });
 

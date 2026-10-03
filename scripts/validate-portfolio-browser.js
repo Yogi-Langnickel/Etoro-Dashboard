@@ -1,0 +1,88 @@
+// Invoke with Playwright CLI run-code --filename; synthetic-only offline UI proof.
+async (page) => {
+  const assert = (condition, message) => { if (!condition) throw new Error(message); };
+  let assertions = 0, providerReads = 0, failRefresh = false;
+  const check = (condition, message) => { assert(condition, message); assertions++; };
+  const now = "2026-10-04T12:00:00.000Z";
+  const cache = { state: "hit", cachedAt: now, expiresAt: "2026-10-04T12:05:00.000Z", ttlMs: 300000 };
+  const instruments = Array.from({ length: 128 }, (_, n) => ({ symbol: `S${String(n + 1).padStart(3, "0")}`, displayName: `Synthetic instrument ${n + 1}`, scope: "direct", positionCount: n === 0 ? null : 1, units: n === 0 ? 0.125 : 1, netContracts: null, currentPrice: n === 0 ? 0.000123456789 : 100, averageOpenPrice: n === 0 ? -0.00012345 : 90, assetCurrency: "USD", investedValue: 100, netValue: n === 2 ? null : 110, unrealizedPnl: n === 2 ? null : n === 1 ? -10 : 10, unrealizedPnlPercent: n === 2 ? null : n === 1 ? -10 : 10, allocationPercent: 0.01, currentExposure: 110, completeness: n === 2 ? "partial" : "complete", fieldReasons: { netContracts: "Not supplied by this synthetic contract.", ...(n === 0 ? { positionCount: "Synthetic breakdown omitted." } : {}), ...(n === 2 ? { netValue: "Synthetic liquidation field absent.", unrealizedPnl: "Synthetic P/L absent.", unrealizedPnlPercent: "Validated margin and P/L required." } : {}) }, fieldSources: { currentPrice: "breakdown.currentRate", averageOpenPrice: "aggregate.netAvgOpenRate" }, positionsOmittedCount: 0, positions: n === 0 ? [] : [{ direction: "long", settlementType: "real", leverage: 1, units: 1, contracts: 1, openPrice: 90, currentPrice: 100, assetCurrency: "USD", rateUpdatedAt: now }] }));
+  const portfolio = (environment) => ({ ok: true, mode: "read-only", cache, data: { environment, currency: "USD", accountCurrency: "USD", equity: environment === "real" ? 999999999999.99 : 500, availableCash: environment === "real" ? 999999999.99 : 200, totalInvested: 12800, usedMargin: 12800, unrealizedPnl: 1280, realizedPnl: null, frozenCash: 0, mirrorCash: 0, accountBalance: 12800, conversionMode: "eToroApp", breakdownUpdatedAt: null, providerUpdatedAt: now, openPositionCount: null, instrumentCount: instruments.length, mirrorCount: 0, pendingOrderCount: null, omittedRowCount: 0, incompleteRowCount: 1, fieldReasons: { realizedPnl: "Aggregate has no realized P/L field.", openPositionCount: "Synthetic breakdown incomplete.", pendingOrderCount: "Synthetic breakdown incomplete." }, fieldSources: {}, arithmetic: { equity: "mismatch", cash: "mismatch" }, coverage: { copyHoldingsStatus: "complete", manualHoldingsStatus: "complete", metadataStatus: "available", instrumentLimit: 500, metadataResolvedCount: 128, metadataUnresolvedCount: 0, unsupportedInstrumentCount: 0, breakdownStatus: "unavailable", directInstrumentCount: 128, copyInstrumentCount: 0 }, instruments } });
+  const fx = { ok: true, data: { source: "ECB", basis: "units-per-EUR", rateDate: "2026-10-02", receivedAt: "2026-10-04T12:00:00.000Z", freshness: "current", rates: { EUR: 1, USD: 1.25, AUD: 2, GBP: 0.8, JPY: 200, CHF: 0.9, CAD: 1.5, NZD: 2.2 } } };
+  await page.unroute("**/api/**");
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("http://127.0.0.1:4175");
+  await page.waitForFunction(() => document.querySelector("#portfolio-read-state").textContent.includes("not configured"));
+  check(await page.locator("[data-instrument-row]").count() === 0, "offline no-profile state has no financial fallback rows");
+  check(await page.locator("#mock-equity").textContent() === "Unavailable", "offline no-profile monetary values unavailable");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no-profile 375px has no page overflow");
+  await page.screenshot({ path: "/private/tmp/etoro-portfolio-ui-no-profile.png", fullPage: true });
+  await page.addInitScript(() => { Date.now = () => Date.parse("2026-10-04T12:00:00.000Z"); localStorage.removeItem("etoro-display-currency"); });
+  await page.route("**/api/**", async (route) => {
+    const url = new URL(route.request().url()), environment = url.searchParams.get("environment") ?? "real";
+    let body, status = 200;
+    if (url.pathname === "/api/health") body = { ok: true };
+    else if (url.pathname === "/api/fx/reference") body = fx;
+    else if (url.pathname === "/api/etoro/status") body = { ok: true, credentialStatus: { defaultEnvironment: "real", profiles: { real: { state: "ready" }, demo: { state: "ready" } } }, profileReadiness: { real: "ready", demo: "ready" }, cachePolicy: { readOnlyTtlMs: 300000 } };
+    else if (url.pathname === "/api/etoro/portfolio") { providerReads++; if (failRefresh) { status = 503; body = { ok: false, error: { code: "ETORO_PROVIDER_ERROR", status: 503, message: "Synthetic failure" } }; } else body = portfolio(environment); }
+    else { status = 503; body = { ok: false, error: { code: "ETORO_PROFILE_NOT_CONFIGURED", message: "Synthetic unavailable" } }; }
+    await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+  });
+  await page.goto("http://127.0.0.1:4175");
+  await page.waitForFunction(() => document.querySelectorAll("[data-instrument-row]").length === 128);
+  check(await page.locator("[data-instrument-row]:visible").count() === 25, "25 rows on first page");
+  check(await page.locator("#portfolio-selected-price").textContent() === "0.000123456789 USD", "native small-price precision");
+  check(await page.locator("#portfolio-selected-opening").textContent() === "-0.00012345 USD", "signed provider opening rate");
+  check(await page.locator("#portfolio-selected-units").textContent() === "0.125", "fractional net quantity");
+  const layout = async (label) => {
+    const measurements = await page.evaluate(() => ({ viewport: innerWidth, width: document.documentElement.scrollWidth, cards: [...document.querySelectorAll(".metric strong")].map((node) => ({ width: node.clientWidth, content: node.scrollWidth, text: node.textContent })), rowValues: [...document.querySelectorAll("[data-instrument-row]:not([hidden]) td")].map((node) => ({ width: node.clientWidth, content: node.scrollWidth })), inspector: document.querySelector("#portfolio-inspector").getBoundingClientRect().top, holdings: document.querySelector(".positions-panel").getBoundingClientRect().top }));
+    check(measurements.width <= measurements.viewport, `${label}: no horizontal page overflow`);
+    check(measurements.cards.every((node) => node.content <= node.width + 1), `${label}: financial cards do not clip`);
+    check(measurements.rowValues.every((node) => node.content <= node.width + 1), `${label}: financial table cells do not clip`);
+    if (measurements.viewport <= 950) check(measurements.inspector < measurements.holdings, `${label}: mobile inspector reachable before table`);
+    return measurements;
+  };
+  for (const width of [1440, 768, 375]) { await page.setViewportSize({ width, height: 900 }); await layout(String(width)); await page.screenshot({ path: `/private/tmp/etoro-portfolio-ui-${width}.png`, fullPage: true }); }
+  await page.setViewportSize({ width: 720, height: 450 }); // 1440px screen at 200% browser zoom has this CSS viewport.
+  await layout("200% zoom equivalent CSS viewport");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.evaluate(() => { document.documentElement.style.zoom = "2"; });
+  await layout("200% CSS zoom supplement");
+  await page.evaluate(() => { document.documentElement.style.zoom = "1"; });
+  await page.setViewportSize({ width: 720, height: 450 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  check(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches), "reduced-motion preference");
+  check(await page.evaluate(() => { const node = document.createElement("span"); node.className = "portfolio-loading-skeleton"; document.body.append(node); const style = getComputedStyle(node); const disabled = style.animationName === "none" || style.animationDuration === "0s"; node.remove(); return disabled; }), "reduced-motion disables computed loading animation");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  check((await page.locator("#portfolio-page-status").textContent()).includes("Page 2 of 6"), "local pagination next");
+  await page.locator("[data-instrument-row]:visible").nth(3).focus(); await page.keyboard.press("Enter");
+  const selected = await page.locator("[data-instrument-row].active").getAttribute("data-row-key");
+  const reads = providerReads;
+  await page.getByRole("combobox", { name: "Display currency" }).selectOption("AUD");
+  check(providerReads === reads, "currency change has no portfolio request per holding");
+  check(await page.locator("[data-instrument-row].active").getAttribute("data-row-key") === selected, "currency keeps selected holding");
+  check((await page.locator("#exposure").textContent()).includes("AUD"), "actual account-money currency conversion");
+  check((await page.locator("#portfolio-stat-balance").textContent()).includes("AUD"), "account balance converts with shared snapshot");
+  check((await page.locator("#portfolio-stat-frozen").textContent()).includes("AUD"), "frozen pending cash converts with shared snapshot");
+  check((await page.locator("#portfolio-stat-mirror").textContent()).includes("AUD"), "copy mirror cash converts with shared snapshot");
+  await page.getByRole("link", { name: "Inspect selected instrument" }).click();
+  check(await page.evaluate(() => document.activeElement?.id === "portfolio-inspector"), "mobile inspector link moves keyboard focus");
+  await page.locator("#portfolio-review-search").fill("S003");
+  check(await page.locator("[data-instrument-row]:visible").count() === 1, "local search filters page");
+  check((await page.locator("#portfolio-field-reasons").textContent()).includes("Synthetic P/L absent"), "Why missing enumerates independent P/L gap");
+  await page.locator("#portfolio-review-search").fill("");
+  await page.getByRole("combobox", { name: "Workspace environment" }).selectOption("demo");
+  await page.waitForFunction(() => document.querySelector("#mock-equity").textContent.includes("800.00"));
+  check((await page.locator("#mock-equity").textContent()).includes("AUD"), "profile change preserves currency preference and converts new account");
+  failRefresh = true; await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.waitForFunction(() => document.querySelector("#portfolio-freshness").textContent.includes("stale"));
+  check((await page.locator("#mock-equity").textContent()).includes("800.00"), "failed refresh retains same-profile converted last-good value");
+  check((await page.locator("#portfolio-partial").textContent()).includes("Retained stale coverage: 1 incomplete aggregate rows; 0 omitted") && !(await page.locator("#portfolio-partial").textContent()).includes("no last-good"), "failed refresh retains known partial coverage with stale qualifier");
+  check((await page.locator("#portfolio-omitted").textContent()).includes("Omitted rows: 0 (retained stale snapshot)"), "failed refresh retains known omission count separately from current read failure");
+  check((await page.locator("#portfolio-fx-basis").textContent()).includes("FX current"), "portfolio and FX freshness remain separate");
+  await page.getByRole("combobox", { name: "Display currency" }).selectOption("EUR");
+  check((await page.locator("#portfolio-stat-source").textContent()).includes("stale"), "currency repaint preserves stale portfolio source status synchronously");
+  await page.getByRole("tab", { name: "Watchlist Items" }).focus(); await page.keyboard.press("ArrowLeft");
+  check(await page.getByRole("tab", { name: "Portfolio View" }).getAttribute("aria-selected") === "true", "keyboard tabs remain usable");
+  check(await page.getByRole("tab").count() === 3, "all three tabs preserved");
+  return { syntheticOnly: true, assertions, widths: [375, 768, 1440], zoom: "200% equivalent CSS viewport plus CSS zoom supplement; native browser toolbar zoom unavailable in this automation", providerCalls: "browser intercepts only; offline server denies all provider and FX fetches" };
+}

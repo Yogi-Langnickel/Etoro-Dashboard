@@ -1,3 +1,4 @@
+import { createEcbReferenceAdapter } from "./ecb-fx.mjs";
 import { createMoneyMakerAdapter, BOT_CAPABILITY_REGISTRY, OfflineOperationError } from "./money-maker-adapter.mjs";
 import { createServer as createHttpServer } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -50,9 +51,11 @@ export { createReadOnlyProviderCache } from "./provider-read-cache.mjs";
 
 const STATIC_ROOT = fileURLToPath(new URL("./", import.meta.url));
 const DEFAULT_PORT = 4173;
+const publicFxReference = createEcbReferenceAdapter();
 
 export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/health",
+  "/api/fx/reference",
   "/api/etoro/status",
   "/api/etoro/identity",
   "/api/etoro/demo/pnl",
@@ -576,6 +579,12 @@ async function handleApiRoute(pathname, response, options) {
       routes: INTERNAL_API_ROUTES,
       checkedAt: new Date().toISOString(),
     });
+    return;
+  }
+
+  if (pathname === "/api/fx/reference") {
+    try { sendJson(response, 200, { ok: true, data: await (options.fetchFxReference ?? publicFxReference)() }); }
+    catch { sendJson(response, 503, { ok: false, error: { code: "FX_UNAVAILABLE", message: "ECB indicative reference rates are unavailable." } }); }
     return;
   }
 

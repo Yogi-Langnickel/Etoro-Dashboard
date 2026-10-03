@@ -1,3 +1,4 @@
+import { syntheticAggregate, syntheticBreakdown } from "./portfolio-fixture.mjs";
 import assert from "node:assert/strict";
 import test, { before, after } from "node:test";
 import { loadEtoroConfig } from "../src/etoro-config.mjs";
@@ -27,7 +28,9 @@ async function call(handler, url) {
 
 function syntheticPayload(url) {
   const path = url.pathname;
-  if (path === "/api/v1/me") return { gcid: 1, realCid: 2, demoCid: 3 };
+  if (path === "/api/v1/me") return { gcid: 1, realCid: 2, demoCid: 3, scopes: ["etoro-public:trade.real:read", "etoro-public:trade.demo:read"] };
+  if (path.endsWith("aggregate-portfolio")) return syntheticAggregate({ cid: path.includes("/demo/") ? 3 : 2 });
+  if (path.endsWith("instrument-breakdown")) return syntheticBreakdown();
   if (path.includes("/trading/info/")) return { clientPortfolio: {
     credit: 900, positions: [{ instrumentSymbol: "AAA", amount: 100, unrealizedPnL: 10, units: 1, openRate: 100, currentRate: 110 }],
     orders: [], ordersForOpen: [], ordersForClose: [], ordersForCloseMultiple: [], mirrors: [],
@@ -182,7 +185,7 @@ test("documented ID-only portfolio and watchlist rows resolve through one privat
     if (url.pathname === "/api/v1/market-data/instruments") {
       assert.equal(url.searchParams.get("instrumentIds"), "1");
       payload = { instrumentDisplayDatas: [{ instrumentID: 1, symbolFull: "AAA", instrumentDisplayName: "Synthetic A" }] };
-    } else if (url.pathname.includes("/trading/info/") && url.pathname.endsWith("portfolio")) {
+    } else if (url.pathname.includes("/trading/info/") && url.pathname.endsWith("/portfolio")) {
       payload.clientPortfolio.positions = [{ instrumentID: 1, amount: 100, unrealizedPnL: 10 }];
     } else if (url.pathname.includes("/watchlists/")) {
       payload = [{ itemId: 1, itemType: "Instrument", itemRank: 0 }];

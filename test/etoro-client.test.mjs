@@ -1,3 +1,4 @@
+import { syntheticSnapshotEndpoint } from "./portfolio-fixture.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -235,28 +236,16 @@ test("Real and Demo portfolio normalizers count malformed market numeric types a
   }
 });
 
-test("Real and Demo portfolio DTOs retain fractional quantities and prices while rounding totals and percentages", async () => {
+test("Real and Demo aggregate DTOs preserve original values through the browser boundary", async () => {
   for (const environment of ["real", "demo"]) {
-    const snapshot = await fetchPortfolioSnapshot(environment, {
-      fetchEndpoint: async (endpoint) => {
-        if (endpoint === "identity") return { data: { authenticated: true } };
-        if (endpoint.endsWith("Pnl")) return { data: {
-          equity: 1.2345, availableCash: 0, totalInvested: 0.015, unrealizedPnL: -0.0049, realizedPnL: 0,
-          mirrorCount: 0, pendingOrderCount: 0, providerUpdatedAt: null,
-        } };
-        return { data: {
-          positionCount: 1, instrumentCount: 1, omittedPositionCount: 0, incompleteValuePositionCount: 0, providerUpdatedAt: null,
-          instruments: [{ symbol: "PENNY", displayName: "Penny", positionCount: 1, units: 0.125, averageOpenPrice: 0.00012345, currentPrice: 0.00023456, investedUsd: 0.015, unrealizedPnlUsd: -0.0049, valueStatus: "complete" }],
-        } };
-      },
-    });
+    const snapshot = await fetchPortfolioSnapshot(environment, { fetchEndpoint: async (endpoint) => syntheticSnapshotEndpoint(endpoint) });
     const instrument = snapshot.data.instruments[0];
-    assert.equal(instrument.units, 0.125);
-    assert.equal(instrument.averageOpenPrice, 0.00012345);
-    assert.equal(instrument.currentPrice, 0.00023456);
-    assert.equal(instrument.investedValue, 0.01);
-    assert.equal(instrument.unrealizedPnl, 0);
-    assert.equal(instrument.allocationPercent, 66.67);
+    assert.equal(instrument.units, 1);
+    assert.equal(instrument.averageOpenPrice, 100);
+    assert.equal(instrument.currentPrice, 110);
+    assert.equal(instrument.investedValue, 100);
+    assert.equal(instrument.unrealizedPnl, 10);
+    assert.equal(instrument.allocationPercent, 100);
   }
 });
 
@@ -608,6 +597,8 @@ test("read-only endpoint allow-list excludes mutation routes", async () => {
 
   assert.deepEqual(Object.keys(READ_ONLY_ENDPOINTS).sort(), [
     "defaultWatchlist",
+    "demoAggregatePortfolio",
+    "demoInstrumentBreakdown",
     "demoPnl",
     "demoPortfolio",
     "identity",
@@ -615,6 +606,10 @@ test("read-only endpoint allow-list excludes mutation routes", async () => {
     "instrumentSearch",
     "marketCandles",
     "marketRates",
+    "portfolioMetadata",
+    "privateIdentity",
+    "realAggregatePortfolio",
+    "realInstrumentBreakdown",
     "realPnl",
     "realPortfolio",
   ]);

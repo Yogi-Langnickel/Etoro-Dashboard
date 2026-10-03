@@ -1,3 +1,4 @@
+import { syntheticSnapshotEndpoint } from "./portfolio-fixture.mjs";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -168,6 +169,7 @@ test("server exposes only internal API routes and no execution routes", () => {
 
   assert.deepEqual(INTERNAL_API_ROUTES, [
     "/api/health",
+    "/api/fx/reference",
     "/api/etoro/status",
     "/api/etoro/identity",
     "/api/etoro/demo/pnl",
@@ -202,6 +204,8 @@ test("unified portfolio route is environment-allowlisted and omits provider meta
   const handler = createRequestHandler({
     loadConfig: async () => config,
     fetchEndpoint: async (endpoint) => {
+      const snapshotResult = syntheticSnapshotEndpoint(endpoint);
+      if (snapshotResult) return snapshotResult;
       if (endpoint === "identity") return { data: { authenticated: true }, provider: {} };
       if (endpoint.endsWith("Pnl")) return { data: { equity: 120, availableCash: 20, totalInvested: 100, unrealizedPnL: 5, realizedPnL: null, mirrorCount: 0, pendingOrderCount: 0, providerUpdatedAt: null }, provider: {} };
       return { data: { positionCount: 1, instrumentCount: 1, omittedPositionCount: 0, incompleteValuePositionCount: 0, providerUpdatedAt: null, instruments: [{ symbol: "AAPL", displayName: "Apple", positionCount: 1, units: 1, averageOpenPrice: 100, currentPrice: 120, investedUsd: 100, unrealizedPnlUsd: 5, valueStatus: "complete" }] }, provider: {} };
@@ -227,6 +231,8 @@ test("status readiness shares a Real snapshot with portfolio and reports Demo no
     loadConfig: async () => config,
     fetchEndpoint: async (endpoint) => {
       endpointCalls.push(endpoint);
+      const snapshotResult = syntheticSnapshotEndpoint(endpoint);
+      if (snapshotResult) return snapshotResult;
       if (endpoint === "identity") return { data: { authenticated: true }, provider: {} };
       if (endpoint === "realPnl") return { data: { equity: 120, availableCash: 20, totalInvested: 100, unrealizedPnL: 5, realizedPnL: null, mirrorCount: 0, pendingOrderCount: 0, providerUpdatedAt: null }, provider: {} };
       return { data: { positionCount: 0, instrumentCount: 0, omittedPositionCount: 0, incompleteValuePositionCount: 0, providerUpdatedAt: null, instruments: [] }, provider: {} };
@@ -238,7 +244,7 @@ test("status readiness shares a Real snapshot with portfolio and reports Demo no
   assert.equal(status.json.profileReadiness.demo, "not-configured");
   assert.equal(portfolio.status, 200);
   assert.equal(portfolio.json.cache.state, "hit");
-  assert.deepEqual(endpointCalls.sort(), ["identity", "realPnl", "realPortfolio"]);
+  assert.deepEqual(endpointCalls.sort(), ["portfolioMetadata", "privateIdentity", "realAggregatePortfolio", "realInstrumentBreakdown"]);
   assert.equal(portfolio.text.includes("requestId"), false);
 });
 
@@ -486,12 +492,12 @@ test("portfolio view starts without fixture rows and has period controls", async
   assert.deepEqual(periods, ["24h", "1w", "1m", "1y", "5y", "max"]);
   assert.match(response.text, /Aggregated by asset/);
   assert.match(response.text, /Instrument summary/);
-  assert.match(response.text, /Avg open/);
+  assert.match(response.text, /Direction-aware net opening rate/);
   assert.match(response.text, /P\/L %/);
-  assert.match(response.text, /Invested/);
-  assert.match(response.text, /Net value/);
+  assert.match(response.text, /Margin \/ invested/);
+  assert.match(response.text, /Liquidation value/);
   assert.match(response.text, /Selected instrument/);
-  assert.match(response.text, /No fixture values are used for Portfolio View/);
+  assert.match(response.text, /No provider data loaded/);
 });
 
 test("portfolio view keeps unavailable enrichment and risk context redacted", async () => {

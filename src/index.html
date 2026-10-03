@@ -15,7 +15,7 @@
         <section class="identity" aria-labelledby="dashboard-title">
           <p class="eyebrow">Read-only provider portfolio</p>
           <h1 id="dashboard-title">eToro Dashboard</h1>
-          <p class="subtle">Local portfolio view. Credentials and provider identifiers remain on the Node server.</p>
+          <p class="subtle">Read-only portfolio workspace</p>
         </section>
         <section class="safety-strip" aria-label="Safety and connection status">
           <div class="status-tile ok">
@@ -51,6 +51,7 @@
 
       <div class="workspace-profile-controls">
         <label class="environment-select">Environment <select id="portfolio-environment" aria-label="Workspace environment"><option value="real">Real</option><option value="demo">Demo</option></select></label>
+        <label class="environment-select">Display currency <select id="portfolio-display-currency" aria-describedby="portfolio-fx-basis"><option value="USD">USD (account)</option></select></label>
         <span id="workspace-profile">Checking profile</span>
         <button class="icon-button" id="refresh-etoro" type="button">Refresh</button>
       </div>
@@ -78,22 +79,20 @@
           <small class="neutral-text" id="unrealized-pnl-detail">Awaiting provider data</small>
         </article>
         <article class="metric">
-          <span>Total invested</span>
+          <span>Used margin</span>
           <strong id="exposure">Unavailable</strong>
           <small class="neutral-text" id="exposure-detail">Awaiting provider data</small>
         </article>
-        <article class="metric">
-          <span id="stale-data-label">Direct positions</span>
-          <strong id="stale-data">Unavailable</strong>
-          <small class="neutral-text" id="stale-data-detail">Awaiting provider data</small>
-        </article>
-        <article class="metric">
-          <span>Source watermark</span>
-          <strong id="portfolio-source-watermark">Provider only</strong>
-          <small class="neutral-text" id="portfolio-source-detail">No fixture values are used for Portfolio View</small>
-        </article>
       </section>
 
+      <section class="portfolio-coverage-strip tab-view" data-tab-panel="portfolio-view" aria-label="Portfolio coverage and conversion">
+        <span><strong id="stale-data">Unavailable</strong> <span id="stale-data-label">direct positions</span> · <span id="stale-data-detail">Awaiting provider data</span></span>
+        <span id="portfolio-source-watermark">Provider only</span><span id="portfolio-source-detail">No provider data loaded</span>
+        <span id="portfolio-read-state">Portfolio: loading</span><span id="portfolio-freshness">Freshness: not connected</span>
+        <span id="portfolio-omitted">Omitted rows: unavailable</span><span id="portfolio-partial">Value coverage: unavailable</span>
+        <span id="portfolio-fx-basis" role="status">Account USD · Display USD · no conversion</span>
+        <a class="inspector-jump" href="#portfolio-inspector">Inspect selected instrument</a>
+      </section>
       <div class="workspace tab-view" data-tab-panel="portfolio-view">
         <section class="panel positions-panel" aria-labelledby="positions-title">
           <div class="panel-header">
@@ -102,20 +101,6 @@
               <h2 id="positions-title">Instrument summary</h2>
             </div>
             <span class="pill lock">Aggregated by asset</span>
-          </div>
-          <div class="period-controls" aria-label="Instrument market-history period">
-            <button class="period-button active" type="button" data-period="24h" aria-pressed="true">24h</button>
-            <button class="period-button" type="button" data-period="1w" aria-pressed="false">1w</button>
-            <button class="period-button" type="button" data-period="1m" aria-pressed="false">1m</button>
-            <button class="period-button" type="button" data-period="1y" aria-pressed="false">1y</button>
-            <button class="period-button" type="button" data-period="5y" aria-pressed="false">5y</button>
-            <button class="period-button" type="button" data-period="max" aria-pressed="false">Max</button>
-          </div>
-          <div class="chart-meta" aria-live="polite" aria-label="Portfolio provider state">
-            <span id="portfolio-read-state">Portfolio: loading</span>
-            <span id="portfolio-freshness">Freshness: not connected</span>
-            <span id="portfolio-omitted">Omitted rows: unavailable</span>
-            <span id="portfolio-partial">Value coverage: unavailable</span>
           </div>
           <div class="table-review-controls" aria-label="Portfolio review controls">
             <label>Search <input id="portfolio-review-search" type="search" placeholder="Symbol or name" maxlength="120"></label>
@@ -129,24 +114,26 @@
               <thead>
                 <tr>
                   <th>Asset</th>
-                  <th>Price</th>
-                  <th>Period</th>
-                  <th>Units</th>
-                  <th>Avg open</th>
+                  <th>Margin / invested</th>
+                  <th>Liquidation value</th>
                   <th>P/L</th>
                   <th>P/L %</th>
-                  <th>Invested</th>
-                  <th>Net value</th>
-                  <th>Value coverage</th>
+                  <th>Coverage</th>
                 </tr>
               </thead>
               <tbody id="portfolio-table-body">
-                <tr data-portfolio-loading><td colspan="10"><span class="portfolio-loading-skeleton">Loading provider portfolio…</span></td></tr>
+                <tr data-portfolio-loading><td colspan="6"><span class="portfolio-loading-skeleton">Loading provider portfolio…</span></td></tr>
               </tbody>
             </table>
           </div>
+          <nav class="portfolio-pagination" aria-label="Holdings pages"><button id="portfolio-page-previous" class="icon-button" type="button" disabled>Previous</button><span id="portfolio-page-status" role="status">Page 1 of 1 · 25 per page</span><button id="portfolio-page-next" class="icon-button" type="button" disabled>Next</button></nav>
         </section>
-
+        <aside class="portfolio-inspector" id="portfolio-inspector" tabindex="-1" aria-label="Selected instrument inspector">
+          <section class="panel instrument-detail-panel"><div class="panel-header"><div><p class="eyebrow">Instrument inspector</p><h2 id="portfolio-selected-title">Select a live holding</h2></div><span id="portfolio-selected-scope" class="pill lock">Read only</span></div>
+          <dl class="instrument-facts"><div><dt>Native current price</dt><dd id="portfolio-selected-price">Unavailable</dd></div><div><dt>Direction-aware net opening rate</dt><dd id="portfolio-selected-opening">Unavailable</dd></div><div><dt>Net quantity (provider)</dt><dd id="portfolio-selected-units">Unavailable</dd></div><div><dt>Net contracts</dt><dd id="portfolio-selected-contracts">Unavailable</dd></div><div><dt>Positions</dt><dd id="portfolio-selected-positions">Unavailable</dd></div><div><dt>Portfolio asset currency</dt><dd id="portfolio-selected-currency">Unavailable</dd></div><div><dt>Current exposure</dt><dd id="portfolio-selected-exposure">Unavailable</dd></div></dl>
+          <p class="subtle inspector-note" id="portfolio-selected-opening-source">Opening-rate source unavailable</p><p class="subtle inspector-note">Net quantities and contracts follow provider direction and settlement. Prices use the portfolio route’s evidenced asset currency; chart listing currency is independently unverified.</p>
+          <details class="field-reasons" open><summary>Why missing?</summary><ul id="portfolio-field-reasons"><li>Select an instrument to inspect each field.</li></ul></details>
+          <details class="position-details"><summary>Sanitized position details</summary><ul id="portfolio-position-details"><li>Unavailable</li></ul></details></section>
         <section class="panel chart-panel" aria-labelledby="chart-title">
           <div class="panel-header">
             <div>
@@ -154,6 +141,14 @@
               <h2 id="chart-title">Select a live holding</h2>
             </div>
             <span class="pill warn" id="selected-period-pill">24h</span>
+          </div>
+          <div class="period-controls" aria-label="Instrument market-history period">
+            <button class="period-button active" type="button" data-period="24h" aria-pressed="true">24h</button>
+            <button class="period-button" type="button" data-period="1w" aria-pressed="false">1w</button>
+            <button class="period-button" type="button" data-period="1m" aria-pressed="false">1m</button>
+            <button class="period-button" type="button" data-period="1y" aria-pressed="false">1y</button>
+            <button class="period-button" type="button" data-period="5y" aria-pressed="false">5y</button>
+            <button class="period-button" type="button" data-period="max" aria-pressed="false">Max</button>
           </div>
           <div class="chart-shell" id="portfolio-chart-shell" role="img" aria-label="Selected instrument market-price history">
             <div class="chart-grid" aria-hidden="true"></div>
@@ -191,6 +186,8 @@
           </div>
         </section>
 
+        </aside>
+
         <aside class="panel portfolio-context-panel" aria-labelledby="portfolio-context-title">
           <div class="panel-header">
             <div>
@@ -201,6 +198,9 @@
           </div>
           <p id="portfolio-stat-source" aria-live="polite">Unavailable until provider data loads</p>
           <ul class="readiness-list">
+            <li><span>Account cash balance</span><strong id="portfolio-stat-balance">Unavailable until provider data loads</strong></li>
+            <li><span>Frozen pending-order cash</span><strong id="portfolio-stat-frozen">Unavailable until provider data loads</strong></li>
+            <li><span>Copy mirror cash</span><strong id="portfolio-stat-mirror">Unavailable until provider data loads</strong></li>
             <li><span>Cash / equity</span><strong id="portfolio-stat-cash">Unavailable until provider data loads</strong></li>
             <li><span>Largest displayed holding by invested capital</span><strong id="portfolio-stat-largest">Unavailable until provider data loads</strong></li>
             <li><span>Realized P/L (provider snapshot)</span><strong id="portfolio-stat-realized">Unavailable until provider data loads</strong></li>
@@ -208,6 +208,7 @@
             <li><span>Historical portfolio returns and drawdown</span><strong>Unavailable: account history required</strong></li>
             <li><span>Dividends and expected income</span><strong>Unavailable: distribution evidence required</strong></li>
           </ul>
+          <details class="field-reasons"><summary>Why missing? Account totals</summary><ul id="portfolio-account-reasons"><li>Awaiting selected-profile account fields.</li></ul></details>
           <p id="portfolio-stat-basis">Cash percentage uses available cash divided by positive equity. Concentration uses invested capital, not leveraged exposure.</p>
         </aside>
 

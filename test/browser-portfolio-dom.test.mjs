@@ -18,7 +18,7 @@ async function renderer(document) {
   const contracts = await readFile(new URL("../src/browser-contracts.js", import.meta.url), "utf8");
   const app = await readFile(new URL("../src/app.js", import.meta.url), "utf8");
   const source = app.slice(0, app.indexOf("function renderSelectedWatchlistInstrument"));
-  return Function("document", `${contracts}\n${source}; return { clearPortfolioBoundState, renderProviderPortfolio, renderFulfilledProviderPortfolio, renderPortfolioReadFailure };`)(document);
+  return Function("document", `${contracts}\n${source}; return { clearPortfolioBoundState, renderProviderPortfolio, renderFulfilledProviderPortfolio, renderPortfolioReadFailure, selectDisplayCurrency, refreshFx, renderPortfolioMoney, applyTableReview, applyFxFreshness, fxPublicationDate, normalizeLivePortfolioPayload, normalizeFxPayload, review: tableReview, selected: () => selectedPortfolioKey };`)(document);
 }
 function payload(instruments = [{ symbol: "AAPL", displayName: "Apple", positionCount: 1, units: 2, averageOpenPrice: 100, currentPrice: 120, investedValue: 200, netValue: 220, unrealizedPnl: 20, unrealizedPnlPercent: 10, allocationPercent: 100, completeness: "complete" }]) {
   return { ok: true, mode: "read-only", data: { environment: "real", currency: "USD", equity: 220, availableCash: 0, totalInvested: 200, unrealizedPnl: 20, realizedPnl: null, openPositionCount: instruments.reduce((sum, item) => sum + item.positionCount, 0), instrumentCount: instruments.length, mirrorCount: null, pendingOrderCount: null, providerUpdatedAt: "2026-08-30T00:00:00.000Z", omittedRowCount: 0, incompleteRowCount: 0, instruments }, cache: { state: "hit", cachedAt: "2026-08-30T00:00:00.000Z", expiresAt: "2026-08-30T00:00:15.000Z", ttlMs: 15000 } };
@@ -108,7 +108,7 @@ test("negative provider net value remains displayable without fabricating a nonn
   const document = new Document(); const { renderProviderPortfolio } = await renderer(document);
   const view = payload(); view.data.instruments[0].netValue = -20;
   renderProviderPortfolio(view);
-  assert.equal(document.querySelectorAll("[data-instrument-row]")[0].children[8].textContent, "-$20.00");
+  assert.equal(document.querySelectorAll("[data-instrument-row]")[0].children[2].textContent, "-$20.00");
 });
 
 test("portfolio DOM preserves fractional holdings and small instrument prices", async () => {
@@ -116,11 +116,11 @@ test("portfolio DOM preserves fractional holdings and small instrument prices", 
   const view = payload([{ symbol: "PENNY", displayName: "Penny", positionCount: 1, units: 0.125, averageOpenPrice: 0.00012345, currentPrice: 0.00023456, investedValue: 0.01, netValue: 0.01, unrealizedPnl: -0, unrealizedPnlPercent: 0, allocationPercent: 100, completeness: "complete" }]);
   renderProviderPortfolio(view);
   const row = document.querySelectorAll("[data-instrument-row]")[0];
-  assert.equal(row.children[1].textContent, "0.00023456");
-  assert.equal(row.children[3].textContent, "0.125");
-  assert.equal(row.children[4].textContent, "0.00012345");
-  assert.match(row.children[0].children[1].textContent, /Listing currency unavailable/);
-  assert.equal(row.children[7].textContent, "$0.01");
+  assert.equal(document.getElementById("portfolio-selected-price").textContent, "0.00023456 · denomination unverified");
+  assert.equal(document.getElementById("portfolio-selected-units").textContent, "0.125");
+  assert.equal(document.getElementById("portfolio-selected-opening").textContent, "0.00012345 · denomination unverified");
+  assert.match(row.children[0].children[1].textContent, /Native denomination unverified/);
+  assert.equal(row.children[1].textContent, "$0.01");
 });
 
 test("portfolio DOM does not impose a significant-digit cap on accepted prices or quantities", async () => {
@@ -128,9 +128,9 @@ test("portfolio DOM does not impose a significant-digit cap on accepted prices o
   const view = payload([{ symbol: "PRECISE", displayName: "Precise", positionCount: 1, units: 1.2345678901234567, averageOpenPrice: 0.12345678901234566, currentPrice: 0.12345678901234566, investedValue: 0.01, netValue: 0.01, unrealizedPnl: 0, unrealizedPnlPercent: 0, allocationPercent: 100, completeness: "complete" }]);
   renderProviderPortfolio(view);
   const row = document.querySelectorAll("[data-instrument-row]")[0];
-  assert.equal(row.children[1].textContent, "0.12345678901234566");
-  assert.equal(row.children[3].textContent, "1.2345678901234567");
-  assert.equal(row.children[4].textContent, "0.12345678901234566");
+  assert.equal(document.getElementById("portfolio-selected-price").textContent, "0.12345678901234566 · denomination unverified");
+  assert.equal(document.getElementById("portfolio-selected-units").textContent, "1.2345678901234567");
+  assert.equal(document.getElementById("portfolio-selected-opening").textContent, "0.12345678901234566 · denomination unverified");
 });
 
 test("browser contract rejects numeric strings in financial portfolio DTOs", async () => {
@@ -144,6 +144,6 @@ test("omitted provider positions are not presented as an empty account", async (
   const document = new Document(); const { renderProviderPortfolio } = await renderer(document);
   const view = payload([]); view.data.openPositionCount = 2; view.data.omittedRowCount = 2;
   renderProviderPortfolio(view);
-  assert.match(document.getElementById("portfolio-table-body").children[0].children[0].textContent, /No displayable holdings/);
+  assert.match(document.getElementById("portfolio-table-body").children[0].children[0].textContent, /No displayable holding rows/);
   assert.match(document.getElementById("portfolio-partial").textContent, /Partial coverage.*2 omitted/);
 });

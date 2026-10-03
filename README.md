@@ -7,9 +7,10 @@ Security-first dashboard for viewing and interacting with eToro API data.
 The local read-only dashboard keeps eToro credentials server-side, exposes
 normalized selected-profile Real/Demo portfolio and default-watchlist views to the browser, resolves
 market symbols by verified exact match, batches current-rate reads, and loads
-selected-period close-price charts. It includes a gated demo trading tab with
-no execution routes, briefly caches provider responses, applies short backoff
-metadata for provider failures, and lazy-loads inactive tabs.
+selected-period close-price charts. The three tabs are Portfolio View,
+Watchlist Items and Bot Control. The server briefly caches provider responses
+and applies short failure backoff; the browser lazy-loads inactive tabs.
+Provider execution routes remain absent.
 
 Browser watchlist and market DTOs never include provider instrument, watchlist,
 price-rate, account, position, or order identifiers. Partial rate failures and
@@ -26,8 +27,9 @@ as unconfigured.
 
 Statistics reuse the selected portfolio snapshot. Cash percentage divides
 available cash by positive equity. Largest holding ranks displayed instruments
-by invested capital and divides by provider total invested; omitted or incomplete
-positions may change that ranking. Invested capital is not complete leveraged
+by instrument margin and divides by provider total used margin in v1; omitted
+or incomplete holdings may change that ranking. Direct, copy/mirror cash and
+frozen pending-order scopes are disclosed separately. Invested capital is not complete leveraged
 risk exposure. Instrument price history is not portfolio return history;
 historical performance, drawdown and dividends remain unavailable without the
 required evidence.
@@ -42,12 +44,76 @@ companyfacts normalizer. It exposes normalized coverage fields only and keeps
 live SEC fetching blocked until a server-side cache/rate-limit policy and SEC
 User-Agent contact value are configured.
 
+## Portfolio Completeness And Display Currency v1
+
+The v1 implementation uses matching Real/Demo aggregate-portfolio reads
+for full account totals and instrument aggregates, plus v2 instrument-breakdown
+for supported native prices and position fields. Both use
+conversionMode=eToroApp. Real aggregate accepts matching read OR write; Demo
+aggregate and both breakdowns require matching read. Their provider times remain separate; the composite
+response is not an atomic snapshot. Instrument margin, liquidation value, P/L,
+signed exposure and net units/contracts retain distinct meanings. Direct
+holdings, copy holdings, mirror cash and frozen pending-order amounts do not
+silently collapse into one scope.
+
+Fields are independently available. Missing return cannot hide known margin;
+missing current native price cannot hide units or a supported opening rate. Why
+missing explains field-level omissions, invalid types, scopes, ambiguity,
+overflow and mixed-direction/zero-net semantics. Signed provider opening rates are direction-aware net rates, used only with
+appropriate evidence. Combined-copy and known zero relevant net rates stay unavailable; nonzero futures
+contracts and missing quantities alone do not erase independently supplied rates; no naive
+mixed-position average is invented. The
+raw provider ROE scale is contradictory in the specification; displayed P/L % is
+independently derived from validated return and positive margin.
+Zero-denominator percentages remain unavailable.
+
+Metadata resolution uses bounded 100-ID batches through 500 instruments with
+global ambiguity checks. Later instruments are covered; snapshots beyond the
+supported boundary and unresolved metadata remain visibly incomplete. Optional
+metadata authorization failures preserve validated values with explicit degraded
+identity. Omitted copy collections remain unknown, and manual mirrorId=0 data is
+quarantined. Source clocks without an explicit zone are null with reasons; they
+do not hide usable totals. Exported details cap at 1000 per row while counts and
+consistency use all validated source positions.
+
+Display currency is a labelled native select beside Environment, defaulting to
+the evidenced account currency. The server's public ECB reference-rate adapter
+provides one validated EUR-basis snapshot. Supported account-money fields
+convert consistently using target-rate/source-rate; original amounts remain
+intact. Counts, quantities, percentages and native prices/charts are unchanged.
+Show account/display currency, indicative basis and publication date, with
+currency-specific minor units. Unsupported, stale or unavailable FX stays
+explicit; portfolio and FX freshness are separate. Currency changes do not read
+each holding. Statistics include independently known account balance, frozen
+pending cash and mirror cash. Unknown native denomination is explicitly labelled;
+portfolio currency never establishes candle currency. Currency/FX repaint preserves
+stale portfolio status and refresh restores scoped selection/focus.
+
+The compact Portfolio workspace places four money cards and coverage above a
+wider holdings table beside a bounded inspector. Local pagination starts at 25
+rows; native price and position details are secondary. Period controls are
+inside the chart, and the inspector is reachable before the holdings list on
+mobile. Search, stable sorting, filters, selection and profile-generation guards
+remain.
+
+Current field contracts, action owners and input/completion gates are reached
+through the [Dashboard canonical context pointer](unblockme.md). Follow its
+verified workspace bootstrap and returned projectMemory directory for the current
+API notes, implementation plan, design review and dated validation. The older
+repo-local docs links are compatibility paths and may point to another branch;
+they do not establish current contracts. The portable [design
+baton](docs/designs/2026-10-04-portfolio-completeness-v1/README.md) remains here.
+Actual test/live acceptance and publication states are recorded in canonical validation; offline
+success does not establish live parity. Money Maker's separate research blockers
+are not blanket Dashboard blockers. No collection/training or producer change is
+included.
+
 ## Official eToro API Reference
 
 The current source of truth is the [eToro Developer Portal](https://api-portal.etoro.com/),
 its [documentation index](https://api-portal.etoro.com/llms.txt), and the
 [Agent Skill landing page](https://api-portal.etoro.com/core/ai-agents/etoro-skill).
-As checked through the official MCP catalog on 2026-10-03, the API identifies
+As rediscovered through the official MCP catalog on 2026-10-04, the API identifies
 version `v1.383.0` and Agent Skill version `1.21.0`.
 Its MCP server is `https://mcp.public-api.etoro.com`.
 
@@ -92,17 +158,19 @@ v2 routes coexist. Rediscover the current specification for future changes.
   include an explicit timezone and valid calendar date; the dashboard normalizes
   accepted instants to UTC. Timestamp format does not establish a trading session
   calendar or an exchange-close convention.
-- The Public API contract does not define listing currency, a separate price-basis
+- The rates/candle contract does not define listing currency, a separate price-basis
   flag, corporate-action adjustments, a historical retention period, or rights to
   retain data for model use. Do not infer any of them from a symbol, instrument
   type, conversion rate, successful read, or timestamp. An ETF type alone also
   does not establish product exposure or research suitability. Those matters
   require separate evidence before retained research collection or model use.
 
-Raw instrument prices in Portfolio and Watchlist use precision-preserving numbers
-with listing currency marked unavailable. USD account totals, invested amounts
-and P/L retain their account monetary-unit formatting; they do not establish the
-listing currency of an instrument price.
+Currency evidence is route-specific. Explicit portfolio/breakdown assetCurrency
+can support those native financial fields. It does not establish historical
+candle/rates currency, session, price basis or research eligibility. Market chart
+prices remain in their evidenced units, without an unsupported currency marker.
+Account totals and instrument margin/liquidation/P/L retain their documented
+account currency and are separate from native prices.
 
 ## Contract Boundaries
 

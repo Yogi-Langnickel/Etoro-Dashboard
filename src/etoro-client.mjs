@@ -1,8 +1,28 @@
 import { randomUUID } from "node:crypto";
+import { normalizeAggregatePortfolio, normalizeInstrumentBreakdown, composePortfolioSnapshot } from "./portfolio-contract.mjs";
+import { DEFAULT_PROVIDER_FAILURE_BACKOFF_MS } from "./provider-read-cache.mjs";
 
 const SENSITIVE_HEADER_NAMES = new Set(["x-api-key", "x-user-key", "authorization"]);
 const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_RETRY_AFTER_MS = 60_000;
+// Memory-only quota deadlines use non-secret configuration generations, never
+// credential object identity (the config boundary returns fresh objects).
+const portfolioMetadataDeadlines = new Map();
+const MAX_METADATA_DEADLINES = 32;
+function metadataDeadlineKey(environment, credentials) {
+  const generation = credentials?.credentialGeneration;
+  return typeof generation === "string" && generation.length > 0 && generation.length <= 256 && generation !== "credential-generation-unavailable"
+    ? JSON.stringify([environment, generation, credentials.credentialSource ?? null, credentials.baseUrl ?? null, Boolean(credentials.credentialFileLoaded)]) : null;
+}
+function deferPortfolioMetadata(key, nowMs, retryAfterMs) {
+  if (!key) return;
+  const delay = typeof retryAfterMs === "number" && Number.isFinite(retryAfterMs) && retryAfterMs > 0
+    ? Math.min(Math.ceil(retryAfterMs), MAX_RETRY_AFTER_MS) : DEFAULT_PROVIDER_FAILURE_BACKOFF_MS;
+  for (const [storedKey, deadline] of portfolioMetadataDeadlines) if (deadline <= nowMs) portfolioMetadataDeadlines.delete(storedKey);
+  portfolioMetadataDeadlines.delete(key);
+  portfolioMetadataDeadlines.set(key, nowMs + delay);
+  while (portfolioMetadataDeadlines.size > MAX_METADATA_DEADLINES) portfolioMetadataDeadlines.delete(portfolioMetadataDeadlines.keys().next().value);
+}
 const ALLOWED_ETORO_PROVIDER_ORIGIN = "https://public-api.etoro.com";
 const SAFE_INSTRUMENT_SYMBOL = /^[A-Z0-9][A-Z0-9._:/-]{0,31}$/;
 
@@ -17,7 +37,34 @@ export class EtoroApiError extends Error {
   }
 }
 
+function normalizePrivateIdentity(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) || !Array.isArray(payload.scopes) || payload.scopes.some((scope) => typeof scope !== "string")) {
+    throw new EtoroApiError("Identity scope response did not match the documented contract", { code: "ETORO_INVALID_IDENTITY_RESPONSE" });
+  }
+  return { realCid: positiveInstrumentId(payload.realCid), demoCid: positiveInstrumentId(payload.demoCid), scopes: payload.scopes };
+}
+
+function breakdownPath(environment, params) {
+  if (!Number.isInteger(params.cid) || params.cid <= 0) throw new EtoroApiError("Private account reference is unavailable", { code: "ETORO_INVALID_IDENTITY_RESPONSE" });
+  return `/api/v2/trading/info/${environment === "demo" ? "demo/" : ""}instrument-breakdown?conversionMode=eToroApp&positionLevel=Normal&orderLevel=Normal&mirrorLevel=Details`;
+}
+function normalizePortfolioMetadata(payload, params) {
+  if (!payload || !Array.isArray(payload.instrumentDisplayDatas)) throw new EtoroApiError("Instrument metadata response is invalid", { code: "ETORO_INVALID_INSTRUMENT_DISPLAY_RESPONSE" });
+  const requested = new Set(validatedInstrumentIds(params.instrumentIds));
+  return { instruments: payload.instrumentDisplayDatas.flatMap((item) => {
+    const instrumentId = positiveInstrumentId(item?.instrumentID);
+    const symbol = typeof item?.symbolFull === "string" && SAFE_INSTRUMENT_SYMBOL.test(item.symbolFull) ? item.symbolFull : null;
+    return requested.has(instrumentId) && symbol ? [{ instrumentId, symbol, displayName: safeDisplayText(item.instrumentDisplayName, symbol) }] : [];
+  }) };
+}
+
 export const READ_ONLY_ENDPOINTS = Object.freeze({
+  privateIdentity: Object.freeze({ method: "GET", path: "/api/v1/me", normalize: normalizePrivateIdentity }),
+  realAggregatePortfolio: Object.freeze({ method: "GET", path: "/api/v1/trading/info/aggregate-portfolio?conversionMode=eToroApp&pnlLevel=Pnl", normalize: normalizeAggregatePortfolio }),
+  demoAggregatePortfolio: Object.freeze({ method: "GET", path: "/api/v1/trading/info/demo/aggregate-portfolio?conversionMode=eToroApp&pnlLevel=Pnl", normalize: normalizeAggregatePortfolio }),
+  realInstrumentBreakdown: Object.freeze({ method: "GET", path: (params) => breakdownPath("real", params), privateCid: true, normalize: normalizeInstrumentBreakdown }),
+  demoInstrumentBreakdown: Object.freeze({ method: "GET", path: (params) => breakdownPath("demo", params), privateCid: true, normalize: normalizeInstrumentBreakdown }),
+  portfolioMetadata: Object.freeze({ method: "GET", path: ({ instrumentIds }) => `/api/v1/market-data/instruments?instrumentIds=${validatedInstrumentIds(instrumentIds).join(",")}`, normalize: normalizePortfolioMetadata }),
   identity: Object.freeze({
     method: "GET",
     path: "/api/v1/me",
@@ -592,7 +639,7 @@ function normalizeInstrumentDisplay(payload, params) {
 }
 
 /** Resolve documented ID-only rows before the public normalizer discards IDs.
- * One request covers at most 100 distinct instruments. Unresolved/overflow
+ * Bounded batches cover at most 500 distinct instruments. Unresolved/overflow
  * rows retain missing symbols and are counted by the normalizer as omitted.
  */
 async function enrichMissingDisplaySymbols(endpointName, payload, options) {
@@ -610,18 +657,28 @@ async function enrichMissingDisplaySymbols(endpointName, payload, options) {
     ? (row?.itemType ?? row?.ItemType) === "Instrument" &&
       !normalizedSymbol(row?.market?.symbolName ?? row?.market?.internalSymbolFull)
     : !normalizedSymbol(row?.instrumentSymbol ?? row?.symbol ?? row?.internalSymbolFull);
-  const instrumentIds = [...new Set(considered.filter(needsSymbol).map(idFor).filter((id) => id !== null))].slice(0, 100);
+  const instrumentIds = [...new Set(considered.filter(needsSymbol).map(idFor).filter((id) => id !== null))].slice(0, watchlist ? 100 : 500);
   if (instrumentIds.length === 0) return payload;
-  let display;
-  try {
-    display = await fetchReadOnlyEndpoint("instrumentDisplay", {
-      ...options, requestId: undefined, params: { instrumentIds },
-    });
-  } catch (error) {
-    if (error?.status === 401 || error?.status === 403) throw error;
-    return payload;
+  const candidates = [];
+  for (let offset = 0; offset < instrumentIds.length; offset += 100) {
+    try {
+      const display = await fetchReadOnlyEndpoint("portfolioMetadata", { ...options, requestId: undefined, params: { instrumentIds: instrumentIds.slice(offset, offset + 100) } });
+      candidates.push(...display.data.instruments);
+    } catch (error) {
+      if (error?.status === 401 || error?.status === 403) throw error;
+    }
   }
-  const byId = new Map(display.data.instruments.map((item) => [item.instrumentId, item]));
+  const byId = new Map(); const duplicates = new Set(); const symbolIds = new Map(); const ambiguousSymbols = new Set();
+  const known = rows.filter((row) => !needsSymbol(row)).map((row) => ({ instrumentId: idFor(row), symbol: watchlist ? normalizedSymbol(row?.market?.symbolName ?? row?.market?.internalSymbolFull) : normalizedSymbol(row?.instrumentSymbol ?? row?.symbol ?? row?.internalSymbolFull) })).filter((item) => item.instrumentId !== null);
+  for (const item of [...known, ...candidates]) {
+    if (symbolIds.has(item.symbol) && symbolIds.get(item.symbol) !== item.instrumentId) ambiguousSymbols.add(item.symbol);
+    symbolIds.set(item.symbol, item.instrumentId);
+  }
+  for (const item of candidates) {
+    if (byId.has(item.instrumentId)) duplicates.add(item.instrumentId);
+    byId.set(item.instrumentId, item);
+  }
+  for (const [id, item] of byId) if (duplicates.has(id) || ambiguousSymbols.has(item.symbol)) byId.delete(id);
   const enriched = rows.map((row) => {
     const item = needsSymbol(row) ? byId.get(idFor(row)) : null;
     if (!item) return row;
@@ -857,8 +914,9 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const params = options.params ?? {};
   const path = typeof endpoint.path === "function" ? endpoint.path(params) : endpoint.path;
+  if (endpoint.privateCid) headers.CID = String(params.cid);
   const url = new URL(path, `${credentials.baseUrl}/`);
-  const secrets = [credentials.apiKey, credentials.userKey];
+  const secrets = [credentials.apiKey, credentials.userKey, ...(endpoint.privateCid ? [String(params.cid)] : [])];
   const startedAtMs = now();
 
   try {
@@ -908,8 +966,8 @@ export async function fetchReadOnlyEndpoint(endpointName, options = {}) {
       });
     }
 
-    throw new EtoroApiError(redactSecrets(error?.message ?? "eToro request failed", secrets), {
-      code: "ETORO_FETCH_FAILED",
+    throw new EtoroApiError("eToro response or transport validation failed", {
+      code: typeof error?.code === "string" && /^ETORO_INVALID_[A-Z_]+_RESPONSE$/.test(error.code) ? error.code : "ETORO_FETCH_FAILED",
       requestId,
     });
   } finally {
@@ -929,59 +987,49 @@ function finitePrecisionNumber(value, allowNegative = false) {
 
 /** Compose the only account-linked DTO permitted to cross the browser boundary. */
 export async function fetchPortfolioSnapshot(environment, options = {}) {
-  if (!["real", "demo"].includes(environment)) {
-    throw new EtoroApiError("Requested eToro environment is invalid", { code: "ETORO_INVALID_ENVIRONMENT", status: 400 });
+  if (!["real", "demo"].includes(environment)) throw new EtoroApiError("Requested eToro environment is invalid", { code: "ETORO_INVALID_ENVIRONMENT", status: 400 });
+  const read = (endpointName, params = {}) => options.fetchEndpoint
+    ? options.fetchEndpoint(endpointName, { credentials: options.credentials, params })
+    : fetchReadOnlyEndpoint(endpointName, { ...options, params });
+  const identity = await read("privateIdentity");
+  const scope = `etoro-public:trade.${environment}:read`;
+  if (!identity.data.scopes.includes(scope) && !(environment === "real" && identity.data.scopes.includes("etoro-public:trade.real:write"))) {
+    throw new EtoroApiError("Matching portfolio read scope is not granted", { code: "ETORO_SCOPE_MISSING", status: 403 });
   }
-  const endpointPrefix = environment === "real" ? "real" : "demo";
-  const read = options.fetchEndpoint
-    ? (endpointName) => options.fetchEndpoint(endpointName, { credentials: options.credentials })
-    : (endpointName) => fetchReadOnlyEndpoint(endpointName, options);
-  const [identity, pnl, portfolio] = await Promise.all([
-    read("identity"), read(`${endpointPrefix}Pnl`), read(`${endpointPrefix}Portfolio`),
-  ]);
-  if (!identity.data?.authenticated) throw new EtoroApiError("Identity response was not authenticated", { code: "ETORO_INVALID_IDENTITY_RESPONSE" });
-  const normalizedInstruments = portfolio.data.instruments.map((instrument) => {
-    const investedValue = finiteMonetaryTotal(instrument.investedUsd);
-    const unrealizedPnl = finiteMonetaryTotal(instrument.unrealizedPnlUsd, true);
-    const netValue = investedValue !== null && unrealizedPnl !== null ? finiteMonetaryTotal(investedValue + unrealizedPnl, true) : null;
-    const allocationPercent = pnl.data.totalInvested !== null && pnl.data.totalInvested > 0 && investedValue !== null
-      ? finiteMonetaryTotal((investedValue / pnl.data.totalInvested) * 100)
-      : null;
-    return {
-      symbol: instrument.symbol,
-      displayName: safeDisplayText(instrument.displayName, instrument.symbol),
-      positionCount: instrument.positionCount,
-      units: finitePrecisionNumber(instrument.units),
-      averageOpenPrice: finitePrecisionNumber(instrument.averageOpenPrice),
-      currentPrice: finitePrecisionNumber(instrument.currentPrice),
-      investedValue,
-      netValue,
-      unrealizedPnl,
-      unrealizedPnlPercent: investedValue && unrealizedPnl !== null ? finiteMonetaryTotal((unrealizedPnl / investedValue) * 100, true) : null,
-      allocationPercent,
-      completeness: instrument.valueStatus === "complete" ? "complete" : "partial",
-    };
-  });
-  return {
-    data: {
-      environment,
-      currency: "USD",
-      equity: finiteMonetaryTotal(pnl.data.equity),
-      availableCash: finiteMonetaryTotal(pnl.data.availableCash),
-      totalInvested: finiteMonetaryTotal(pnl.data.totalInvested),
-      unrealizedPnl: finiteMonetaryTotal(pnl.data.unrealizedPnL, true),
-      realizedPnl: finiteMonetaryTotal(pnl.data.realizedPnL, true),
-      openPositionCount: portfolio.data.positionCount,
-      instrumentCount: portfolio.data.instrumentCount,
-      mirrorCount: pnl.data.mirrorCount,
-      pendingOrderCount: pnl.data.pendingOrderCount,
-      providerUpdatedAt: portfolio.data.providerUpdatedAt ?? pnl.data.providerUpdatedAt,
-      omittedRowCount: portfolio.data.omittedPositionCount,
-      incompleteRowCount: portfolio.data.incompleteValuePositionCount,
-      instruments: normalizedInstruments,
-    },
-    provider: { endpoint: "portfolioSnapshot", method: "GET", status: 200, receivedAt: new Date().toISOString(), durationMs: 0 },
-  };
+  const aggregate = await read(`${environment}AggregatePortfolio`);
+  if (aggregate.data.cid !== identity.data[`${environment}Cid`]) throw new EtoroApiError("Portfolio account context did not match selected profile", { code: "ETORO_ACCOUNT_CONTEXT_MISMATCH" });
+  if (!positiveInstrumentId(identity.data[`${environment}Cid`])) throw new EtoroApiError("Selected account reference is unavailable", { code: "ETORO_INVALID_IDENTITY_RESPONSE" });
+  let breakdown = null;
+  let breakdownReason = "Matching instrument-breakdown read scope is not granted.";
+  if (identity.data.scopes.includes(scope)) {
+    try { breakdown = (await read(`${environment}InstrumentBreakdown`, { cid: aggregate.data.cid })).data; }
+    catch (error) {
+      breakdownReason = error?.status === 401 || error?.status === 403 ? "Instrument-breakdown authorization was rejected." : error?.status === 429 ? "Instrument-breakdown shared quota is temporarily rate-limited." : error?.code === "ETORO_TIMEOUT" ? "Instrument-breakdown request timed out." : /^ETORO_INVALID_/.test(error?.code ?? "") ? "Instrument-breakdown response failed documented contract validation." : "Instrument-breakdown provider is unavailable.";
+    }
+  }
+  const ids = [...new Set(aggregate.data.rows.map(({ aggregate: item }) => positiveInstrumentId(item?.instrumentId)).filter((id) => id !== null))].slice(0, 500);
+  const metadata = [];
+  const metadataFailures = new Map();
+  const now = typeof options.now === "function" ? options.now : Date.now;
+  const deadlineKey = metadataDeadlineKey(environment, options.credentials);
+  for (let offset = 0; offset < ids.length; offset += 100) {
+    if (deadlineKey && (portfolioMetadataDeadlines.get(deadlineKey) ?? 0) > now()) {
+      for (const id of ids.slice(offset)) metadataFailures.set(id, "Instrument metadata not attempted during shared-quota rate-limit backoff; identity is unresolved.");
+      break;
+    }
+    const requestedIds = ids.slice(offset, offset + 100);
+    try { metadata.push(...(await read("portfolioMetadata", { instrumentIds: requestedIds })).data.instruments); }
+    catch (error) {
+      const reason = error?.status === 401 || error?.status === 403 ? "Instrument metadata authorization was rejected; identity is unresolved." : error?.status === 429 ? "Instrument metadata shared quota is rate-limited; identity is unresolved." : /^ETORO_INVALID_/.test(error?.code ?? "") ? "Instrument metadata failed contract validation; identity is unresolved." : "Instrument metadata provider is unavailable; identity is unresolved.";
+      for (const id of requestedIds) metadataFailures.set(id, reason);
+      if (error?.status === 429) {
+        deferPortfolioMetadata(deadlineKey, now(), error.retryAfterMs);
+        for (const id of ids.slice(offset + 100)) metadataFailures.set(id, "Instrument metadata not attempted after shared-quota rate limit; identity is unresolved.");
+        break;
+      }
+    }
+  }
+  return { data: composePortfolioSnapshot(environment, aggregate.data, breakdown, metadata, breakdownReason, metadataFailures), provider: { endpoint: "portfolioSnapshot", method: "GET", status: 200, receivedAt: new Date().toISOString(), durationMs: 0 } };
 }
 
 export function readOnlyEndpointSummary() {

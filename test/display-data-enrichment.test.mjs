@@ -17,13 +17,13 @@ async function readPortfolio({ rows, display, displayStatus = 200 }) {
   return { result, calls };
 }
 
-test("ID-only portfolio lookup is a single bounded batch with explicit overflow omission", async () => {
+test("ID-only portfolio lookup is a bounded batches include instruments after the first 100", async () => {
   const rows = Array.from({ length: 101 }, (_, index) => ({ instrumentID: index + 1, amount: 100, unrealizedPnL: 1 }));
   const { result, calls } = await readPortfolio({ rows, display: { instrumentDisplayDatas: rows.map(({ instrumentID }) => displayItem(instrumentID)) } });
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.equal(calls[1].searchParams.get("instrumentIds").split(",").length, 100);
-  assert.equal(result.data.instrumentCount, 100);
-  assert.equal(result.data.omittedPositionCount, 1);
+  assert.equal(result.data.instrumentCount, 101);
+  assert.equal(result.data.omittedPositionCount, 0);
   assert.equal(result.data.positionCount, 101);
   assert.doesNotMatch(JSON.stringify(result.data), /instrumentID|instrumentId|instrumentDisplayDatas/);
 });

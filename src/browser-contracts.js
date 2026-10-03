@@ -267,30 +267,75 @@ function portfolioNumber(value, { negative = false } = {}) {
   return value === null || (Number.isFinite(value) && Math.abs(value) <= 1_000_000_000_000 && (negative || value >= 0));
 }
 
+function validCurrency(value) { return typeof value === "string" && /^[A-Z]{3}$/.test(value); }
+function validFieldReasons(value, allowed) {
+  return value && typeof value === "object" && !Array.isArray(value) && Object.entries(value).every(([key, reason]) => allowed.includes(key) && typeof reason === "string" && reason.length > 0 && reason.length <= 240 && !/[\u0000-\u001F\u007F]/.test(reason));
+}
 function normalizeLivePortfolioPayload(payload) {
   const data = payload?.data;
   const dataKeys = ["environment", "currency", "equity", "availableCash", "totalInvested", "unrealizedPnl", "realizedPnl", "openPositionCount", "instrumentCount", "mirrorCount", "pendingOrderCount", "providerUpdatedAt", "omittedRowCount", "incompleteRowCount", "instruments"];
+  const addedKeys = ["accountCurrency", "usedMargin", "accountBalance", "frozenCash", "mirrorCash", "conversionMode", "breakdownUpdatedAt", "fieldReasons", "fieldSources", "arithmetic", "coverage"];
+  const extended = data && hasExactKeys(data, [...dataKeys, ...addedKeys]);
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || containsForbiddenPortfolioKey(payload) ||
-    !hasExactKeys(payload, ["ok", "mode", "data", "cache"]) || payload.ok !== true || payload.mode !== "read-only" || !data || !hasExactKeys(data, dataKeys) ||
-    !["real", "demo"].includes(data.environment) || data.currency !== "USD" || !Array.isArray(data.instruments) || data.instruments.length > 500 ||
-    ![data.equity, data.availableCash, data.totalInvested].every(portfolioNumber) || ![data.unrealizedPnl, data.realizedPnl].every((value) => portfolioNumber(value, { negative: true })) ||
-    ![data.openPositionCount, data.instrumentCount, data.omittedRowCount, data.incompleteRowCount].every((value) => Number.isInteger(value) && value >= 0) ||
-    (data.mirrorCount !== null && (!Number.isInteger(data.mirrorCount) || data.mirrorCount < 0)) ||
-    (data.pendingOrderCount !== null && (!Number.isInteger(data.pendingOrderCount) || data.pendingOrderCount < 0)) ||
+    !hasExactKeys(payload, ["ok", "mode", "data", "cache"]) || payload.ok !== true || payload.mode !== "read-only" || !data || !(hasExactKeys(data, dataKeys) || extended) ||
+    !["real", "demo"].includes(data.environment) || !validCurrency(data.currency) || !Array.isArray(data.instruments) || data.instruments.length > (extended ? 1000 : 500) ||
+    ![data.equity, data.availableCash, data.totalInvested].every((value) => portfolioNumber(value, { negative: true })) || ![data.unrealizedPnl, data.realizedPnl].every((value) => portfolioNumber(value, { negative: true })) ||
+    !(extended && data.openPositionCount === null || Number.isSafeInteger(data.openPositionCount) && data.openPositionCount >= 0) ||
+    ![data.instrumentCount, data.omittedRowCount, data.incompleteRowCount].every((value) => Number.isSafeInteger(value) && value >= 0) ||
+    (data.mirrorCount !== null && (!Number.isSafeInteger(data.mirrorCount) || data.mirrorCount < 0)) ||
+    (data.pendingOrderCount !== null && (!Number.isSafeInteger(data.pendingOrderCount) || data.pendingOrderCount < 0)) ||
     (data.providerUpdatedAt !== null && !isIsoInstant(data.providerUpdatedAt))) throw new Error("Portfolio data is unavailable.");
-  const symbols = new Set();
+  if (extended) {
+    const coverage = data.coverage, arithmetic = data.arithmetic;
+    if (data.accountCurrency !== data.currency || data.conversionMode !== "eToroApp" ||
+      ![data.usedMargin, data.accountBalance, data.frozenCash, data.mirrorCash].every((value) => portfolioNumber(value, { negative: true })) ||
+      (data.breakdownUpdatedAt !== null && !isIsoInstant(data.breakdownUpdatedAt)) ||
+      !validFieldReasons(data.fieldReasons, [...dataKeys, ...addedKeys]) || !validFieldReasons(data.fieldSources, [...dataKeys, ...addedKeys]) ||
+      !hasExactKeys(arithmetic, ["equity", "cash"]) || !Object.values(arithmetic).every((value) => ["verified", "mismatch", "unavailable"].includes(value)) ||
+      !hasExactKeys(coverage, ["instrumentLimit", "metadataResolvedCount", "metadataUnresolvedCount", "unsupportedInstrumentCount", "breakdownStatus", "directInstrumentCount", "copyInstrumentCount", "copyHoldingsStatus", "manualHoldingsStatus", "metadataStatus"]) ||
+      coverage.instrumentLimit !== 500 || !["complete", "incomplete"].includes(coverage.copyHoldingsStatus) || !["complete", "incomplete"].includes(coverage.manualHoldingsStatus) || !["available", "partial", "unavailable", "authorization-degraded"].includes(coverage.metadataStatus) || !["available", "unavailable"].includes(coverage.breakdownStatus) ||
+      ![coverage.metadataResolvedCount, coverage.metadataUnresolvedCount, coverage.unsupportedInstrumentCount, coverage.directInstrumentCount, coverage.copyInstrumentCount].every((value) => Number.isSafeInteger(value) && value >= 0)) throw new Error("Portfolio data is unavailable.");
+  }
+  const rowKeys = new Set();
   const instruments = data.instruments.map((instrument) => {
     const keys = ["symbol", "displayName", "positionCount", "units", "averageOpenPrice", "currentPrice", "investedValue", "netValue", "unrealizedPnl", "unrealizedPnlPercent", "allocationPercent", "completeness"];
-    if (!instrument || !hasExactKeys(instrument, keys) || typeof instrument.symbol !== "string" || !/^[A-Z0-9][A-Z0-9._:/-]{0,31}$/.test(instrument.symbol) || symbols.has(instrument.symbol) ||
+    const added = ["scope", "assetCurrency", "netContracts", "currentExposure", "fieldReasons", "fieldSources", "positions", "positionsOmittedCount"];
+    const key = `${instrument?.scope ?? "direct"}:${instrument?.symbol}`;
+    if (!instrument || !(extended ? hasExactKeys(instrument, [...keys, ...added]) : hasExactKeys(instrument, keys)) || typeof instrument.symbol !== "string" || !/^[A-Z0-9][A-Z0-9._:/-]{0,31}$/.test(instrument.symbol) || rowKeys.has(key) ||
       typeof instrument.displayName !== "string" || !instrument.displayName.trim() || instrument.displayName.length > 120 || /[\u0000-\u001F\u007F]/.test(instrument.displayName) ||
-      !Number.isInteger(instrument.positionCount) || instrument.positionCount < 1 || !["complete", "partial"].includes(instrument.completeness) ||
-      ![instrument.units, instrument.averageOpenPrice, instrument.currentPrice, instrument.investedValue, instrument.allocationPercent].every(portfolioNumber) ||
-      ![instrument.netValue, instrument.unrealizedPnl, instrument.unrealizedPnlPercent].every((value) => portfolioNumber(value, { negative: true }))) throw new Error("Portfolio data is unavailable.");
-    symbols.add(instrument.symbol); return { ...instrument, displayName: instrument.displayName.trim() };
+      !(extended && instrument.positionCount === null || Number.isSafeInteger(instrument.positionCount) && instrument.positionCount >= (extended ? 0 : 1)) || !["complete", "partial"].includes(instrument.completeness) ||
+      ![instrument.currentPrice, instrument.investedValue, instrument.allocationPercent].every(portfolioNumber) ||
+      ![instrument.averageOpenPrice, instrument.units, instrument.netValue, instrument.unrealizedPnl, instrument.unrealizedPnlPercent].every((value) => portfolioNumber(value, { negative: true }))) throw new Error("Portfolio data is unavailable.");
+    if (extended) {
+      if (!["direct", "copy"].includes(instrument.scope) || (instrument.assetCurrency !== null && !validCurrency(instrument.assetCurrency)) ||
+        ![instrument.netContracts, instrument.currentExposure].every((value) => portfolioNumber(value, { negative: true })) ||
+        !validFieldReasons(instrument.fieldReasons, [...keys, ...added]) || !validFieldReasons(instrument.fieldSources, [...keys, ...added]) || !Array.isArray(instrument.positions) || instrument.positions.length > 1000 || !Number.isSafeInteger(instrument.positionsOmittedCount) || instrument.positionsOmittedCount < 0 || (instrument.positionCount !== null && instrument.positions.length + instrument.positionsOmittedCount !== instrument.positionCount)) throw new Error("Portfolio data is unavailable.");
+      for (const position of instrument.positions) {
+        if (!hasExactKeys(position, ["direction", "settlementType", "leverage", "units", "contracts", "openPrice", "currentPrice", "assetCurrency", "rateUpdatedAt"]) ||
+          ![null, "long", "short"].includes(position.direction) || ![null, "cfd", "real", "trs", "cmt", "realFutures", "marginTrade"].includes(position.settlementType) ||
+          ![position.leverage, position.openPrice, position.currentPrice].every(portfolioNumber) || ![position.units, position.contracts].every((value) => portfolioNumber(value, { negative: true })) ||
+          (position.assetCurrency !== null && !validCurrency(position.assetCurrency)) || (position.rateUpdatedAt !== null && !isIsoInstant(position.rateUpdatedAt))) throw new Error("Portfolio data is unavailable.");
+      }
+    }
+    rowKeys.add(key); return { ...instrument, displayName: instrument.displayName.trim() };
   });
-  if (instruments.length !== data.instrumentCount || instruments.reduce((total, item) => total + item.positionCount, 0) + data.omittedRowCount !== data.openPositionCount) throw new Error("Portfolio data is unavailable.");
+  const directPositions = instruments.filter((item) => !extended || item.scope === "direct").reduce((total, item) => total + item.positionCount, 0);
+  if (instruments.length !== data.instrumentCount || (!extended && directPositions + data.omittedRowCount !== data.openPositionCount)) throw new Error("Portfolio data is unavailable.");
+  if (extended && (data.coverage.directInstrumentCount !== instruments.filter((item) => item.scope === "direct").length || data.coverage.copyInstrumentCount !== instruments.filter((item) => item.scope === "copy").length)) throw new Error("Portfolio data is unavailable.");
   const cache = normalizeReadCache(payload.cache, "Portfolio data is unavailable.");
   return { ...data, instruments, cache };
+}
+
+function normalizeFxPayload(payload) {
+  const fail = () => { throw new Error("FX reference is unavailable."); };
+  const data = payload?.data;
+  if (!hasExactKeys(payload, ["ok", "data"]) || payload.ok !== true || !hasExactKeys(data, ["source", "basis", "rateDate", "receivedAt", "freshness", "rates"]) ||
+    data.source !== "ECB" || data.basis !== "units-per-EUR" || !["current", "stale"].includes(data.freshness) || !isIsoInstant(data.receivedAt) ||
+    typeof data.rateDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(data.rateDate) || !Number.isFinite(Date.parse(`${data.rateDate}T00:00:00.000Z`)) ||
+    new Date(`${data.rateDate}T00:00:00.000Z`).toISOString().slice(0, 10) !== data.rateDate || data.rateDate > data.receivedAt.slice(0, 10) ||
+    !data.rates || typeof data.rates !== "object" || Array.isArray(data.rates) || Object.keys(data.rates).length < 2 || Object.keys(data.rates).length > 60 || data.rates.EUR !== 1 ||
+    !Object.entries(data.rates).every(([currency, rate]) => validCurrency(currency) && typeof rate === "number" && Number.isFinite(rate) && rate > 0 && rate <= 1_000_000_000)) fail();
+  return { ...data, rates: { ...data.rates } };
 }
 
 const draftStrategies = ["dca-cash-reserve", "threshold-rebalance", "volatility-band-accumulator", "slow-trend-allocation", "news-aware-watchlist"];
@@ -371,6 +416,7 @@ function normalizeOfflineOperationsPayload(payload) {
     isIsoInstant,
     normalizeMarketChartPayload,
     normalizeLivePortfolioPayload,
+    normalizeFxPayload,
     normalizePortfolioViewPayload,
     normalizeWatchlistViewPayload,
   });
