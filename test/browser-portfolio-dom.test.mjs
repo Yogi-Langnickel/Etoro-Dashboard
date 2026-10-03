@@ -144,6 +144,6 @@ test("omitted provider positions are not presented as an empty account", async (
   const document = new Document(); const { renderProviderPortfolio } = await renderer(document);
   const view = payload([]); view.data.openPositionCount = 2; view.data.omittedRowCount = 2;
   renderProviderPortfolio(view);
-  assert.match(document.getElementById("portfolio-table-body").children[0].children[0].textContent, /No displayable holding rows/);
+  assert.match(document.getElementById("portfolio-table-body").children[0].children[0].textContent, /No holdings to display; coverage is incomplete/);
   assert.match(document.getElementById("portfolio-partial").textContent, /Partial coverage.*2 omitted/);
 });

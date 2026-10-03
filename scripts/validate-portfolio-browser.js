@@ -15,7 +15,7 @@ async (page) => {
   check(await page.locator("[data-instrument-row]").count() === 0, "offline no-profile state has no financial fallback rows");
   check(await page.locator("#mock-equity").textContent() === "Unavailable", "offline no-profile monetary values unavailable");
   check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "no-profile 375px has no page overflow");
-  await page.screenshot({ path: "/private/tmp/etoro-portfolio-ui-no-profile.png", fullPage: true });
+  await page.screenshot({ path: "/private/tmp/etoro-presentation-ui-no-profile.png", fullPage: true });
   await page.addInitScript(() => { Date.now = () => Date.parse("2026-10-04T12:00:00.000Z"); localStorage.removeItem("etoro-display-currency"); });
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url()), environment = url.searchParams.get("environment") ?? "real";
@@ -33,15 +33,17 @@ async (page) => {
   check(await page.locator("#portfolio-selected-price").textContent() === "0.000123456789 USD", "native small-price precision");
   check(await page.locator("#portfolio-selected-opening").textContent() === "-0.00012345 USD", "signed provider opening rate");
   check(await page.locator("#portfolio-selected-units").textContent() === "0.125", "fractional net quantity");
+  check(await page.locator("#portfolio-inspector").evaluate((node) => !node.open), "initial selected holding does not open inspector");
+  check(providerReads === 1, "initial selection has no additional portfolio reads");
   const layout = async (label) => {
-    const measurements = await page.evaluate(() => ({ viewport: innerWidth, width: document.documentElement.scrollWidth, cards: [...document.querySelectorAll(".metric strong")].map((node) => ({ width: node.clientWidth, content: node.scrollWidth, text: node.textContent })), rowValues: [...document.querySelectorAll("[data-instrument-row]:not([hidden]) td")].map((node) => ({ width: node.clientWidth, content: node.scrollWidth })), inspector: document.querySelector("#portfolio-inspector").getBoundingClientRect().top, holdings: document.querySelector(".positions-panel").getBoundingClientRect().top }));
+    const measurements = await page.evaluate(() => ({ viewport: innerWidth, width: document.documentElement.scrollWidth, cards: [...document.querySelectorAll(".metric strong")].map((node) => ({ width: node.clientWidth, content: node.scrollWidth, text: node.textContent })), rowValues: [...document.querySelectorAll("[data-instrument-row]:not([hidden]) td")].map((node) => ({ width: node.clientWidth, content: node.scrollWidth })), inspectorClosed: !document.querySelector("#portfolio-inspector").open, statistics: document.querySelector(".portfolio-statistics").getBoundingClientRect().top, holdings: document.querySelector(".positions-panel").getBoundingClientRect(), workspace: document.querySelector(".workspace").getBoundingClientRect() }));
     check(measurements.width <= measurements.viewport, `${label}: no horizontal page overflow`);
     check(measurements.cards.every((node) => node.content <= node.width + 1), `${label}: financial cards do not clip`);
     check(measurements.rowValues.every((node) => node.content <= node.width + 1), `${label}: financial table cells do not clip`);
-    if (measurements.viewport <= 950) check(measurements.inspector < measurements.holdings, `${label}: mobile inspector reachable before table`);
+    check(measurements.inspectorClosed && measurements.statistics < measurements.holdings.top && Math.abs(measurements.holdings.width - measurements.workspace.width) < 2, `${label}: closed inspector leaves full-width holdings and supporting statistics above table`);
     return measurements;
   };
-  for (const width of [1440, 768, 375]) { await page.setViewportSize({ width, height: 900 }); await layout(String(width)); await page.screenshot({ path: `/private/tmp/etoro-portfolio-ui-${width}.png`, fullPage: true }); }
+  for (const width of [1440, 768, 375]) { await page.setViewportSize({ width, height: 900 }); await layout(String(width)); await page.screenshot({ path: `/private/tmp/etoro-presentation-ui-${width}.png`, fullPage: true }); }
   await page.setViewportSize({ width: 720, height: 450 }); // 1440px screen at 200% browser zoom has this CSS viewport.
   await layout("200% zoom equivalent CSS viewport");
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -55,7 +57,10 @@ async (page) => {
   await page.getByRole("button", { name: "Next", exact: true }).click();
   check((await page.locator("#portfolio-page-status").textContent()).includes("Page 2 of 6"), "local pagination next");
   await page.locator("[data-instrument-row]:visible").nth(3).focus(); await page.keyboard.press("Enter");
+  check(await page.locator("#portfolio-inspector").evaluate((node) => node.open) && await page.evaluate(() => document.activeElement?.id === "portfolio-inspector-close"), "Enter opens inspector and focuses its visible Close command");
   const selected = await page.locator("[data-instrument-row].active").getAttribute("data-row-key");
+  await page.keyboard.press("Escape");
+  check(await page.evaluate(() => document.activeElement?.dataset.rowKey) === selected, "Escape closes inspector and returns scoped holding focus");
   const reads = providerReads;
   await page.getByRole("combobox", { name: "Display currency" }).selectOption("AUD");
   check(providerReads === reads, "currency change has no portfolio request per holding");
@@ -64,25 +69,32 @@ async (page) => {
   check((await page.locator("#portfolio-stat-balance").textContent()).includes("AUD"), "account balance converts with shared snapshot");
   check((await page.locator("#portfolio-stat-frozen").textContent()).includes("AUD"), "frozen pending cash converts with shared snapshot");
   check((await page.locator("#portfolio-stat-mirror").textContent()).includes("AUD"), "copy mirror cash converts with shared snapshot");
-  await page.getByRole("link", { name: "Inspect selected instrument" }).click();
-  check(await page.evaluate(() => document.activeElement?.id === "portfolio-inspector"), "mobile inspector link moves keyboard focus");
+  await page.getByRole("button", { name: "Open selected holding" }).click();
+  check(await page.evaluate(() => document.activeElement?.id === "portfolio-inspector-close"), "visible inspector command opens native dialog with contained initial focus");
+  await page.keyboard.press("Escape");
   await page.locator("#portfolio-review-search").fill("S003");
   check(await page.locator("[data-instrument-row]:visible").count() === 1, "local search filters page");
-  check((await page.locator("#portfolio-field-reasons").textContent()).includes("Synthetic P/L absent"), "Why missing enumerates independent P/L gap");
+  check((await page.locator("#portfolio-field-reasons").textContent()).includes("P/L: This field was not supplied"), "Why missing enumerates independent P/L gap in plain language");
+  check(await page.locator("[data-instrument-row]:visible td").nth(3).textContent() === "—" && (await page.locator("[data-instrument-row]:visible td").nth(3).getAttribute("aria-label")).includes("P/L unavailable"), "missing P/L cell is compact with accessible reason");
+  await page.getByRole("button", { name: "System health", exact: true }).click();
+  check((await page.locator("#portfolio-technical-reasons").textContent()).includes("Synthetic P/L absent"), "System health preserves exact technical missing reason");
+  check(await page.locator("#portfolio-inspector").evaluate((node) => !node.open), "only one modal is open at a time");
+  await page.keyboard.press("Escape");
   await page.locator("#portfolio-review-search").fill("");
   await page.getByRole("combobox", { name: "Workspace environment" }).selectOption("demo");
   await page.waitForFunction(() => document.querySelector("#mock-equity").textContent.includes("800.00"));
   check((await page.locator("#mock-equity").textContent()).includes("AUD"), "profile change preserves currency preference and converts new account");
-  failRefresh = true; await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  failRefresh = true; await page.getByRole("button", { name: "Refresh data", exact: true }).first().click();
   await page.waitForFunction(() => document.querySelector("#portfolio-freshness").textContent.includes("stale"));
   check((await page.locator("#mock-equity").textContent()).includes("800.00"), "failed refresh retains same-profile converted last-good value");
   check((await page.locator("#portfolio-partial").textContent()).includes("Retained stale coverage: 1 incomplete aggregate rows; 0 omitted") && !(await page.locator("#portfolio-partial").textContent()).includes("no last-good"), "failed refresh retains known partial coverage with stale qualifier");
   check((await page.locator("#portfolio-omitted").textContent()).includes("Omitted rows: 0 (retained stale snapshot)"), "failed refresh retains known omission count separately from current read failure");
   check((await page.locator("#portfolio-fx-basis").textContent()).includes("FX current"), "portfolio and FX freshness remain separate");
+  check((await page.locator("#workspace-banner-detail").textContent()).includes("1 incomplete holding rows; 0 omitted") && (await page.locator("#workspace-banner-title").textContent()).includes("latest read failed"), "visible banner discloses retained partial coverage and current read failure");
   await page.getByRole("combobox", { name: "Display currency" }).selectOption("EUR");
   check((await page.locator("#portfolio-stat-source").textContent()).includes("stale"), "currency repaint preserves stale portfolio source status synchronously");
   await page.getByRole("tab", { name: "Watchlist Items" }).focus(); await page.keyboard.press("ArrowLeft");
   check(await page.getByRole("tab", { name: "Portfolio View" }).getAttribute("aria-selected") === "true", "keyboard tabs remain usable");
   check(await page.getByRole("tab").count() === 3, "all three tabs preserved");
-  return { syntheticOnly: true, assertions, widths: [375, 768, 1440], zoom: "200% equivalent CSS viewport plus CSS zoom supplement; native browser toolbar zoom unavailable in this automation", providerCalls: "browser intercepts only; offline server denies all provider and FX fetches" };
+  return { syntheticOnly: true, assertions, widths: [375, 768, 1440], zoom: "200% equivalent CSS viewport plus CSS zoom supplement; separate primary native browser zoom proof required", providerCalls: "browser intercepts only; offline server denies all provider and FX fetches" };
 }

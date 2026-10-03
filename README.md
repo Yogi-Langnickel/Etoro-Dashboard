@@ -89,12 +89,21 @@ pending cash and mirror cash. Unknown native denomination is explicitly labelled
 portfolio currency never establishes candle currency. Currency/FX repaint preserves
 stale portfolio status and refresh restores scoped selection/focus.
 
-The compact Portfolio workspace places four money cards and coverage above a
-wider holdings table beside a bounded inspector. Local pagination starts at 25
-rows; native price and position details are secondary. Period controls are
-inside the chart, and the inspector is reachable before the holdings list on
-mobile. Search, stable sorting, filters, selection and profile-generation guards
-remain.
+The compact Portfolio workspace places four money cards, visible indicative FX
+basis, partial/unknown coverage and collapsible cash statistics above full-width
+holdings. Local pagination starts at 25 rows. Open a holding by click, Enter,
+Space or the visible details command; its native dialog contains price/position
+facts and chart periods. Initial selection leaves the dialog closed. Escape or
+Close returns focus to the current scoped row or a visible fallback. Profile/tab
+changes close details; the three established tabs and generation guards remain.
+
+A plain Portfolio data banner distinguishes snapshot freshness, current-read
+failure and FX availability. Refresh data retries recoverable reads; Connection
+details opens System health for authorization/configuration problems. There is
+no new authentication action. System health holds precise clocks, retry metadata,
+technical field reasons/sources and the read audit. Partial/unknown coverage stays
+visible outside it. Missing table/inspector cells use a dash with accessible plain
+reasons, including missing conversion; source amounts and precision are unchanged.
 
 Current field contracts, action owners and input/completion gates are reached
 through the [Dashboard canonical context pointer](unblockme.md). Follow its
@@ -102,7 +111,8 @@ verified workspace bootstrap and returned projectMemory directory for the curren
 API notes, implementation plan, design review and dated validation. The older
 repo-local docs links are compatibility paths and may point to another branch;
 they do not establish current contracts. The portable [design
-baton](docs/designs/2026-10-04-portfolio-completeness-v1/README.md) remains here.
+baton](docs/designs/2026-10-04-ui-presentation/README.md) remains here. The earlier
+[v1 baton](docs/designs/2026-10-04-portfolio-completeness-v1/README.md) is historical.
 Actual test/live acceptance and publication states are recorded in canonical validation; offline
 success does not establish live parity. Money Maker's separate research blockers
 are not blanket Dashboard blockers. No collection/training or producer change is

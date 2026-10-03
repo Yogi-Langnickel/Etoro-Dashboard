@@ -74,6 +74,30 @@ test("missing or stale FX hides converted money explicitly while account currenc
   api.selectDisplayCurrency("XXX"); assert.equal(document.getElementById("mock-equity").textContent, "Unavailable (FX)");
 });
 
+test("valid reference rates with out-of-range conversion use compact range reasons and recover in the original account currency", async () => {
+  const rates = snapshot(); rates.data.rates.USD = 1; rates.data.rates.AUD = 2000;
+  const { api, document } = await workspace(async () => response(rates));
+  const raw = syntheticAggregate(); raw.accountTotals.accountTotalUsedMargin = 1e12;
+  raw.instrumentAggregates[0].totalMarginAccountCurrency = 1e12;
+  raw.instrumentAggregates[0].netCurrentExposureAccountCurrency = 1e12;
+  const source = dto({ aggregate: raw }); api.renderProviderPortfolio(source); await api.refreshFx(); api.selectDisplayCurrency("AUD");
+  const cell = document.getElementById("portfolio-table-body").children[0].children[1];
+  const exposure = document.getElementById("portfolio-selected-exposure");
+  for (const node of [cell, exposure]) {
+    assert.equal(node.textContent, "—");
+    assert.match(node.attributes["aria-label"], /unavailable.*outside the supported display range.*account currency/);
+    assert.doesNotMatch(node.attributes["aria-label"], /reference rates.*unavailable|could not be validated/);
+    assert.match(node.attributes.title, /supported display range/);
+  }
+  assert.match(document.getElementById("portfolio-fx-basis").textContent, /FX current/);
+  assert.doesNotMatch(document.getElementById("workspace-banner-detail").textContent, /FX is unavailable/);
+  api.selectDisplayCurrency("USD");
+  assert.equal(cell.textContent, "$1,000,000,000,000.00");
+  assert.equal(exposure.textContent, "$1,000,000,000,000.00");
+  assert.equal(source.data.instruments[0].investedValue, 1e12);
+  assert.equal(source.data.instruments[0].currentExposure, 1e12);
+});
+
 test("publication ageing invalidates conversions without polling and preserves Friday rates over the weekend and TARGET holidays", async () => {
   let calls = 0; const { api, document, clock } = await workspace(async () => { calls++; return response(snapshot()); });
   api.renderProviderPortfolio(dto()); await api.refreshFx(); api.selectDisplayCurrency("AUD");
@@ -99,7 +123,8 @@ test("independent fields and account missing reasons stay visible when breakdown
   assert.equal(document.getElementById("portfolio-table-body").children[0].children[1].textContent, "$100.00");
   assert.equal(document.getElementById("portfolio-selected-units").textContent, "1");
   assert.equal(document.getElementById("portfolio-selected-opening").textContent, "100 USD");
-  assert.equal(document.getElementById("portfolio-selected-positions").textContent, "Unavailable");
+  assert.equal(document.getElementById("portfolio-selected-positions").textContent, "—");
+  assert.match(document.getElementById("portfolio-selected-positions").attributes["aria-label"], /unavailable.*Matching position details/);
   assert.match(document.getElementById("portfolio-field-reasons").children.map((node) => node.textContent).join(" "), /P\/L:.*Native current price:/);
   assert.match(document.getElementById("portfolio-account-reasons").children.map((node) => node.textContent).join(" "), /Realized P\/L:/);
 });
@@ -183,10 +208,12 @@ test("source clock, metadata and position-count gaps have precise disclosures; u
   const breakdown = syntheticBreakdown(); breakdown.instruments[0].positions[0].assetCurrency = null;
   api.renderProviderPortfolio(dto({ aggregate: raw, breakdown }));
   assert.equal(document.getElementById("portfolio-selected-price").textContent, "110 · denomination unverified");
-  assert.match(document.getElementById("portfolio-field-reasons").children.map((node) => node.textContent).join(" "), /Native current price: Native price denomination is unverified/);
-  assert.match(document.getElementById("portfolio-account-reasons").children.map((node) => node.textContent).join(" "), /Aggregate source time:.*timezone/);
+  assert.match(document.getElementById("portfolio-field-reasons").children.map((node) => node.textContent).join(" "), /Native current price: The currency for this value could not be verified/);
+  assert.match(document.getElementById("portfolio-account-reasons").children.map((node) => node.textContent).join(" "), /Aggregate source time: The source time could not be verified/);
+  assert.match(document.getElementById("portfolio-technical-reasons").children.map((node) => node.textContent).join(" "), /timezone.*Native price denomination is unverified/);
   api.renderProviderPortfolio(dto({ breakdown: null }));
-  assert.match(document.getElementById("portfolio-field-reasons").children.map((node) => node.textContent).join(" "), /Position count: Instrument breakdown unavailable/);
+  assert.match(document.getElementById("portfolio-field-reasons").children.map((node) => node.textContent).join(" "), /Position count: Matching position details were not available/);
+  assert.match(document.getElementById("portfolio-technical-reasons").children.map((node) => node.textContent).join(" "), /PositionCount: Instrument breakdown unavailable/);
 });
 
 test("legitimate UNKNOWN-prefixed symbols remain usable while reason-marked placeholders disable market lookup", async () => {

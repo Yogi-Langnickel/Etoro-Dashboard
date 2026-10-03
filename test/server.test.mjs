@@ -490,8 +490,10 @@ test("portfolio view starts without fixture rows and has period controls", async
   assert.equal(response.status, 200);
   assert.deepEqual(symbols, []);
   assert.deepEqual(periods, ["24h", "1w", "1m", "1y", "5y", "max"]);
-  assert.match(response.text, /Aggregated by asset/);
-  assert.match(response.text, /Instrument summary/);
+  assert.match(response.text, /Holdings/);
+  assert.match(response.text, /Instrument inspector/);
+  assert.match(response.text, /<dialog[^>]+id="portfolio-inspector"/);
+  assert.match(response.text, /Open selected holding/);
   assert.match(response.text, /Direction-aware net opening rate/);
   assert.match(response.text, /P\/L %/);
   assert.match(response.text, /Margin \/ invested/);
@@ -500,19 +502,18 @@ test("portfolio view starts without fixture rows and has period controls", async
   assert.match(response.text, /No provider data loaded/);
 });
 
-test("portfolio view keeps unavailable enrichment and risk context redacted", async () => {
+test("portfolio view keeps capability limits in details and financial status redacted", async () => {
   const response = await callHandler(configuredHandler(), {
     url: "/",
   });
 
   assert.equal(response.status, 200);
-  assert.match(response.text, /context-only enrichment receipts/);
-  assert.match(response.text, /No synthetic market context is shown/);
-  assert.match(response.text, /Descriptive Statistics/);
+  assert.match(response.text, /Historical account performance, news, dividends and expected income are not supplied/);
+  assert.match(response.text, /Portfolio statistics/);
   assert.match(response.text, /Cash \/ equity/);
   assert.match(response.text, /Largest displayed holding by invested capital/);
-  assert.match(response.text, /Unavailable: account history required/);
-  assert.match(response.text, /Unavailable: distribution evidence required/);
+  assert.match(response.text, /<dialog[^>]+id="system-health"/);
+  assert.match(response.text, /Technical field reasons and sources/);
   assert.match(response.text, /No write actions|No writes|No orders|Read only/);
   assert.match(response.text, /Submit disabled/);
   assert.equal(response.text.includes("server-api-secret"), false);

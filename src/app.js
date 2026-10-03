@@ -47,6 +47,10 @@ const tableReview = {
   portfolio: { search: "", coverage: "all", sort: "symbol", direction: "asc", page: 1 },
   watchlist: { search: "", coverage: "all", sort: "rank", direction: "asc" },
 };
+let presentationReadFailure = null;
+let presentationConnection = "checking";
+let activePresentationDialog = null;
+const presentationDialogReturns = new Map();
 let operationsPayload = null;
 let operationsPending = false;
 const pendingOperations = new Set();
@@ -108,6 +112,150 @@ function freshnessDetail(record, now = Date.now()) {
   return `Freshness: ${state}${state === "stale" ? "; last-good provider rows retained" : ""} · fetched ${cache.cachedAt} · age ${age}s · expires ${cache.expiresAt}`;
 }
 
+function plainPortfolioReason(reason) {
+  const value = String(reason ?? "").toLowerCase();
+  if (/authorization|permission|missing read scope|read.scope.*(rejected|unavailable)/.test(value)) return "Read permission is unavailable for this field.";
+  if (/conversion.*overflow|display.*range/.test(value)) return "The converted amount is outside the supported display range. Use the account currency.";
+  if (/\bfx\b|reference rates|conversion/.test(value)) return "Current reference rates are unavailable for this conversion. Use the account currency or refresh data.";
+  if (/rate.limit|quota|backoff/.test(value)) return "The data service is temporarily limiting reads. Try again later.";
+  if (/timed out|timeout|unavailable.*provider|provider is unavailable/.test(value)) return "The data service could not provide this field. Try refreshing.";
+  if (/timezone|timestamp|calendar|source time/.test(value)) return "The source time could not be verified.";
+  if (/currency|currencies|denomination/.test(value)) return /conflict|inconsistent|differing/.test(value) ? "The positions do not share a verified currency." : "The currency for this value could not be verified.";
+  if (/zero.*margin|positive.*equity|denominator/.test(value)) return "A percentage cannot be calculated from the available amounts.";
+  if (/combined|zero.net|no single|direction/.test(value)) return "These positions do not have one reliable combined value.";
+  if (/ambiguous|identity|globally/.test(value)) return "The asset identity could not be verified.";
+  if (/validation|invalid|finite|range|overflow/.test(value)) return "The supplied value could not be validated.";
+  if (/no matching|breakdown|details/.test(value)) return "Matching position details were not available.";
+  if (/not supplied|missing|omitted|absent|no.*field/.test(value)) return "This field was not supplied by the data source.";
+  return "This field could not be verified. System health contains the source details.";
+}
+
+function setPortfolioField(node, rawValue, formatted, label, reason) {
+  if (!node) return;
+  const conversionMissing = formatted === "Unavailable (FX)";
+  const conversionOverflow = formatted === "Unavailable (FX overflow)";
+  const missing = rawValue === null || rawValue === undefined || conversionMissing || conversionOverflow;
+  if (conversionOverflow) reason = "FX conversion overflow";
+  else if (conversionMissing) reason = "FX conversion unavailable";
+  node.textContent = missing ? "—" : formatted;
+  const explanation = missing || reason ? `${label}: ${plainPortfolioReason(reason)}` : label;
+  node.setAttribute("aria-label", missing ? `${label} unavailable. ${plainPortfolioReason(reason)}` : `${label}: ${formatted}${reason ? `. ${plainPortfolioReason(reason)}` : ""}`);
+  node.setAttribute("title", explanation);
+}
+
+function renderPresentationStatus(now = Date.now()) {
+  const record = investmentFreshness.portfolio, view = record.view;
+  const state = freshnessState(record, now);
+  const environment = selectedPortfolioEnvironment ?? view?.environment;
+  text("workspace-profile", `${environment ? labelize(environment) : "Account"} · Read only`);
+  const summaries = [];
+  if (view) {
+    const seconds = Math.max(0, Math.floor((now - Date.parse(view.cache.cachedAt)) / 1000));
+    summaries.push(seconds < 60 ? "Fetched less than a minute ago." : seconds < 3600 ? `Fetched ${Math.floor(seconds / 60)} minute${seconds < 120 ? "" : "s"} ago.` : `Fetched ${Math.floor(seconds / 3600)} hour${seconds < 7200 ? "" : "s"} ago.`);
+  }
+  if (view && (view.omittedRowCount || view.incompleteRowCount)) summaries.push(`${view.incompleteRowCount} incomplete holding rows; ${view.omittedRowCount} omitted.`);
+  if (view?.coverage?.copyHoldingsStatus === "incomplete" || view?.coverage?.manualHoldingsStatus === "incomplete") summaries.push("Some holdings coverage is unknown.");
+  if (view?.coverage?.metadataStatus !== undefined && view.coverage.metadataStatus !== "available") summaries.push("Some asset identities are unverified.");
+  if (view?.fieldReasons?.providerUpdatedAt) summaries.push("The source clock is unverified.");
+  const fxUnavailable = view && displayCurrency && displayCurrency !== (view.accountCurrency ?? view.currency) && (!fxCurrent(now) || !fxSnapshot?.rates[displayCurrency] || !fxSnapshot?.rates[view.accountCurrency ?? view.currency]);
+  if (fxUnavailable) summaries.push("FX is unavailable or out of date; converted amounts are hidden.");
+  let title, detail, action = "Refresh data", tone = "warn";
+  const failure = presentationReadFailure ?? (!view && presentationConnection !== "ready" ? presentationConnection : null);
+  if (state === "pending") {
+    title = "Refreshing data";
+    detail = view ? `Previous values remain visible${record.failed ? " and stale" : ""} while this read completes.` : "Waiting for the selected account. No account values are loaded.";
+    const history = { "provider timeout": "Previous read timed out.", "provider rate-limited": "Previous read was rate-limited.", "provider response malformed": "Previous data could not be validated.", "authentication rejected": "Previous read was not authorized.", "not configured": "Previous connection was not configured." };
+    if (failure && failure !== "checking") detail += ` ${history[failure] ?? "Previous read failed."}`;
+    tone = "neutral";
+  } else if (failure && failure !== "checking") {
+    const messages = {
+      "authentication rejected": ["Connection not authorized", "Check account permissions and server-side credentials in connection details."],
+      "unauthorized-or-expired": ["Connection not authorized", "Check account permissions and server-side credentials in connection details."],
+      "wrong-environment": ["Connection does not match this account", "Check the selected Real/Demo connection details."],
+      "not configured": ["Connection not configured", "Set up the selected account connection outside this dashboard."],
+      "not-configured": ["Connection not configured", "Set up the selected account connection outside this dashboard."],
+      "provider rate-limited": ["Reads temporarily limited", "Wait for the retry window before refreshing."],
+      "rate-limited": ["Reads temporarily limited", "Wait for the retry window before refreshing."],
+      "provider timeout": ["The latest read timed out", "Refresh data to try again."], timeout: ["The latest read timed out", "Refresh data to try again."],
+      "provider response malformed": ["The latest data could not be validated", "Refresh data; the previous snapshot has not been replaced."], malformed: ["The latest data could not be validated", "Refresh data; the previous snapshot has not been replaced."],
+    };
+    [title, detail] = messages[failure] ?? ["The latest read failed", "Refresh data to try again."];
+    if (/auth|environment|configured/.test(failure)) { action = "Connection details"; tone = "danger"; }
+    if (view) detail += " Last available values are retained and stale.";
+    else detail += " No account values are loaded.";
+  } else if (state === "stale") { title = "Showing a retained snapshot"; detail = "Values are stale. Refresh data for a new read."; }
+  else if (state === "expired") { title = "This snapshot is out of date"; detail = "Values keep their original timestamp. Refresh data to update them."; }
+  else if (fxUnavailable) { title = "Currency conversion unavailable"; detail = "Refresh data for reference rates, or use the account currency."; }
+  else if (state === "partial") { title = "Some data is incomplete"; detail = "Available fields remain usable. Open a holding for plain missing-field reasons."; }
+  else if (state === "current") { title = "Snapshot available"; detail = "Read-only account values. Reference conversions are indicative."; tone = "ok"; action = "System health"; }
+  else { title = "Checking your connection"; detail = "Waiting for read-only account data."; tone = "neutral"; action = "Connection details"; }
+  const announcement = (id, value) => { const node = document.getElementById(id); if (node && node.textContent !== value) node.textContent = value; };
+  announcement("workspace-banner-title", `Portfolio data · ${title}`);
+  announcement("workspace-banner-detail", [detail, ...summaries].join(" "));
+  announcement("portfolio-visible-coverage", view ? `${view.instrumentCount} holding rows · ${view.incompleteRowCount} incomplete · ${view.omittedRowCount} omitted${state === "stale" || state === "expired" ? ` · ${state}` : ""}${summaries.filter((part) => /unknown|unverified/.test(part)).length ? " · Some coverage is unverified" : ""}` : "Holding coverage unavailable");
+  const banner = document.getElementById("workspace-banner");
+  if (banner) { banner.dataset.state = state; banner.dataset.failure = state === "pending" ? "none" : failure ?? "none"; banner.dataset.previousFailure = state === "pending" ? failure ?? "none" : "none"; banner.dataset.tone = tone; }
+  const button = document.getElementById("workspace-banner-action");
+  if (button) { button.textContent = action; button.dataset.action = action === "Refresh data" ? "refresh" : "health"; button.disabled = state === "pending" && action === "Refresh data"; }
+  renderHealthDiagnostics();
+}
+
+function renderHealthDiagnostics() {
+  const view = investmentFreshness.portfolio.view;
+  const item = tableRows.portfolio.find(({ item }) => portfolioRowKey(item) === selectedPortfolioKey)?.item;
+  const details = [];
+  for (const [prefix, source] of [["Account", view], ["Selected holding", item]]) {
+    for (const [field, reason] of Object.entries(source?.fieldReasons ?? {})) details.push(`${prefix} · ${labelize(field)}: ${reason}`);
+    for (const [field, origin] of Object.entries(source?.fieldSources ?? {})) details.push(`${prefix} · ${labelize(field)} source: ${origin}`);
+  }
+  if (view?.coverage) details.push(`Holdings coverage: copy ${view.coverage.copyHoldingsStatus}; manual ${view.coverage.manualHoldingsStatus}; metadata ${view.coverage.metadataStatus}; ${view.incompleteRowCount} incomplete rows; ${view.omittedRowCount} omitted rows.`);
+  if (fxSnapshot) details.push(`FX: ECB reference ${fxSnapshot.rateDate}; fetched ${fxSnapshot.receivedAt}; ${fxCurrent() ? "current" : "stale or failed refresh"}; indicative.`);
+  const node = document.getElementById("portfolio-technical-reasons");
+  const evidence = details.length ? details : ["No validated field evidence is loaded."];
+  const fingerprint = JSON.stringify(evidence);
+  if (node && node.dataset.evidence !== fingerprint) {
+    node.replaceChildren(...evidence.map((detail) => { const li = document.createElement("li"); li.textContent = detail; return li; }));
+    node.dataset.evidence = fingerprint;
+  }
+}
+
+function presentationFocusTarget(record) {
+  if (record?.rowKey) return tableRows.portfolio.find(({ row, item }) => portfolioRowKey(item) === record.rowKey && !row.hidden)?.row
+    ?? tableRows.portfolio.find(({ row, item }) => portfolioRowKey(item) === selectedPortfolioKey && !row.hidden)?.row
+    ?? document.getElementById("portfolio-review-search");
+  const invoker = record?.invoker;
+  if (invoker && invoker.isConnected !== false && !invoker.hidden && !invoker.closest?.("dialog")) return invoker;
+  return document.querySelector("[data-tab-target].active") ?? document.getElementById("portfolio-environment");
+}
+
+function closePresentationDialog(id, { restoreFocus = true } = {}) {
+  const dialog = document.getElementById(id);
+  const record = presentationDialogReturns.get(id);
+  presentationDialogReturns.delete(id);
+  if (activePresentationDialog === id) activePresentationDialog = null;
+  if (dialog?.open) dialog.close?.();
+  if (id === "portfolio-inspector") portfolioChartRequestSequence += 1;
+  if (restoreFocus && record) presentationFocusTarget(record)?.focus?.();
+}
+
+function closePresentationDialogs(options) {
+  for (const id of ["portfolio-inspector", "system-health"]) closePresentationDialog(id, options);
+}
+
+function openPresentationDialog(id, invoker = document.activeElement, { loadChart = true } = {}) {
+  if (id === "portfolio-inspector" && !selectedPortfolioKey) return;
+  const dialog = document.getElementById(id);
+  if (!dialog || typeof dialog.showModal !== "function") return;
+  if (activePresentationDialog && activePresentationDialog !== id) closePresentationDialog(activePresentationDialog, { restoreFocus: false });
+  if (dialog.open) return;
+  presentationDialogReturns.set(id, { invoker, rowKey: invoker?.dataset?.rowKey ?? null });
+  activePresentationDialog = id;
+  if (id === "portfolio-inspector") { renderPortfolioInspector(); if (loadChart) void renderSelectedPortfolioInstrument(); }
+  else renderHealthDiagnostics();
+  dialog.showModal();
+  document.getElementById(id === "portfolio-inspector" ? "portfolio-inspector-close" : "system-health-close")?.focus?.();
+}
+
 function applyInvestmentFreshness(now = Date.now()) {
   for (const kind of ["portfolio", "watchlist"]) {
     const record = investmentFreshness[kind];
@@ -138,11 +286,11 @@ function applyInvestmentFreshness(now = Date.now()) {
     if (kind === "portfolio") {
       text("portfolio-freshness", detail);
       const descriptions = {
-        "equity-detail": "Provider-normalized equity", "cash-buffer-detail": "Provider-normalized available cash",
-        "unrealized-pnl-detail": "Provider-normalized unrealized P/L", "exposure-detail": "Provider-normalized used margin",
+        "equity-detail": "Account value", "cash-buffer-detail": "Available cash",
+        "unrealized-pnl-detail": "Open holdings", "exposure-detail": "Account used margin",
         "stale-data-detail": record.view ? `${record.view.instrumentCount} instrument aggregates` : "Provider positions unavailable",
       };
-      for (const [id, label] of Object.entries(descriptions)) text(id, `${retained ? label : "Awaiting provider data"} · ${state}`);
+      for (const [id, label] of Object.entries(descriptions)) text(id, `${retained ? label : "Awaiting data"}${degraded ? ` · ${state}` : ""}`);
       setTile("last-sync", degraded ? "warn" : "ok", `Last sync · ${state}`, retained ? detail.replace("Freshness: ", "") : `No provider snapshot · ${state}`);
       if (retained) text("portfolio-stat-source", `${labelize(record.view.environment)} snapshot · ${state === "current" ? "provider normalized" : state === "partial" ? "provider normalized · partial" : state} · fetched ${record.view.cache.cachedAt} · provider observation ${record.view.providerUpdatedAt ?? "unavailable"}`);
     } else {
@@ -170,6 +318,7 @@ function applyInvestmentFreshness(now = Date.now()) {
       }
     }
   }
+  renderPresentationStatus(now);
 }
 
 function tableItemValue(kind, item, key) {
@@ -220,7 +369,15 @@ function applyTableReview(kind, { refreshSelection = true } = {}) {
     renderPortfolioInspector();
   }
   if (key !== selectedBefore && refreshSelection) {
-    if (kind === "portfolio") void renderSelectedPortfolioInstrument(); else renderSelectedWatchlistInstrument();
+    if (kind === "portfolio") {
+      clearChartEvidence("portfolio");
+      portfolioChartRequestSequence += 1;
+      document.getElementById("performance-line")?.setAttribute("points", "");
+      document.getElementById("performance-area")?.setAttribute("d", "");
+      text("chart-title", selected ? `${selected.item.symbol} · open holding details for market history` : "Select a live holding");
+      text("chart-period-label", "Market-price history unavailable until holding details open");
+      if (document.getElementById("portfolio-inspector")?.open) void renderSelectedPortfolioInstrument();
+    } else renderSelectedWatchlistInstrument();
   }
 }
 
@@ -328,7 +485,7 @@ function renderPortfolioMoney() {
   if (!view) return;
   for (const [id, key, signed] of [["mock-equity", "equity", false], ["cash-buffer", "availableCash", false], ["exposure", "usedMargin", false], ["unrealized-pnl", "unrealizedPnl", true]]) text(id, accountMoney(view[key] ?? null, signed));
   for (const { row, item } of tableRows.portfolio) {
-    for (const [index, key, signed] of [[1, "investedValue", false], [2, "netValue", false], [3, "unrealizedPnl", true]]) if (row.children[index]) row.children[index].textContent = accountMoney(item[key], signed);
+    for (const [index, key, signed] of [[1, "investedValue", false], [2, "netValue", false], [3, "unrealizedPnl", true]]) setPortfolioField(row.children[index], item[key], accountMoney(item[key], signed), portfolioFieldLabels[key], item.fieldReasons?.[key]);
   }
   renderPortfolioStatistics(view);
   renderPortfolioInspector();
@@ -364,7 +521,7 @@ function renderAccountReasons() {
   const node = document.getElementById("portfolio-account-reasons");
   if (!node) return;
   const labels = { openPositionCount: "Position count", pendingOrderCount: "Pending-order count", equity: "Equity", availableCash: "Available cash", usedMargin: "Used margin", unrealizedPnl: "Unrealized P/L", totalInvested: "Total invested", accountBalance: "Account balance", frozenCash: "Frozen pending-order cash", mirrorCash: "Copy mirror cash", realizedPnl: "Realized P/L", providerUpdatedAt: "Aggregate source time", breakdownUpdatedAt: "Breakdown source time", coverage: "Holdings coverage" };
-  const reasons = view ? Object.entries(labels).filter(([key]) => view[key] === null || view[key] === undefined || view.fieldReasons?.[key]).map(([key, label]) => `${label}: ${view.fieldReasons?.[key] ?? "Provider field unavailable"}`) : ["Account fields unavailable until the selected profile loads."];
+  const reasons = view ? Object.entries(labels).filter(([key]) => view[key] === null || view[key] === undefined || view.fieldReasons?.[key]).map(([key, label]) => `${label}: ${plainPortfolioReason(view.fieldReasons?.[key])}`) : ["Account fields unavailable until the selected profile loads."];
   node.replaceChildren(...(reasons.length ? reasons : ["All listed account monetary fields are available."]).map((reason) => { const li = document.createElement("li"); li.textContent = reason; return li; }));
   if (view?.coverage) text("portfolio-source-detail", `${view.coverage.directInstrumentCount} direct · ${view.coverage.copyInstrumentCount} copy · ${view.coverage.metadataUnresolvedCount} metadata unresolved · ${view.coverage.unsupportedInstrumentCount} above ${view.coverage.instrumentLimit}-instrument boundary · breakdown ${view.coverage.breakdownStatus} · copy coverage ${view.coverage.copyHoldingsStatus} · manual coverage ${view.coverage.manualHoldingsStatus} · metadata ${view.coverage.metadataStatus}; independently timed provider reads`);
 }
@@ -373,17 +530,21 @@ const portfolioFieldLabels = { investedValue: "Margin / invested", netValue: "Li
 function renderPortfolioInspector() {
   const item = tableRows.portfolio.find(({ item }) => portfolioRowKey(item) === selectedPortfolioKey)?.item;
   const native = (value) => `${price(value)}${value !== null ? item?.assetCurrency ? ` ${item.assetCurrency}` : " · denomination unverified" : ""}`;
-  for (const [id, value] of [["portfolio-selected-title", item ? `${item.fieldReasons?.symbol ? "Unresolved instrument" : item.symbol} · ${item.displayName}` : "Select a live holding"], ["portfolio-selected-scope", item ? labelize(item.scope ?? "direct") : "Read only"], ["portfolio-selected-price", item ? native(item.currentPrice) : "Unavailable"], ["portfolio-selected-opening", item ? native(item.averageOpenPrice) : "Unavailable"], ["portfolio-selected-units", quantity(item?.units)], ["portfolio-selected-contracts", quantity(item?.netContracts)], ["portfolio-selected-positions", item ? item.positionCount === null ? "Unavailable" : String(item.positionCount) : "Unavailable"], ["portfolio-selected-currency", item?.assetCurrency ?? "Unavailable"], ["portfolio-selected-exposure", accountMoney(item?.currentExposure)]]) text(id, value);
-  for (const [id, key] of [["portfolio-selected-price", "currentPrice"], ["portfolio-selected-opening", "averageOpenPrice"], ["portfolio-selected-units", "units"], ["portfolio-selected-exposure", "currentExposure"]]) document.getElementById(id)?.setAttribute("title", item?.fieldSources?.[key] ?? item?.fieldReasons?.[key] ?? "Provider source unavailable");
-  text("portfolio-selected-opening-source", item?.fieldSources?.averageOpenPrice ? `Source: ${item.fieldSources.averageOpenPrice}; provider direction-aware net opening rate, not a local weighted average.` : "Opening-rate source unavailable");
+  text("portfolio-selected-title", item ? `${item.fieldReasons?.symbol ? "Unresolved instrument" : item.symbol} · ${item.displayName}` : "Select a live holding");
+  text("portfolio-selected-scope", item ? labelize(item.scope ?? "direct") : "Read only");
+  for (const [id, key, formatted] of [["portfolio-selected-price", "currentPrice", item ? native(item.currentPrice) : "Unavailable"], ["portfolio-selected-opening", "averageOpenPrice", item ? native(item.averageOpenPrice) : "Unavailable"], ["portfolio-selected-units", "units", quantity(item?.units)], ["portfolio-selected-contracts", "netContracts", quantity(item?.netContracts)], ["portfolio-selected-positions", "positionCount", String(item?.positionCount)], ["portfolio-selected-currency", "assetCurrency", item?.assetCurrency], ["portfolio-selected-exposure", "currentExposure", accountMoney(item?.currentExposure)]]) setPortfolioField(document.getElementById(id), item?.[key], formatted, portfolioFieldLabels[key], item?.fieldReasons?.[key]);
+  text("portfolio-selected-opening-source", item?.fieldSources?.averageOpenPrice ? "Opening rate follows the provider’s direction-aware long-minus-short calculation." : "Opening-rate source could not be verified.");
+  const open = document.getElementById("portfolio-inspector-open");
+  if (open) open.disabled = !item;
   const reasons = document.getElementById("portfolio-field-reasons");
   if (reasons) {
-    const missing = item ? Object.entries(portfolioFieldLabels).filter(([key]) => item[key] === null || item[key] === undefined || item.fieldReasons?.[key]).map(([key, label]) => `${label}: ${item.fieldReasons?.[key] ?? "Provider field unavailable"}`) : ["Select an instrument to inspect each field."];
+    const missing = item ? Object.entries(portfolioFieldLabels).filter(([key]) => item[key] === null || item[key] === undefined || item.fieldReasons?.[key]).map(([key, label]) => `${label}: ${plainPortfolioReason(item.fieldReasons?.[key])}`) : ["Select an instrument to inspect each field."];
     if (item && displayCurrency !== (investmentFreshness.portfolio.view?.accountCurrency ?? investmentFreshness.portfolio.view?.currency) && accountMoney(1).startsWith("Unavailable")) missing.push("Display amounts: validated current FX for both currencies is unavailable.");
     reasons.replaceChildren(...(missing.length ? missing : ["All listed instrument fields are available. Chart listing currency and completion remain independently unverified."]).map((reason) => { const li = document.createElement("li"); li.textContent = reason; return li; }));
   }
   const positions = document.getElementById("portfolio-position-details");
   if (positions) positions.replaceChildren(...(item?.positions?.length ? item.positions : [null]).map((position) => { const li = document.createElement("li"); li.textContent = position ? Object.entries(position).map(([key, value]) => `${labelize(key)}: ${typeof value === "number" ? quantity(value) : value ?? "Unavailable"}`).join(" · ") : "Optional position details unavailable"; return li; }));
+  renderHealthDiagnostics();
 }
 
 function money(value) {
@@ -543,6 +704,7 @@ function renderStatus(payload) {
   const readiness = payload.profileReadiness ?? {};
   const activeState = readiness[defaultEnvironment] ?? status?.profiles?.[defaultEnvironment]?.state ?? "not-configured";
   const configured = activeState === "ready";
+  presentationConnection = activeState;
   const cacheTtlMs = payload.cachePolicy?.readOnlyTtlMs ?? status?.readCacheTtlMs;
 
   setTile(
@@ -565,6 +727,7 @@ function renderStatus(payload) {
     "portfolio-environment-detail",
     `Real ${labelize(readiness.real ?? "not-configured")} · Demo ${labelize(readiness.demo ?? "not-configured")}`,
   );
+  renderPresentationStatus();
 }
 
 function renderAudit(message, detail, listId = "audit-list") {
@@ -701,6 +864,8 @@ function appendPortfolioCell(row, value, className) {
 }
 
 function clearPortfolioBoundState() {
+  closePresentationDialogs({ restoreFocus: false });
+  presentationReadFailure = null;
   investmentFreshness.portfolio = { view: null, pending: false, failed: false };
   tableRows.portfolio = [];
   selectedPortfolioKey = null; displayCurrency = null; tableReview.portfolio.page = 1;
@@ -784,7 +949,7 @@ function selectEnvironment(environment) {
   document.getElementById("audit-list")?.replaceChildren();
   document.getElementById("research-audit-list")?.replaceChildren();
   text("portfolio-read-state", "Portfolio: loading");
-  text("workspace-profile", `${labelize(environment)} profile`);
+  text("workspace-profile", `${labelize(environment)} · Read only`);
   setTile("provider-status", "neutral", `Checking ${labelize(environment)} profile`, "Awaiting selected-profile readiness");
   setTile("last-sync", "neutral", "Last sync", "Awaiting selected-profile data");
   void refreshEtoro();
@@ -814,6 +979,8 @@ function renderProviderPortfolio(payload) {
   if (!body) return view;
 
   investmentFreshness.portfolio = { view, pending: false, failed: false };
+  presentationReadFailure = null;
+  presentationConnection = "ready";
   tableRows.portfolio = [];
   portfolioDataSource = "provider-normalized";
   portfolioLastGoodEnvironment = view.environment;
@@ -827,19 +994,22 @@ function renderProviderPortfolio(payload) {
     row.dataset.symbol = instrument.symbol;
     row.dataset.rowKey = portfolioRowKey(instrument);
     row.dataset.source = "provider-normalized";
+    row.setAttribute("aria-haspopup", "dialog");
+    row.setAttribute("aria-controls", "portfolio-inspector");
 
     const assetCell = document.createElement("td");
     const symbol = document.createElement("strong");
     const detail = document.createElement("span");
     symbol.textContent = instrument.fieldReasons?.symbol ? "Unresolved instrument" : instrument.symbol;
-    detail.textContent = `${instrument.displayName} · ${instrument.positionCount ?? "Unavailable"} aggregated position${instrument.positionCount === 1 ? "" : "s"} · ${labelize(instrument.scope ?? "direct")} · ${instrument.assetCurrency ?? "Native denomination unverified"}`;
+    detail.textContent = `${instrument.displayName} · ${labelize(instrument.scope ?? "direct")} · ${instrument.assetCurrency ?? "Native denomination unverified"}`;
+    const command = document.createElement("span"); command.className = "holding-open-label"; command.textContent = "Open details";
+    row.setAttribute("aria-label", `${symbol.textContent}, ${instrument.displayName}, ${labelize(instrument.scope ?? "direct")}. Open holding details with Enter or Space.`);
     assetCell.append(symbol, detail);
+    assetCell.append(command);
     row.append(assetCell);
 
-    appendPortfolioCell(row, accountMoney(instrument.investedValue));
-    appendPortfolioCell(row, accountMoney(instrument.netValue));
-    appendPortfolioCell(row, accountMoney(instrument.unrealizedPnl, true), signedClass(signedMoney(instrument.unrealizedPnl)));
-    appendPortfolioCell(row, signedPercent(instrument.unrealizedPnlPercent), signedClass(signedPercent(instrument.unrealizedPnlPercent)));
+    for (const [key, signed] of [["investedValue", false], ["netValue", false], ["unrealizedPnl", true]]) setPortfolioField(appendPortfolioCell(row, "", signed ? signedClass(signedMoney(instrument[key])) : undefined), instrument[key], accountMoney(instrument[key], signed), portfolioFieldLabels[key], instrument.fieldReasons?.[key]);
+    setPortfolioField(appendPortfolioCell(row, "", signedClass(signedPercent(instrument.unrealizedPnlPercent))), instrument.unrealizedPnlPercent, signedPercent(instrument.unrealizedPnlPercent), portfolioFieldLabels.unrealizedPnlPercent, instrument.fieldReasons?.unrealizedPnlPercent);
     appendPortfolioCell(row, instrument.completeness === "complete" ? "Complete" : "Partial · inspect", instrument.completeness === "complete" ? "good-text" : "warn-text");
     bindPortfolioRow(row);
     tableRows.portfolio.push({ row, item: instrument });
@@ -849,7 +1019,7 @@ function renderProviderPortfolio(payload) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
     cell.colSpan = 6;
-    cell.textContent = view.coverage?.copyHoldingsStatus === "incomplete" || view.coverage?.manualHoldingsStatus === "incomplete" ? "No supplied holding rows; some holdings coverage is unknown" : view.openPositionCount === 0 ? view.coverage ? "No direct or copy positions" : "No direct positions" : "No displayable holding rows; provider coverage is incomplete";
+    cell.textContent = view.coverage?.copyHoldingsStatus === "incomplete" || view.coverage?.manualHoldingsStatus === "incomplete" ? "No holdings to display; some holdings coverage is unknown" : view.openPositionCount === 0 ? view.coverage ? "No holdings to display" : "No direct positions" : "No holdings to display; coverage is incomplete";
     row.append(cell);
     body.append(row);
   }
@@ -924,6 +1094,7 @@ function renderPortfolioReadFailure(error, { retainLastGood = false } = {}) {
     (cache.retryAt === undefined || (isIsoInstant(cache.retryAt) && isIsoInstant(cache.failureAt) && Date.parse(cache.retryAt) >= Date.parse(cache.failureAt))) &&
     typeof cache.reason === "string" && /^[A-Z0-9_]{1,80}$/.test(cache.reason);
   const failure = readFailureState(error);
+  presentationReadFailure = failure;
   const state = validCache && cache.state === "backoff"
     ? `Portfolio: ${failure} (backoff)`
     : `Portfolio: ${failure}`;
@@ -1015,7 +1186,7 @@ function updatePortfolioPeriod(period) {
     const target = row.querySelector("[data-period-value]");
     if (target) { target.textContent = "Market history"; target.className = "neutral-text"; }
   });
-  void renderSelectedPortfolioInstrument();
+  if (document.getElementById("portfolio-inspector")?.open) void renderSelectedPortfolioInstrument();
 }
 
 function selectPortfolioInstrument(row) {
@@ -1040,11 +1211,12 @@ function selectPortfolioInstrument(row) {
 }
 
 function bindPortfolioRow(row) {
-  row.addEventListener("click", () => selectPortfolioInstrument(row));
+  const open = () => { selectPortfolioInstrument(row); openPresentationDialog("portfolio-inspector", row, { loadChart: false }); };
+  row.addEventListener("click", open);
   row.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      selectPortfolioInstrument(row);
+      open();
     }
   });
 }
@@ -2190,6 +2362,7 @@ function activeTabId() {
 }
 
 function activateTab(targetId) {
+  closePresentationDialogs({ restoreFocus: false });
   document.querySelectorAll("[data-tab-target]").forEach((button) => {
     const active = button.dataset.tabTarget === targetId;
 
@@ -2223,7 +2396,7 @@ async function refreshEtoro() {
     selectedPortfolioEnvironment ??= status.credentialStatus?.defaultEnvironment === "demo" ? "demo" : "real";
     const environment = selectedPortfolioEnvironment;
     renderStatus(status);
-    text("workspace-profile", `${labelize(environment)} profile`);
+    text("workspace-profile", `${labelize(environment)} · Read only`);
     const selectedState = status.profileReadiness?.[environment] ?? "not-configured";
     const portfolioRead = selectedState === "ready"
       ? getProfileJson("/api/etoro/portfolio", environment)
@@ -2317,7 +2490,14 @@ function collectBotConfig() {
 
 document.getElementById("portfolio-display-currency")?.addEventListener("change", (event) => selectDisplayCurrency(event.target.value));
 for (const [id, delta] of [["portfolio-page-previous", -1], ["portfolio-page-next", 1]]) document.getElementById(id)?.addEventListener("click", () => { tableReview.portfolio.page += delta; applyTableReview("portfolio"); });
-document.querySelector(".inspector-jump")?.addEventListener("click", () => document.getElementById("portfolio-inspector")?.focus());
+document.querySelector(".inspector-jump")?.addEventListener("click", (event) => openPresentationDialog("portfolio-inspector", event.currentTarget));
+document.getElementById("system-health-open")?.addEventListener("click", (event) => openPresentationDialog("system-health", event.currentTarget));
+document.getElementById("workspace-banner-action")?.addEventListener("click", (event) => { if (event.currentTarget.dataset.action === "refresh") void refreshEtoro(); else openPresentationDialog("system-health", event.currentTarget); });
+for (const [id, closeId] of [["portfolio-inspector", "portfolio-inspector-close"], ["system-health", "system-health-close"]]) {
+  document.getElementById(closeId)?.addEventListener("click", () => closePresentationDialog(id));
+  document.getElementById(id)?.addEventListener("cancel", (event) => { event.preventDefault(); closePresentationDialog(id); });
+  document.getElementById(id)?.addEventListener("close", () => { if (presentationDialogReturns.has(id)) closePresentationDialog(id); });
+}
 document.getElementById("refresh-etoro")?.addEventListener("click", refreshEtoro);
 document.getElementById("portfolio-environment")?.addEventListener("change", (event) => {
   selectEnvironment(event.target.value);

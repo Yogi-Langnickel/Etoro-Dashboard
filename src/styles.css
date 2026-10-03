@@ -1312,3 +1312,91 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   .portfolio-loading-skeleton { animation: none; }
 }
+
+/* Approved presentation pass: full-width holdings and details on demand. */
+body { font-size:16px; }
+.cockpit { max-width:1480px; }
+.topbar { align-items:center; }
+.identity h1 { font-size:1.3rem; }
+.workspace-status { color:var(--muted); font-size:14px; margin:.25rem 0 0; }
+.workspace-profile-controls { display:flex; flex-wrap:wrap; gap:12px; align-items:end; margin:0; }
+.environment-select { font-size:14px; color:var(--muted); }
+.environment-select select, .icon-button { font-size:14px; min-height:40px; }
+.environment-select select { color:var(--text); background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:8px; }
+.presentation-banner { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:14px 16px; margin:16px 0; border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:8px; background:var(--surface); }
+.presentation-banner strong { font-size:16px; }
+.presentation-banner p { margin:5px 0 0; color:var(--muted); font-size:14px; line-height:1.5; }
+.presentation-banner > button { flex-shrink:0; }
+.presentation-banner[data-tone="warn"] { border-left-color:var(--warn); }
+.presentation-banner[data-tone="danger"] { border-left-color:var(--bad); }
+.presentation-banner[data-tone="ok"] { border-left-color:var(--good); }
+.tab-button { font-size:14px; }
+.metric { min-height:120px; padding:18px; }
+.metric span, .metric small { font-size:14px; }
+.metric strong { font-size:1.7rem; }
+.portfolio-fx-caption, .portfolio-visible-coverage { font-size:14px; line-height:1.5; color:var(--muted); margin:8px 0; overflow-wrap:anywhere; }
+.portfolio-statistics { margin:16px 0; padding:14px 16px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+.portfolio-statistics summary { font-size:14px; cursor:pointer; font-weight:600; }
+.portfolio-statistics > p { font-size:14px; line-height:1.5; color:var(--muted); }
+.portfolio-statistics .readiness-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 24px; padding:0; }
+.portfolio-statistics .readiness-list li { min-width:0; font-size:14px; gap:16px; }
+.portfolio-statistics .readiness-list strong { text-align:right; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.workspace { display:block; }
+.table-review-controls { display:flex; justify-content:space-between; gap:20px; padding:16px; flex-wrap:wrap; }
+.review-filter-group, .review-sort-group { display:flex; gap:12px; flex-wrap:wrap; min-width:0; }
+.review-filter-group { flex:1 1 360px; max-width:540px; }
+.review-sort-group { flex:0 1 360px; }
+.table-review-controls label { font-size:14px; align-content:start; }
+.table-review-controls input, .table-review-controls select { min-height:40px; font-size:14px; }
+.review-count, .table-scroll-cue { margin:0; padding:0 16px 12px; font-size:14px; color:var(--muted); line-height:1.5; }
+.instrument-table th, .instrument-table td { text-align:right; font-size:14px; padding:14px 16px; }
+.instrument-table th:first-child, .instrument-table td:first-child { text-align:left; }
+.instrument-table td:first-child { min-width:170px; }
+.instrument-table td:first-child span { max-width:250px; font-size:14px; }
+.holding-open-label { color:var(--accent); margin-top:4px; }
+.portfolio-pagination { font-size:14px; padding:14px 16px; }
+.presentation-dialog { color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:12px; width:min(880px,calc(100% - 32px)); max-width:calc(100% - 32px); max-height:calc(100dvh - 32px); margin:auto; padding:20px; overflow:auto; font-size:16px; }
+.presentation-dialog:not([open]) { display:none; }
+.presentation-dialog::backdrop { background:rgba(4,8,14,.78); }
+.dialog-toolbar { display:flex; justify-content:space-between; gap:18px; align-items:start; margin-bottom:16px; }
+.dialog-toolbar > p { margin:0; color:var(--muted); font-size:14px; line-height:1.5; }
+.dialog-toolbar > h2 { margin:0; font-size:1.25rem; }
+.dialog-toolbar > button { flex-shrink:0; }
+.portfolio-inspector { max-height:calc(100dvh - 32px); }
+.portfolio-inspector .instrument-detail-panel, .portfolio-inspector .chart-panel { min-width:0; }
+.instrument-facts { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.instrument-facts dt { font-size:14px; }
+.instrument-facts dd { text-align:right; font-size:16px; line-height:1.5; }
+.inspector-note, .field-reasons, .position-details, .capability-note, .chart-details, .chart-meta, .chart-axes, .chart-coverage { font-size:14px; line-height:1.5; }
+.capability-note { padding:14px; border-top:1px solid var(--line); }
+.capability-note summary { cursor:pointer; }
+.capability-note p { color:var(--muted); }
+.health-dialog > p, .health-facts { font-size:14px; line-height:1.6; color:var(--muted); }
+.health-dialog .safety-strip { justify-content:flex-start; margin:18px 0; }
+.health-dialog .status-tile small { font-size:14px; }
+.health-dialog #demo-status { display:flex; }
+.health-facts { display:grid; grid-template-columns:1fr; gap:14px; margin:20px 0; }
+.health-facts dt { color:var(--text); font-weight:600; }
+.health-facts dd { margin:4px 0 0; overflow-wrap:anywhere; }
+.health-dialog .audit-panel { margin-top:18px; }
+.health-dialog .audit-list { font-size:14px; }
+:is(.presentation-dialog,.positions-panel,.portfolio-statistics) :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+@media(max-width:1100px) { .topbar { align-items:flex-start; } }
+@media(max-width:768px) { .portfolio-statistics .readiness-list { grid-template-columns:1fr; } .kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .metric { padding:14px; } .metric strong { font-size:1.4rem; } }
+@media(max-width:600px) {
+  .cockpit { padding:12px; }
+  .topbar { gap:16px; }
+  .workspace-profile-controls { width:100%; }
+  .presentation-banner { align-items:flex-start; flex-direction:column; gap:12px; }
+  .metric { padding:12px; }
+  .metric strong { font-size:1.2rem; }
+  .panel-header { gap:12px; flex-wrap:wrap; }
+  .table-review-controls { gap:16px; }
+  .review-filter-group, .review-sort-group { width:100%; }
+  .table-review-controls label { flex:1 1 110px; min-width:0; }
+  .table-review-controls :is(input,select) { width:100%; min-width:0; }
+  .presentation-dialog { padding:14px; width:calc(100% - 20px); max-width:calc(100% - 20px); max-height:calc(100dvh - 20px); }
+  .instrument-facts { grid-template-columns:1fr; }
+  .portfolio-statistics .readiness-list li { flex-wrap:wrap; }
+  .portfolio-statistics .readiness-list strong { margin-left:auto; }
+}
