@@ -80,9 +80,10 @@ v2 routes coexist. Rediscover the current specification for future changes.
   substitute for `SPY`. Omitted exact matches and ambiguous rows fail closed.
 - Explicitly projecting `instrumentId` can produce the same JSON property twice
   with equal values. These are one identifier on one result, not two instruments.
-  The normal JSON parser handles equal repeated properties. Multiple exact
-  result rows remain ambiguous; this handling is scoped to the confirmed
-  equal-value duplicate property behavior.
+  Equal repeated properties are the provider-confirmed and regression-tested
+  case. The normal JSON parser retains the last repeated property's value and
+  does not detect conflicting duplicate properties. Multiple exact result rows
+  remain ambiguous and fail resolution independently of repeated properties.
 - Current prices come from
   `GET /api/v1/market-data/instruments/rates?instrumentIds={instrumentId}`:
   `bid`, `ask`, `lastExecution`, and ISO 8601 UTC `date`. Candle history uses
