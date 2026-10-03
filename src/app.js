@@ -195,7 +195,7 @@ function applyTableReview(kind, { refreshSelection = true } = {}) {
   if (rows.length && body) body.replaceChildren(...entries.map(({ row }) => row));
   const selected = visible.find(({ item }) => item.symbol === selectedBefore) ?? visible[0];
   const symbol = selected?.item.symbol ?? null;
-  if (focusedRow) (focusedRow.hidden ? selected?.row : focusedRow)?.focus?.();
+  if (focusedRow) (focusedRow.hidden ? selected?.row ?? document.getElementById(`${kind}-review-search`) : focusedRow)?.focus?.();
   if (kind === "portfolio") selectedPortfolioSymbol = symbol; else selectedWatchlistSymbol = symbol;
   for (const { row } of rows) { const active = row === selected?.row; row.classList.toggle("active", active); row.setAttribute("aria-selected", String(active)); }
   const complete = visible.filter(({ item }) => kind === "portfolio" ? item.completeness === "complete" : item.rateStatus === "available").length;
@@ -225,9 +225,25 @@ function renderChartEvidence(kind, chart) {
 function clearChartEvidence(kind) {
   chartFreshness[kind] = null;
   const shell = document.getElementById(`${kind}-chart-shell`);
-  if (shell) { shell.dataset.freshness = "unavailable"; shell.setAttribute("aria-busy", "false"); }
+  if (shell) { shell.dataset.freshness = "unavailable"; shell.setAttribute("aria-busy", "false"); shell.setAttribute("aria-label", "Market-price history unavailable; no selected history"); }
   for (const suffix of ["price-axis", "time-axis", "coverage"]) text(`${kind}-chart-${suffix}`, "Unavailable");
   document.getElementById(`${kind}-chart-details-body`)?.replaceChildren();
+  if (kind === "portfolio") {
+    text("chart-provider", "Candle start: unavailable");
+    text("chart-cache", "Cache: unavailable");
+    text("chart-request", "Provider request ID: hidden");
+    for (const prefix of ["portfolio-financial", "portfolio-news", "portfolio-insider"]) {
+      text(`${prefix}-title`, "Unavailable");
+      text(`${prefix}-detail`, "No selected instrument context available");
+    }
+  } else {
+    text("watchlist-chart-source", "Source: unavailable");
+    text("watchlist-chart-freshness", "Freshness: unavailable");
+    text("watchlist-context-title", "Unavailable");
+    text("watchlist-context-source", "No selected instrument");
+    text("watchlist-context-freshness", "Unavailable");
+    text("watchlist-context-detail", "No market context available");
+  }
 }
 
 function money(value) {

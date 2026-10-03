@@ -65,7 +65,7 @@ async function workspace(fetch = async () => response({ ok: false }, false)) {
   const app = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
   const source = app.slice(0, app.indexOf('document.getElementById("refresh-etoro")?.addEventListener'));
   const api = Function('document', 'fetch', 'Date', `${contracts}\n${source}; selectedPortfolioEnvironment = 'real'; return {
-    renderProviderPortfolio, renderProviderWatchlist, renderPortfolioReadFailure, renderWatchlistReadFailure,
+    renderProviderPortfolio, renderProviderWatchlist, renderPortfolioReadFailure, renderWatchlistReadFailure, renderSelectedPortfolioInstrument,
     applyInvestmentFreshness, applyTableReview, marketChartSvgPoints, renderMarketChart, renderOfflineOperations,
     refreshOfflineOperations, operateOfflineDiagnostic, normalizeOfflineOperationsPayload, normalizeDraftBotConfig,
     freshnessState, refreshEtoro, clearPortfolioBoundState, clearWatchlistBoundState,
@@ -221,4 +221,46 @@ test('reload recovers pending diagnostic identity only for run-once, gates busy 
   assert.match(document.getElementById('operations-identity').textContent, /original start 2026-10-03T00:00:00.000Z/);
   const other = await workspace(); other.api.token(); other.api.renderOfflineOperations(operations({ operation: { id: identity, action: 'block', startedAt: instant, status: 'pending' } }));
   assert.equal(other.document.getElementById('operations-run').disabled, true);
+});
+
+
+test('filtering away the selected instrument clears every history receipt and context for both tables', async () => {
+  const chart = (symbol) => ({ ok: true, environment: 'real', cache: cache(), data: { symbol, displayName: `${symbol} selected test instrument`, resolution: 'exact', period: '24h', interval: 'OneHour', pointCount: 2, changePercent: 5, providerUpdatedAt: instant, points: [{ at: '2026-10-02T00:00:00.000Z', close: 100 }, { at: instant, close: 105 }] } });
+  const { api, document } = await workspace(async (url) => response(chart(new URL(url, 'http://localhost').searchParams.get('symbol'))));
+  api.renderProviderPortfolio(portfolio());
+  await api.renderSelectedPortfolioInstrument();
+  api.renderProviderWatchlist(watchlist(), { refreshChart: false });
+  api.renderMarketChart(chart('ZZZ'), 'ZZZ', '24h');
+  assert.match(document.getElementById('chart-provider').textContent, /Last candle start: 2026/);
+  assert.equal(document.getElementById('portfolio-financial-title').textContent, 'Provider holding selected');
+  assert.match(document.getElementById('watchlist-chart-source').textContent, /provider current.*5.00%/);
+  for (const kind of ['portfolio', 'watchlist']) {
+    const row = document.querySelectorAll(kind === 'portfolio' ? '[data-instrument-row]' : '[data-watchlist-row]')[0];
+    row.focus();
+    api.review[kind].search = 'NO-MATCH';
+    api.applyTableReview(kind);
+    assert.equal(api.selection()[kind], null);
+    assert.equal(document.activeElement, document.getElementById(`${kind}-review-search`));
+    assert.match(document.getElementById(`${kind}-review-count`).textContent, /No instruments match/);
+    assert.equal(document.getElementById(`${kind}-chart-details-body`).children.length, 0);
+    for (const suffix of ['price-axis', 'time-axis', 'coverage']) assert.equal(document.getElementById(`${kind}-chart-${suffix}`).textContent, 'Unavailable');
+    const shell = document.getElementById(`${kind}-chart-shell`);
+    assert.equal(shell.dataset.freshness, 'unavailable');
+    assert.match(shell.attributes['aria-label'], /unavailable/);
+  }
+  api.applyInvestmentFreshness();
+  assert.equal(document.getElementById('chart-provider').textContent, 'Candle start: unavailable');
+  assert.equal(document.getElementById('chart-cache').textContent, 'Cache: unavailable');
+  assert.equal(document.getElementById('performance-line').attributes.points, '');
+  for (const prefix of ['portfolio-financial', 'portfolio-news', 'portfolio-insider']) {
+    assert.equal(document.getElementById(`${prefix}-title`).textContent, 'Unavailable');
+    assert.equal(document.getElementById(`${prefix}-detail`).textContent, 'No selected instrument context available');
+  }
+  assert.equal(document.getElementById('watchlist-chart-source').textContent, 'Source: unavailable');
+  assert.equal(document.getElementById('watchlist-chart-freshness').textContent, 'Freshness: unavailable');
+  assert.equal(document.getElementById('watchlist-context-title').textContent, 'Unavailable');
+  assert.equal(document.getElementById('watchlist-context-source').textContent, 'No selected instrument');
+  assert.equal(document.getElementById('watchlist-context-freshness').textContent, 'Unavailable');
+  assert.equal(document.getElementById('watchlist-context-detail').textContent, 'No market context available');
+  assert.equal(document.getElementById('watchlist-performance-line').attributes.points, '');
 });
