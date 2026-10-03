@@ -47,9 +47,8 @@ User-Agent contact value are configured.
 The current source of truth is the [eToro Developer Portal](https://api-portal.etoro.com/),
 its [documentation index](https://api-portal.etoro.com/llms.txt), and the
 [Agent Skill landing page](https://api-portal.etoro.com/core/ai-agents/etoro-skill).
-As checked directly from the official skill URL on 2026-09-22,
-`https://mcp.public-api.etoro.com/skill` identifies
-`etoro-public-api-operations` version `1.20.0`; the landing page links to it.
+As checked through the official MCP catalog on 2026-10-03, the API identifies
+version `v1.383.0` and Agent Skill version `1.21.0`.
 Its MCP server is `https://mcp.public-api.etoro.com`.
 
 Those references do not authorize MCP installation, credential use, provider
@@ -62,6 +61,47 @@ official catalog. Use exactly one authentication mode: the
 The current server's `/api/v1` paths and pinned base URL are dated local
 implementation contracts, not current route authority; the applicable official
 operation may have a replacement or use `v2`.
+
+### Market-data clarifications received 2026-10-03
+
+The owner supplied an eToro support clarification on this date; the sender's
+message date was not supplied. The following operational notes paraphrase that
+clarification. The official catalog was also checked without executing provider
+reads: the v1 market-data routes below remain listed without deprecation, and
+v2 routes coexist. Rediscover the current specification for future changes.
+
+- Search may omit `instrumentType` and `instrumentTypeID` even when projected.
+  If classification is needed, obtain `instrumentTypeID` from
+  `GET /api/v1/market-data/instruments?instrumentIds={instrumentId}` and map it
+  through `GET /api/v1/market-data/instrument-types`. The dashboard's current
+  symbol resolver does not classify instruments from search results.
+- Search can return related symbols. Compare the returned `internalSymbolFull`
+  exactly with the requested canonical symbol; `SPY.RTH` and `SPY5.L` cannot
+  substitute for `SPY`. Omitted exact matches and ambiguous rows fail closed.
+- Explicitly projecting `instrumentId` can produce the same JSON property twice
+  with equal values. These are one identifier on one result, not two instruments.
+  The normal JSON parser handles equal repeated properties. Multiple exact
+  result rows remain ambiguous; this handling is scoped to the confirmed
+  equal-value duplicate property behavior.
+- Current prices come from
+  `GET /api/v1/market-data/instruments/rates?instrumentIds={instrumentId}`:
+  `bid`, `ask`, `lastExecution`, and ISO 8601 UTC `date`. Candle history uses
+  `GET /api/v1/market-data/instruments/{instrumentId}/history/candles/{direction}/{interval}/{candlesCount}`;
+  its `fromDate` is the candle start in ISO 8601 format. Market timestamps must
+  include an explicit timezone and valid calendar date; the dashboard normalizes
+  accepted instants to UTC. Timestamp format does not establish a trading session
+  calendar or an exchange-close convention.
+- The Public API contract does not define listing currency, a separate price-basis
+  flag, corporate-action adjustments, a historical retention period, or rights to
+  retain data for model use. Do not infer any of them from a symbol, instrument
+  type, conversion rate, successful read, or timestamp. An ETF type alone also
+  does not establish product exposure or research suitability. Those matters
+  require separate evidence before retained research collection or model use.
+
+Raw instrument prices in Portfolio and Watchlist use precision-preserving numbers
+with listing currency marked unavailable. USD account totals, invested amounts
+and P/L retain their account monetary-unit formatting; they do not establish the
+listing currency of an instrument price.
 
 ## Contract Boundaries
 

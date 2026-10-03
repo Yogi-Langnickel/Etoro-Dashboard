@@ -220,6 +220,22 @@ function normalizeTimestamp(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function normalizeMarketTimestamp(value) {
+  // Market timestamps must identify an instant. Date's permissive parser also
+  // accepts date-only, locale and timezone-free values, which can shift charts
+  // with the server timezone. ISO formatting does not establish a session.
+  if (typeof value !== "string") return null;
+  const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|([+-])(\d{2}):(\d{2}))$/.exec(value);
+  if (!parts) return null;
+  const [, year, month, day, hour, minute, second, , offsetHour, offsetMinute] = parts;
+  const leapYear = Number(year) % 4 === 0 && (Number(year) % 100 !== 0 || Number(year) % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][Number(month) - 1];
+  if (!daysInMonth || Number(day) < 1 || Number(day) > daysInMonth ||
+    Number(hour) > 23 || Number(minute) > 59 || Number(second) > 59 ||
+    Number(offsetHour ?? 0) > 23 || Number(offsetMinute ?? 0) > 59) return null;
+  return normalizeTimestamp(value);
+}
+
 function normalizeIdentity(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new EtoroApiError("Identity response did not match expected shape", {
@@ -666,7 +682,9 @@ function normalizeInstrumentSearch(payload, params) {
   }
 
   const matches = payload.items.flatMap((item) => {
-    const symbol = normalizedSymbol(item?.internalSymbolFull);
+    // The search filter can return related symbols. Provider identity must be
+    // exactly the requested canonical symbol, without case/whitespace repair.
+    const symbol = item?.internalSymbolFull;
     const instrumentId = positiveInstrumentId(item?.instrumentId ?? item?.InstrumentID);
     if (symbol !== requestedSymbol || instrumentId === null) return [];
     return [{ instrumentId, symbol, displayName: safeDisplayText(item?.displayname, symbol) }];
@@ -703,7 +721,7 @@ function normalizeMarketRates(payload) {
       const bid = marketNumberOrNull(rate?.bid);
       const ask = marketNumberOrNull(rate?.ask);
       const lastExecution = marketNumberOrNull(rate?.lastExecution);
-      const updatedAt = normalizeTimestamp(rate?.date);
+      const updatedAt = normalizeMarketTimestamp(rate?.date);
       if (instrumentId === null || seenIds.has(instrumentId) || bid === null || ask === null || bid < 0 || ask < 0 ||
         (lastExecution !== null && lastExecution < 0) || !updatedAt) continue;
       seenIds.add(instrumentId);
@@ -731,7 +749,7 @@ function normalizeMarketCandles(payload, params) {
   }
 
   const points = group.candles.flatMap((candle) => {
-    const at = normalizeTimestamp(candle?.fromDate);
+    const at = normalizeMarketTimestamp(candle?.fromDate);
     const close = marketNumberOrNull(candle?.close);
     const candleInstrumentId = positiveInstrumentId(candle?.instrumentID ?? candle?.instrumentId);
     return at && close !== null && close >= 0 && candleInstrumentId === params.instrumentId ? [{ at, close }] : [];

@@ -359,6 +359,60 @@ test("market rates batch ids and normalize only finite timestamped rows", async 
   assert.equal(JSON.stringify(result.data).includes("priceRateID"), false);
 });
 
+test("search resolves one exact symbol with omitted type fields and a repeated id property", async () => {
+  const result = await fetchReadOnlyEndpoint("instrumentSearch", {
+    credentials,
+    params: { symbol: "AAA" },
+    // Synthetic raw JSON preserves the repeated-key shape reported by support.
+    fetchImpl: async () => new Response('{"items":[{"instrumentId":101,"internalSymbolFull":"AAA.RTH"},{"instrumentId":102,"internalSymbolFull":"AAA5.L"},{"instrumentId":103,"instrumentId":103,"internalSymbolFull":"AAA","displayname":"Synthetic exact symbol"}]}'),
+  });
+  assert.deepEqual(result.data, { instrumentId: 103, symbol: "AAA", displayName: "Synthetic exact symbol" });
+});
+
+test("search rejects provider symbol repair and ambiguous exact rows", async () => {
+  for (const items of [
+    [{ instrumentId: 101, internalSymbolFull: "aaa" }],
+    [{ instrumentId: 101, internalSymbolFull: " AAA " }],
+    [{ instrumentId: 101, internalSymbolFull: "AAA.RTH" }, { instrumentId: 102, internalSymbolFull: "AAA5.L" }],
+    [{ instrumentId: 101, internalSymbolFull: "AAA" }, { instrumentId: 102, internalSymbolFull: "AAA" }],
+    [{ instrumentId: 101, internalSymbolFull: "AAA" }, { instrumentId: 101, internalSymbolFull: "AAA" }],
+  ]) {
+    await assert.rejects(() => fetchReadOnlyEndpoint("instrumentSearch", {
+      credentials,
+      params: { symbol: "AAA" },
+      fetchImpl: async () => new Response(JSON.stringify({ items })),
+    }), (error) => error.code === (items.some((item) => item.internalSymbolFull === "AAA")
+      ? "ETORO_SYMBOL_AMBIGUOUS" : "ETORO_SYMBOL_NOT_FOUND"));
+  }
+});
+
+test("market rates omit timezone-free, non-ISO and invalid calendar timestamps", async () => {
+  const invalidDates = ["2026-10-03", "2026-10-03T01:00:00", "10/03/2026 01:00:00", "2026-02-30T01:00:00Z", "2026-10-03T24:00:00Z"];
+  const result = await fetchReadOnlyEndpoint("marketRates", {
+    credentials,
+    params: { instrumentIds: [101] },
+    fetchImpl: async () => new Response(JSON.stringify({ rates: [
+      ...invalidDates.map((date) => ({ instrumentID: 101, bid: 10, ask: 11, date })),
+      { instrumentID: 101, bid: 10, ask: 11, lastExecution: 10.5, date: "2026-10-03T01:00:00+00:00" },
+    ] })),
+  });
+  assert.deepEqual(result.data.rates, [{ instrumentId: 101, bid: 10, ask: 11, lastExecution: 10.5, updatedAt: "2026-10-03T01:00:00.000Z" }]);
+});
+
+test("market candles normalize explicit offsets and reject timezone-free or invalid dates", async () => {
+  const read = (fromDate) => fetchReadOnlyEndpoint("marketCandles", {
+    credentials,
+    params: { instrumentId: 101, direction: "asc", interval: "OneHour", candlesCount: 1 },
+    fetchImpl: async () => new Response(JSON.stringify({ interval: "OneHour", candles: [{
+      instrumentId: 101, candles: [{ instrumentID: 101, fromDate, close: 10 }],
+    }] })),
+  });
+  assert.deepEqual((await read("2026-10-03T11:00:00+10:00")).data.points, [{ at: "2026-10-03T01:00:00.000Z", close: 10 }]);
+  for (const date of ["2026-10-03T11:00:00", "2026-10-03", "2026-02-29T11:00:00Z"]) {
+    await assert.rejects(() => read(date), (error) => error.code === "ETORO_INVALID_MARKET_CANDLES_RESPONSE");
+  }
+});
+
 test("market candles normalize ordered close-only chart points", async () => {
   const result = await fetchReadOnlyEndpoint("marketCandles", {
     credentials,

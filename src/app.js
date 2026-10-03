@@ -63,8 +63,7 @@ function money(value) {
 }
 
 function price(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "Unavailable";
-  return Number.isInteger(value) ? formatter.format(value) : `$${formatExactDecimal(value)}`;
+  return typeof value === "number" && Number.isFinite(value) ? formatExactDecimal(value) : "Unavailable";
 }
 
 function quantity(value) {
@@ -483,7 +482,7 @@ function renderProviderPortfolio(payload) {
     const symbol = document.createElement("strong");
     const detail = document.createElement("span");
     symbol.textContent = instrument.symbol;
-    detail.textContent = `${instrument.displayName} · ${instrument.positionCount} aggregated position${instrument.positionCount === 1 ? "" : "s"}`;
+    detail.textContent = `${instrument.displayName} · ${instrument.positionCount} aggregated position${instrument.positionCount === 1 ? "" : "s"} · Listing currency unavailable`;
     assetCell.append(symbol, detail);
     row.append(assetCell);
 
@@ -696,7 +695,7 @@ function bindWatchlistRow(row) {
 function watchlistPrice(item) {
   if (item.rateStatus !== "available") return "Unavailable";
   const value = item.lastExecution ?? ((item.bid + item.ask) / 2);
-  return money(value);
+  return price(value);
 }
 
 function appendWatchlistCell(row, value, className) {
@@ -741,7 +740,7 @@ function renderProviderWatchlist(payload, { refreshChart = true } = {}) {
     symbol.textContent = item.symbol;
     symbolCell.append(symbol);
     row.append(symbolCell);
-    appendWatchlistCell(row, item.displayName);
+    appendWatchlistCell(row, `${item.displayName} · Listing currency unavailable`);
     appendWatchlistCell(row, watchlistPrice(item));
     const periodCell = appendWatchlistCell(row, "Unavailable", "neutral-text");
     periodCell.dataset.watchlistPeriodValue = "";

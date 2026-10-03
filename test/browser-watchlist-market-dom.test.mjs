@@ -150,7 +150,8 @@ test("provider watchlist renders dynamic read-only rows and explicit partial sta
   assert.equal(view.items.length, 2);
   assert.equal(rows.length, 2);
   assert.equal(rows[0].querySelector("strong").textContent, "AAPL");
-  assert.equal(rows[0].children[2].textContent, "$190.50");
+  assert.equal(rows[0].children[2].textContent, "190.5");
+  assert.match(rows[0].children[1].textContent, /Listing currency unavailable/);
   assert.equal(rows[1].children[2].textContent, "Unavailable");
   assert.equal(document.getElementById("watchlist-provider-state").textContent, "Provider partial");
   assert.match(renderedText(document.getElementById("research-audit-list")), /1 omitted; 1 rates unavailable/);
@@ -158,6 +159,22 @@ test("provider watchlist renders dynamic read-only rows and explicit partial sta
 
   rows[1].dispatch("click");
   assert.match(rows[1].className, /active/);
+});
+
+test("watchlist instrument prices preserve provider precision without a currency assumption", async () => {
+  const document = new FakeDocument();
+  const { renderProviderWatchlist } = await watchlistRenderer(document);
+  const payload = watchlistPayload();
+  payload.data.items[0].bid = 0.00012345;
+  payload.data.items[0].ask = 0.00023456;
+  payload.data.items[0].lastExecution = 0.00012345678901234567;
+  renderProviderWatchlist(payload, { refreshChart: false });
+  assert.equal(document.querySelectorAll("[data-watchlist-row]")[0].children[2].textContent, "0.00012345678901234567");
+  payload.data.items[0].lastExecution = null;
+  payload.data.items[0].bid = 0.125;
+  payload.data.items[0].ask = 0.25;
+  renderProviderWatchlist(payload, { refreshChart: false });
+  assert.equal(document.querySelectorAll("[data-watchlist-row]")[0].children[2].textContent, "0.1875");
 });
 
 test("selected-period market chart renders normalized close points without identifiers", async () => {

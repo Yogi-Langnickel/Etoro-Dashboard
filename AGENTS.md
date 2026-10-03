@@ -50,9 +50,9 @@ These repo-local financial rules are hard overrides over workspace-level general
 Use the [Developer Portal](https://api-portal.etoro.com/), its
 [documentation index](https://api-portal.etoro.com/llms.txt), and the official
 [Agent Skill landing page](https://api-portal.etoro.com/core/ai-agents/etoro-skill)
-as the current source of truth. As checked directly from the official skill URL
-on 2026-09-22, `https://mcp.public-api.etoro.com/skill` identifies
-`etoro-public-api-operations` version `1.20.0`; the landing page links to it.
+as the current source of truth. As checked through the official MCP catalog
+on 2026-10-03, the API identifies version `v1.383.0` and Agent Skill version
+`1.21.0`.
 Its MCP server is `https://mcp.public-api.etoro.com`.
 
 The reference does not authorize installing the MCP server, making provider
@@ -65,6 +65,17 @@ rate-limit group, and deprecation/replacement. Authenticate with either the
 Treat the repository's existing `/api/v1` endpoint references as dated local
 implementation contracts. They are not authority to select a current route;
 the official replacement may be `v2`.
+
+The support clarification received 2026-10-03 is paraphrased in the root README.
+Search type fields may be absent; obtain instrument type IDs from the instruments
+endpoint and map them through instrument-types when classification is needed.
+Require an exact returned `internalSymbolFull` for symbol resolution. Equal
+repeated `instrumentId` JSON properties are not additional instruments. Rates
+provide ISO 8601 UTC `date`; candle `fromDate` is an ISO 8601 start timestamp.
+Neither format establishes sessions or listing currency. Keep price basis,
+corporate-action methodology, retention periods and model-use rights unresolved
+without separate evidence; successful transport or type lookup cannot establish
+those semantics or permissions.
 
 ## Recommended Architecture
 

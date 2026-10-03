@@ -116,9 +116,11 @@ test("portfolio DOM preserves fractional holdings and small instrument prices", 
   const view = payload([{ symbol: "PENNY", displayName: "Penny", positionCount: 1, units: 0.125, averageOpenPrice: 0.00012345, currentPrice: 0.00023456, investedValue: 0.01, netValue: 0.01, unrealizedPnl: -0, unrealizedPnlPercent: 0, allocationPercent: 100, completeness: "complete" }]);
   renderProviderPortfolio(view);
   const row = document.querySelectorAll("[data-instrument-row]")[0];
-  assert.equal(row.children[1].textContent, "$0.00023456");
+  assert.equal(row.children[1].textContent, "0.00023456");
   assert.equal(row.children[3].textContent, "0.125");
-  assert.equal(row.children[4].textContent, "$0.00012345");
+  assert.equal(row.children[4].textContent, "0.00012345");
+  assert.match(row.children[0].children[1].textContent, /Listing currency unavailable/);
+  assert.equal(row.children[7].textContent, "$0.01");
 });
 
 test("portfolio DOM does not impose a significant-digit cap on accepted prices or quantities", async () => {
@@ -126,9 +128,9 @@ test("portfolio DOM does not impose a significant-digit cap on accepted prices o
   const view = payload([{ symbol: "PRECISE", displayName: "Precise", positionCount: 1, units: 1.2345678901234567, averageOpenPrice: 0.12345678901234566, currentPrice: 0.12345678901234566, investedValue: 0.01, netValue: 0.01, unrealizedPnl: 0, unrealizedPnlPercent: 0, allocationPercent: 100, completeness: "complete" }]);
   renderProviderPortfolio(view);
   const row = document.querySelectorAll("[data-instrument-row]")[0];
-  assert.equal(row.children[1].textContent, "$0.12345678901234566");
+  assert.equal(row.children[1].textContent, "0.12345678901234566");
   assert.equal(row.children[3].textContent, "1.2345678901234567");
-  assert.equal(row.children[4].textContent, "$0.12345678901234566");
+  assert.equal(row.children[4].textContent, "0.12345678901234566");
 });
 
 test("browser contract rejects numeric strings in financial portfolio DTOs", async () => {

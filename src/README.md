@@ -12,3 +12,12 @@ README to dynamically discover the current contract. Existing `/api/v1` paths
 are dated local implementation evidence, not route authority; do not install
 MCP tooling, paste credentials into chat, or make provider/trading calls merely
 because a reference describes them.
+
+The root README records the eToro support clarification received 2026-10-03.
+Search results are accepted only for an exact `internalSymbolFull`; projected
+type fields can be missing, and equal repeated `instrumentId` JSON properties
+do not represent extra results. Classification, if introduced, must resolve the
+instruments endpoint's `instrumentTypeID` through the instrument-types endpoint.
+Market timestamp normalization requires an explicit ISO 8601 timezone and a
+valid calendar date, and does not infer session, listing currency, price basis,
+corporate-action adjustments, retention, or model-use rights.
