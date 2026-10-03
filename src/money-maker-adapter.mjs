@@ -122,10 +122,19 @@ function diagnosticResult(last, ledger) {
   }
   const histogram = ledger.summary.vetoHistogram;
   if (!histogram || typeof histogram !== 'object' || Array.isArray(histogram)) throw new OfflineOperationError('OFFLINE_TELEMETRY_INVALID');
-  const vetoReasons = Object.entries(histogram).map(([reason, occurrences]) => {
+  for (const [reason, occurrences] of Object.entries(histogram)) {
     count(occurrences);
-    return enumValue(reason, RUNTIME_MANIFEST.vetoCodes);
-  });
+    enumValue(reason, RUNTIME_MANIFEST.vetoCodes);
+  }
+  let vetoReasons = [];
+  if (['completed', 'already-completed'].includes(result.status) && ledger.integrity.state === 'clean') {
+    if (!Array.isArray(ledger.records)) throw new OfflineOperationError('OFFLINE_TELEMETRY_INVALID');
+    const matches = ledger.records.filter((record) => record.recordedAt === last.startedAt && record.strategyId === 'slow-trend-allocation');
+    if (matches.length !== 1 || !Array.isArray(matches[0].vetoes) || new Set(matches[0].vetoes).size !== matches[0].vetoes.length) {
+      throw new OfflineOperationError('OFFLINE_TELEMETRY_INVALID');
+    }
+    vetoReasons = matches[0].vetoes.map((reason) => enumValue(reason, RUNTIME_MANIFEST.vetoCodes));
+  }
   return { status: resultStatus(result.status), startedAt: instant(last.startedAt), diagnostics, vetoReasons };
 }
 function dto(raw) {

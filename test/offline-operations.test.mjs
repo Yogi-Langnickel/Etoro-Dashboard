@@ -136,6 +136,8 @@ test('Genuine producer handles non-ready status, one completion, restart retry p
   assert.equal(blocked.state, 'blocked'); assert.equal(blocked.lease.killSwitchReason, 'operator-stop'); assert.equal(blocked.capabilities.runOnce, false);
   const vetoed = await adapter.act({ action: 'run-once', operationId: randomUUID() });
   assert.equal(vetoed.action.status, 'lease-blocked'); assert.equal(vetoed.ledger.recordCount, 1);
+  assert.equal(vetoed.lastResult.status, 'lease-blocked'); assert.equal(vetoed.lastResult.diagnostics, null);
+  assert.deepEqual(vetoed.lastResult.vetoReasons, []);
   const enabled = await adapter.act({ action: 'reenable', operationId: randomUUID() });
   assert.equal(enabled.lease.workerState, 'available'); assert.equal(enabled.capabilities.runOnce, true);
   assert.equal(JSON.stringify(enabled).includes(stateRoot), false);
@@ -152,7 +154,7 @@ test('First-run block and re-enable support clean missing ledger; deleted comple
   assert.equal(enabled.capabilities.runOnce, true);
   await adapter.act({ action: 'run-once', operationId: randomUUID() });
   await rm(join(stateRoot, 'lease.json'));
-  assert.equal((await adapter.status()).capabilities.runOnce, false);
+  await assert.rejects(adapter.status());
   await assert.rejects(adapter.act({ action: 'run-once', operationId: randomUUID() }));
   const journal = JSON.parse(await readFile(join(stateRoot, 'operations.json'), 'utf8'));
   journal.operations[0].startedAt = 'unsafe';
@@ -196,6 +198,8 @@ test('Actual producer busy lease blocks concurrent run; Dashboard block fences a
   const stateRoot = join(root, 'fencing-state');
   const adapter = createMoneyMakerAdapter({ runtimeRoot: runtime, stateRoot });
   await adapter.status();
+  const pending = { id: randomUUID(), action: 'run-once', startedAt: new Date().toISOString(), status: 'pending', result: null };
+  await writeFile(join(stateRoot, 'operations.json'), JSON.stringify({ version: 1, operations: [pending] }), { mode: 0o600 });
   const marker = join(root, 'fenced-completion-marker');
   const script = `import sys,json\nfrom pathlib import Path\nsys.path.insert(0,sys.argv[1])\nfrom money_maker_3000.worker_leases import WorkerLeaseStore\nstore=WorkerLeaseStore(Path(sys.argv[2])/'lease.json')\nstore.initialize()\nlease=store.acquire(holder='test-held-diagnostic',idempotency_key='test-held-occurrence',ttl_seconds=300)\nassert lease['status']=='acquired'\nprint('ready',flush=True)\nsys.stdin.readline()\nresult=store.complete_fenced(holder='test-held-diagnostic',idempotency_key='test-held-occurrence',epoch=lease['epoch'],fence=lease['fence'],operation=lambda:Path(sys.argv[3]).write_text('unsafe-completion'))\nprint(json.dumps({'completed':result['completed'],'status':result['status']}),flush=True)\n`;
   const child = spawn(OFFLINE_PYTHON_EXECUTABLE, ['-I', '-S', '-B', '-c', script, join(runtime, 'src'), stateRoot, marker], { cwd: runtime, env: { PATH: '/usr/bin:/bin' }, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -268,4 +272,51 @@ test('Consumer rejects contradictory producer safety and telemetry before exposi
   const blocked = await adapter.status(); assert.equal(blocked.state, 'blocked'); assert.equal(blocked.capabilities.runOnce, false);
   mismatch.action = { type: 'run-once', status: 'completed' }; mismatch.operationResult = mismatch.journal.lastResult;
   await assert.rejects(adapter.act({ action: 'run-once', operationId: randomUUID() }), { code: 'OFFLINE_ACTION_UNCONFIRMED' });
+});
+
+test('Established state without its operation journal refuses status and every action without rewriting files or original starts', async (context) => {
+  if (!requireProducer(context)) return;
+  for (const scenario of ['completed-run', 'blocked', 'reenabled']) {
+    const stateRoot = join(root, `missing-journal-${scenario}`);
+    const adapter = createMoneyMakerAdapter({ runtimeRoot: runtime, stateRoot });
+    const operationId = randomUUID();
+    const completed = await adapter.act({ action: 'run-once', operationId });
+    const originalStartedAt = completed.operation.startedAt;
+    if (scenario !== 'completed-run') await adapter.act({ action: 'block', operationId: randomUUID() });
+    if (scenario === 'reenabled') await adapter.act({ action: 'reenable', operationId: randomUUID() });
+    await rm(join(stateRoot, 'operations.json'));
+    const files = await readdir(stateRoot);
+    const retained = new Map(await Promise.all(files.map(async (name) => [name, { bytes: await readFile(join(stateRoot, name)), info: await lstat(join(stateRoot, name)) }])));
+    const restarted = createMoneyMakerAdapter({ runtimeRoot: runtime, stateRoot });
+    await assert.rejects(restarted.status());
+    for (const action of ['run-once', 'block', 'reenable']) await assert.rejects(restarted.act({ action, operationId: action === 'run-once' ? operationId : randomUUID() }));
+    await assert.rejects(lstat(join(stateRoot, 'operations.json')), { code: 'ENOENT' });
+    assert.deepEqual(await readdir(stateRoot), files);
+    for (const [name, original] of retained) {
+      assert.deepEqual(await readFile(join(stateRoot, name)), original.bytes);
+      const current = await lstat(join(stateRoot, name));
+      assert.equal(current.mtimeMs, original.info.mtimeMs);
+      assert.equal(current.ino, original.info.ino);
+    }
+    const ledger = (await readFile(join(stateRoot, 'ledger.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse);
+    assert.equal(ledger.length, 1);
+    assert.equal(ledger[0].recordedAt, originalStartedAt);
+  }
+});
+
+test('Latest successful diagnostic reasons come from its matching ledger record rather than the cumulative histogram', async (context) => {
+  if (!requireProducer(context)) return;
+  const stateRoot = join(root, 'latest-veto-binding-state');
+  const adapter = createMoneyMakerAdapter({ runtimeRoot: runtime, stateRoot });
+  await adapter.act({ action: 'run-once', operationId: randomUUID() });
+  const bridge = new URL('../scripts/money-maker-bridge.py', import.meta.url).pathname;
+  const raw = await runBoundedSubprocess(OFFLINE_PYTHON_EXECUTABLE, ['-I', '-S', '-B', bridge, runtime, stateRoot, 'status', '-', new Date().toISOString()], { cwd: runtime });
+  // Another historical record's valid reason must not be attributed to this occurrence.
+  raw.ledger.summary.vetoHistogram['weekly-loss-stop'] = 1;
+  const projected = createMoneyMakerAdapter({ runtimeRoot: runtime, stateRoot, subprocess: async () => raw });
+  const status = await projected.status();
+  assert.deepEqual(status.lastResult.vetoReasons, raw.ledger.records[0].vetoes);
+  assert.equal(status.lastResult.vetoReasons.includes('weekly-loss-stop'), false);
+  raw.ledger.records[0].recordedAt = '2020-01-01T00:00:00.000Z';
+  await assert.rejects(projected.status(), { code: 'OFFLINE_TELEMETRY_INVALID' });
 });

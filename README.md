@@ -244,8 +244,12 @@ the operation ID is a UUID v4. Each accepted operation retains its original
 completion instead of appending another ledger record. Pending occurrences may
 need the producer's 300-second lease to expire before recovery. The bounded
 journal retains up to 256 operations and refuses further new identities at
-capacity. Keep the private journal, lease and ledger together; deletion or
-corruption requires deliberate recovery, rather than silent recreation.
+capacity. A first read initializes the adapter journal only in a pristine private root.
+Keep the private journal, lease and ledger together: an established root with a
+missing journal refuses status and all actions without recreating identities or
+changing retained state. Deletion or corruption requires deliberate recovery.
+Latest diagnostic veto reasons come from that occurrence's matching ledger
+record; attempts blocked before completion do not inherit earlier run vetoes.
 
 Blocking runs engages the producer kill switch and fences subsequent
 completion. It does not terminate a subprocess or control a background

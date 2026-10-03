@@ -101,18 +101,24 @@ def write_journal(path, value):
 def journal_update(root, update):
     path = root / 'operations.json'
     lock_path = root / '.operations.lock'
-    private_file(lock_path, missing=True)
-    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    creating = not path.exists()
+    if creating and any(root.iterdir()):
+        raise ValueError('Established operation journal is missing')
+    private_file(lock_path, missing=creating)
+    flags = os.O_RDWR | os.O_NOFOLLOW
+    if creating:
+        flags |= os.O_CREAT | os.O_EXCL
+    fd = os.open(lock_path, flags, 0o600)
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_uid != os.getuid() or info.st_mode & 0o077:
             raise ValueError('Unsafe operation lock')
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        private_file(path, missing=True)
-        value = strict(path.read_text()) if path.exists() else {'version': 1, 'operations': []}
+        private_file(path, missing=creating)
+        value = {'version': 1, 'operations': []} if creating else strict(path.read_text())
         validate_journal(value)
         result, changed = update(value)
-        if changed:
+        if changed or creating:
             write_journal(path, value)
         return result
     finally:
@@ -153,12 +159,29 @@ def main():
         if path.name not in {'lease.json', '.lease.json.lock', 'ledger.jsonl', '.ledger.jsonl.lock', 'operations.json', '.operations.lock'}:
             raise ValueError('Unexpected private state file')
         private_file(path)
+    # Establish identity metadata only in a completely pristine private root.
+    # A retained lock, lease or ledger without its journal is never a new start.
+    journal_update(root, lambda value: (None, False))
     # -I -S prevents ambient PYTHONPATH and site hooks. Add only pinned source.
     sys.path.insert(0, str(Path(runtime) / 'src'))
     from money_maker_3000.cli import main as producer_main
     from money_maker_3000.worker_leases import WorkerLeaseStore
     state_path = root / 'lease.json'
     ledger_path = root / 'ledger.jsonl'
+
+    def guard(value):
+        items = value['operations']
+        completed = any(item['status'] in {'completed', 'already-completed'} for item in items)
+        completed_run = any(item['action'] == 'run-once' and item['status'] in {'completed', 'already-completed'} for item in items)
+        state_exists = state_path.exists()
+        lease_lock_exists = state_path.with_name('.lease.json.lock').exists()
+        ledger_exists = ledger_path.exists()
+        if (not items and (state_exists or lease_lock_exists or ledger_exists)) or state_exists != lease_lock_exists:
+            raise ValueError('Operation journal and producer state disagree')
+        if ((completed or ledger_exists) and not state_exists) or (completed_run and not ledger_exists):
+            raise ValueError('Completed operational state is missing')
+        return None, False
+    journal_update(root, guard)
 
     def invoke(args):
         output, errors = io.StringIO(), io.StringIO()
@@ -170,6 +193,7 @@ def main():
 
     def status():
         nonlocal observed
+        journal_update(root, guard)
         observed = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
         ops = invoke(['operations-status', '--state-path', str(state_path), '--ledger-path', str(ledger_path), '--observed-at', observed])
         lease = invoke(['lease-report', str(state_path), '--observed-at', observed])
@@ -201,12 +225,6 @@ def main():
         value['operations'].append(item)
         return item.copy(), True
     operation = journal_update(root, begin)
-    def guard(value):
-        completed = any(item['status'] in {'completed', 'already-completed'} for item in value['operations'])
-        completed_run = any(item['action'] == 'run-once' and item['status'] in {'completed', 'already-completed'} for item in value['operations'])
-        if ((completed or ledger_path.exists()) and (not state_path.exists() or not state_path.with_name('.lease.json.lock').exists())) or (completed_run and not ledger_path.exists()):
-            raise ValueError('Completed operational state is missing')
-        return None, False
     journal_update(root, guard)
     if action == 'run-once':
         result = invoke(['run-once', '--manifest', str(Path(runtime) / 'contracts' / 'offline-simulation-runner-v1.json'), '--state-path', str(state_path), '--ledger-path', str(ledger_path), '--holder', 'etoro-dashboard-isolated-diagnostic', '--idempotency-key', identity, '--started-at', operation['startedAt']])
