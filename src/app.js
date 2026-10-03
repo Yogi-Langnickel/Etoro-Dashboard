@@ -45,6 +45,7 @@ let operationsFailed = false;
 let operationsRequestSequence = 0;
 let operationsMutationProtection = null;
 let retryOperation = null;
+let retryOriginalStartedAt = null;
 
 const {
   hasExactKeys,
@@ -1877,7 +1878,7 @@ function applyOperationsFreshness(now = Date.now()) {
   }
   const hasToken = Boolean(operationsMutationProtection?.csrfToken);
   const run = document.getElementById("operations-run");
-  if (run) { run.disabled = !usable || !hasToken || !payload.capabilities.runOnce || payload.operation?.status === "pending" || operationsPending || pendingOperations.size > 0; run.textContent = retryOperation ? "Retry the same diagnostic request" : "Run approved synthetic diagnostic once"; }
+  if (run) { run.disabled = !usable || !hasToken || !payload.capabilities.runOnce || (payload.operation?.status === "pending" && !(retryOperation?.operationId === payload.operation.id && payload.operation.action === "run-once" && payload.lease.workerState === "available")) || operationsPending || pendingOperations.size > 0; run.textContent = retryOperation ? "Retry the same diagnostic request" : "Run approved synthetic diagnostic once"; }
   const block = document.getElementById("operations-block");
   // A running diagnostic can be fenced while its request is still pending.
   if (block) block.disabled = !payload || !hasToken || !payload.runtime.verified || !payload.capabilities.block || pendingOperations.has("block") || pendingOperations.has("reenable");
@@ -1887,17 +1888,22 @@ function applyOperationsFreshness(now = Date.now()) {
 
 function renderOfflineOperations(raw) {
   const payload = normalizeOfflineOperationsPayload(raw);
+  if (retryOperation?.operationId === payload.operation?.id && retryOriginalStartedAt && payload.operation.startedAt !== retryOriginalStartedAt) throw new Error("Offline operation original start changed.");
   operationsPayload = payload;
   operationsFailed = false;
+  if (payload.operation?.action === "run-once" && payload.operation.status === "pending") {
+    retryOperation = { action: "run-once", operationId: payload.operation.id };
+    retryOriginalStartedAt = payload.operation.startedAt;
+  }
   text("operations-runtime", payload.runtime.verified ? `${payload.runtime.fixture} · ${payload.runtime.strategyId} · budget ${money(payload.runtime.budgetUsd)} · allocation ${money(payload.runtime.botAllocationUsd)} · reserve ${money(payload.runtime.reservedUsd)} · order cap ${money(payload.runtime.maxOrderUsd)} · fixed approved runner` : "Unavailable; runtime verification failed");
   text("operations-provenance", `${payload.runtime.verified ? "Verified immutable runtime" : "Unverified runtime"} · ${payload.runtime.producerCommit} · ${payload.runtime.manifestId}`);
   text("operations-lease", `${labelize(payload.lease.workerState)} · integrity ${payload.lease.integrity} · completions ${payload.lease.completionCount ?? "unavailable"} · block reason ${payload.lease.killSwitchReason ?? "none"}`);
   text("operations-ledger", `Integrity ${payload.ledger.integrity} · ${payload.ledger.recordCount} records · latest recorded ${payload.ledger.latestRecordedAt ?? "none"}`);
-  text("operations-identity", payload.operation ? `${payload.operation.id} · ${payload.operation.status} · original start ${payload.operation.startedAt}` : "None observed");
+  text("operations-identity", payload.operation ? `${payload.operation.id} · ${payload.operation.action} · ${payload.operation.status} · original start ${payload.operation.startedAt}` : "None observed");
   const result = payload.lastResult;
   text("operations-result", result ? result.diagnostics ? `${result.status} · started ${result.startedAt} · ${result.diagnostics.fixtureRows} fixture rows · ${result.diagnostics.eventCount} events · ${result.diagnostics.blockedEventCount} blocked; history ${result.diagnostics.strategyHistoryState}, walk-forward ${result.diagnostics.walkForwardState}, sampling ${result.diagnostics.samplingState}` : `${result.status} · started ${result.startedAt}; diagnostics not run` : "No result observed");
   text("operations-veto", result ? result.vetoReasons.join(", ") || "None returned" : "No result observed");
-  if (retryOperation && payload.operation?.id === retryOperation.operationId && ["completed", "already-completed"].includes(payload.operation.status)) retryOperation = null;
+  if (retryOperation && payload.operation?.id === retryOperation.operationId && ["completed", "already-completed"].includes(payload.operation.status)) { retryOperation = null; retryOriginalStartedAt = null; }
   applyOperationsFreshness();
   return payload;
 }

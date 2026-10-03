@@ -349,8 +349,8 @@ function normalizeOfflineOperationsPayload(payload) {
     !hasExactKeys(ledger, ["integrity", "recordCount", "latestRecordedAt"]) ||
     !["clean", "missing", "corrupted", "recovered-with-warnings", "not-assessed"].includes(ledger.integrity) || !validCount(ledger.recordCount) ||
     (ledger.latestRecordedAt !== null && !operationsInstant(ledger.latestRecordedAt))) fail();
-  if (payload.operation !== null && (!hasExactKeys(payload.operation, ["id", "startedAt", "status"]) || typeof payload.operation.id !== "string" ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(payload.operation.id) || !operationsInstant(payload.operation.startedAt) || !operationStatuses.includes(payload.operation.status))) fail();
+  if (payload.operation !== null && (!hasExactKeys(payload.operation, ["id", "action", "startedAt", "status"]) || typeof payload.operation.id !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(payload.operation.id) || !["run-once", "block", "reenable"].includes(payload.operation.action) || !operationsInstant(payload.operation.startedAt) || !operationStatuses.includes(payload.operation.status))) fail();
   const result = payload.lastResult;
   if (result !== null) {
     if (!hasExactKeys(result, ["status", "startedAt", "diagnostics", "vetoReasons"]) || !operationStatuses.includes(result.status) || !operationsInstant(result.startedAt) ||

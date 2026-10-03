@@ -174,14 +174,14 @@ test('block remains available during a run and obsolete run completion cannot un
   const { api, document } = await workspace(async (_url, options) => {
     const input = JSON.parse(options.body);
     if (input.action === 'run-once') { runId = input.operationId; return runResponse.promise; }
-    return response(operations({ state: 'blocked', blocked: true, operation: { id: input.operationId, startedAt: instant, status: 'completed' }, action: { type: 'block', status: 'completed' } }));
+    return response(operations({ state: 'blocked', blocked: true, operation: { id: input.operationId, action: 'block', startedAt: instant, status: 'completed' }, action: { type: 'block', status: 'completed' } }));
   });
   api.token(); api.renderOfflineOperations(operations());
   const running = api.operateOfflineDiagnostic('run-once');
   assert.equal(document.getElementById('operations-run').disabled, true);
   assert.equal(document.getElementById('operations-block').disabled, false);
   await api.operateOfflineDiagnostic('block');
-  runResponse.resolve(response(operations({ operation: { id: runId, startedAt: instant, status: 'completed' }, action: { type: 'run-once', status: 'completed' } })));
+  runResponse.resolve(response(operations({ operation: { id: runId, action: 'run-once', startedAt: instant, status: 'completed' }, action: { type: 'run-once', status: 'completed' } })));
   await running;
   assert.match(document.getElementById('operations-lease').textContent, /Kill Switch Blocked/);
   assert.match(document.getElementById('operations-state').textContent, /Blocked/);
@@ -193,7 +193,7 @@ test('ambiguous run retries keep one identity while GET authoritative reconcilia
     if (!options.body) return response(operations());
     const input = JSON.parse(options.body); requests.push(input);
     if (lost) { lost = false; throw new Error('lost synthetic transport'); }
-    return response(operations({ operation: { id: input.operationId, startedAt: instant, status: 'already-completed' }, action: { type: 'run-once', status: 'already-completed' } }));
+    return response(operations({ operation: { id: input.operationId, action: 'run-once', startedAt: instant, status: 'already-completed' }, action: { type: 'run-once', status: 'already-completed' } }));
   });
   api.token(); api.renderOfflineOperations(operations());
   await api.operateOfflineDiagnostic('run-once');
@@ -203,4 +203,22 @@ test('ambiguous run retries keep one identity while GET authoritative reconcilia
   assert.equal(requests.length, 2); assert.equal(requests[0].operationId, requests[1].operationId);
   assert.match(document.getElementById('operations-identity').textContent, /original start 2026-10-03T00:00:00.000Z/);
   assert.match(document.getElementById('operations-action-status').textContent, /Already Completed/);
+});
+
+
+test('reload recovers pending diagnostic identity only for run-once, gates busy lease and never automatically executes', async () => {
+  const identity = 'cf5a5205-2680-4bf9-a25a-b21fd44b9b5a'; let calls = 0; const requests = [];
+  const { api, document } = await workspace(async (_url, options) => {
+    calls++; const input = JSON.parse(options.body); requests.push(input);
+    return response(operations({ operation: { id: input.operationId, action: 'run-once', startedAt: instant, status: 'already-completed' }, action: { type: 'run-once', status: 'already-completed' } }));
+  });
+  api.token(); const pending = operations({ operation: { id: identity, action: 'run-once', startedAt: instant, status: 'pending' } });
+  pending.capabilities.runOnce = false; pending.lease.workerState = 'busy';
+  api.renderOfflineOperations(pending); assert.equal(calls, 0); assert.equal(document.getElementById('operations-run').disabled, true);
+  pending.capabilities.runOnce = true; pending.lease.workerState = 'available'; api.renderOfflineOperations(pending);
+  assert.equal(document.getElementById('operations-run').disabled, false); assert.equal(document.getElementById('operations-run').textContent, 'Retry the same diagnostic request');
+  await api.operateOfflineDiagnostic('run-once'); assert.equal(requests[0].operationId, identity);
+  assert.match(document.getElementById('operations-identity').textContent, /original start 2026-10-03T00:00:00.000Z/);
+  const other = await workspace(); other.api.token(); other.api.renderOfflineOperations(operations({ operation: { id: identity, action: 'block', startedAt: instant, status: 'pending' } }));
+  assert.equal(other.document.getElementById('operations-run').disabled, true);
 });
