@@ -1,5 +1,6 @@
+import { createMoneyMakerAdapter, BOT_CAPABILITY_REGISTRY, OfflineOperationError } from "./money-maker-adapter.mjs";
 import { createServer as createHttpServer } from "node:http";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -63,6 +64,8 @@ export const INTERNAL_API_ROUTES = Object.freeze([
   "/api/etoro/market/chart",
   "/api/etoro/demo/trading/status",
   "/api/etoro/demo/trading/preview",
+  "/api/etoro/bot/operations",
+  "/api/etoro/bot/capabilities",
   "/api/etoro/bot/status",
   "/api/etoro/bot/strategies",
   "/api/etoro/bot/runs",
@@ -145,32 +148,28 @@ function getRequestHeader(request, name) {
       continue;
     }
 
-    return Array.isArray(value) ? value[0] : value;
+    return value;
   }
 
   return undefined;
 }
 
-function normalizeHostname(hostname) {
-  const value = String(hostname ?? "").trim().toLowerCase();
-
-  if (value.startsWith("[") && value.includes("]")) {
-    return value.slice(1, value.indexOf("]"));
+export function validateDashboardRequestBoundary(request) {
+  const host = getRequestHeader(request, "host");
+  if (typeof host !== "string" || !/^(?:localhost|127\.0\.0\.1|\[::1\])(?::[1-9][0-9]{0,4})?$/.test(host) || (host.includes(":") && !host.endsWith("]") && Number(host.slice(host.lastIndexOf(":") + 1)) > 65535)) return false;
+  let base;
+  try { base = new URL(`http://${host}`); } catch { return false; }
+  if (request.rawHeaders) {
+    const keys = request.rawHeaders.filter((_, index) => index % 2 === 0).map((key) => key.toLowerCase());
+    if (keys.filter((key) => key === "host").length !== 1 || keys.filter((key) => key === "origin").length > 1) return false;
   }
-
-  return value.split(":")[0];
-}
-
-function isLocalHostname(hostname) {
-  return ["127.0.0.1", "localhost", "::1"].includes(normalizeHostname(hostname));
-}
-
-function parseOriginHeader(origin) {
-  try {
-    return new URL(origin);
-  } catch {
-    return null;
+  const origin = getRequestHeader(request, "origin");
+  if (origin !== undefined) {
+    if (typeof origin !== "string") return false;
+    try { const parsed = new URL(origin); if (parsed.origin !== base.origin || parsed.username || parsed.password || parsed.pathname !== "/" || parsed.search || parsed.hash || origin !== parsed.origin) return false; } catch { return false; }
   }
+  try { const url = new URL(request.url, base); if (url.origin !== base.origin) return false; } catch { return false; }
+  return true;
 }
 
 function validateBotConfigMutationRequest(request) {
@@ -198,7 +197,7 @@ function validateLocalJsonMutationRequest(request, label) {
   const origin = getRequestHeader(request, "origin");
   const host = getRequestHeader(request, "host");
 
-  if (!contentType.startsWith("application/json")) {
+  if (!/^application\/json(?:;\s*charset=utf-8)?$/.test(contentType)) {
     return {
       ok: false,
       status: 415,
@@ -206,7 +205,7 @@ function validateLocalJsonMutationRequest(request, label) {
     };
   }
 
-  if (!host || !isLocalHostname(host)) {
+  if (!host || !validateDashboardRequestBoundary(request)) {
     return {
       ok: false,
       status: 403,
@@ -214,8 +213,7 @@ function validateLocalJsonMutationRequest(request, label) {
     };
   }
 
-  const originUrl = origin ? parseOriginHeader(origin) : null;
-  if (!originUrl || !isLocalHostname(originUrl.hostname)) {
+  if (!origin) {
     return {
       ok: false,
       status: 403,
@@ -394,7 +392,7 @@ async function profileReadiness(environment, config, providerCache, fetchEndpoin
 async function readJsonBody(request) {
   if (typeof request.body === "string") {
     if (Buffer.byteLength(request.body, "utf8") > MAX_API_BODY_BYTES) {
-      throw new Error(`Request body must be ${MAX_API_BODY_BYTES} bytes or smaller`);
+      throw Object.assign(new Error(`Request body must be ${MAX_API_BODY_BYTES} bytes or smaller`), { code: "REQUEST_BODY_TOO_LARGE" });
     }
 
     return request.body ? JSON.parse(request.body) : {};
@@ -408,7 +406,7 @@ async function readJsonBody(request) {
     totalBytes += buffer.length;
 
     if (totalBytes > MAX_API_BODY_BYTES) {
-      throw new Error(`Request body must be ${MAX_API_BODY_BYTES} bytes or smaller`);
+      throw Object.assign(new Error(`Request body must be ${MAX_API_BODY_BYTES} bytes or smaller`), { code: "REQUEST_BODY_TOO_LARGE" });
     }
 
     chunks.push(buffer);
@@ -476,6 +474,11 @@ async function handleTradePreview(request, response, config) {
   }
 }
 
+function recordSessionEvent(options, action, outcome, observedAt = new Date().toISOString()) {
+  options.sessionEvents?.push({ eventId: randomUUID(), actor: "operator", action, entityRef: "isolated-offline-controls", outcome, createdAt: observedAt });
+  if (options.sessionEvents?.length > 100) options.sessionEvents.splice(0, options.sessionEvents.length - 100);
+}
+
 async function handleBotConfigRead(response, options) {
   const loadStoredBotConfig = options.loadBotConfig ?? loadBotConfig;
   const loaded = await loadStoredBotConfig({
@@ -523,6 +526,7 @@ async function handleBotConfigUpdate(request, response, options) {
       configFile: options.botConfigFile,
     });
 
+    recordSessionEvent(options, "bot_config_updated", "saved-draft-preferences");
     sendJson(response, 200, {
       ...publicBotConfigPayload(saved.config, saved),
       audit: {
@@ -542,7 +546,7 @@ async function handleBotConfigUpdate(request, response, options) {
       mutationRoutesEnabled: false,
       executionBlocked: true,
       error: {
-        code: validationError ? (error.code ?? "BOT_CONFIG_INVALID") : "BOT_CONFIG_SAVE_FAILED",
+        code: validationError ? (error.code === "REQUEST_BODY_TOO_LARGE" ? "BOT_CONFIG_INVALID" : (error.code ?? "BOT_CONFIG_INVALID")) : "BOT_CONFIG_SAVE_FAILED",
         message: validationError ? (error?.message ?? "Invalid bot config") : "Unable to save bot config.",
         fields: validationError ? error.errors : undefined,
       },
@@ -576,6 +580,30 @@ async function handleApiRoute(pathname, response, options) {
   }
 
   try {
+    if (pathname === "/api/etoro/bot/audit") { sendJson(response, 200, botAuditEvents({}, options.sessionEvents)); return; }
+    if (pathname === "/api/etoro/bot/events") { sendJson(response, 200, botEventFeed({}, options.sessionEvents)); return; }
+    if (pathname === "/api/etoro/bot/capabilities") { sendJson(response, 200, { ok: true, ...BOT_CAPABILITY_REGISTRY }); return; }
+    if (pathname === "/api/etoro/bot/operations") {
+      const adapter = options.moneyMakerAdapter;
+      if (options.request?.method === "POST") {
+        const mutation = validateBotConfigMutationRequest(options.request);
+        if (!mutation.ok) { sendJson(response, mutation.status, { ok: false, error: { code: "OFFLINE_MUTATION_FORBIDDEN", message: mutation.message } }); return; }
+      }
+      try {
+        const result = options.request?.method === "POST" ? await adapter.act(await readJsonBody(options.request)) : await adapter.status();
+        if (result.action) recordSessionEvent(options, `diagnostic_${result.action.type.replaceAll("-", "_")}`, result.action.status, result.observedAt);
+        sendJson(response, 200, result, { [BOT_CONFIG_CSRF_RESPONSE_HEADER]: botConfigCsrfToken });
+      } catch (error) {
+        const code = error instanceof OfflineOperationError ? error.code : (error instanceof SyntaxError || error?.code === "REQUEST_BODY_TOO_LARGE") ? "OFFLINE_ACTION_INVALID" : "OFFLINE_OPERATION_FAILED";
+        sendJson(response, code === "OFFLINE_ACTION_INVALID" ? 400 : code === "OFFLINE_BUSY" ? 409 : 503, { ok: false, dtoVersion: "dashboard-offline-operations.v1", state: "failed", error: { code, message: "Isolated offline diagnostic operation is unavailable." } }, { [BOT_CONFIG_CSRF_RESPONSE_HEADER]: botConfigCsrfToken });
+      }
+      return;
+    }
+    if (pathname === BOT_CONFIG_ROUTE) {
+      if (options.request?.method === "PUT") await handleBotConfigUpdate(options.request, response, options);
+      else await handleBotConfigRead(response, options);
+      return;
+    }
     const config = await getConfig(loadConfig);
 
     if (pathname === "/api/etoro/status") {
@@ -624,16 +652,6 @@ async function handleApiRoute(pathname, response, options) {
       return;
     }
 
-    if (pathname === BOT_CONFIG_ROUTE) {
-      if (options.request?.method === "PUT") {
-        await handleBotConfigUpdate(options.request, response, options);
-        return;
-      }
-
-      await handleBotConfigRead(response, options);
-      return;
-    }
-
     if (pathname === "/api/etoro/bot/strategies") {
       sendJson(response, 200, botStrategyRegistry(config));
       return;
@@ -641,16 +659,6 @@ async function handleApiRoute(pathname, response, options) {
 
     if (pathname === "/api/etoro/bot/runs") {
       sendJson(response, 200, botSimulationRuns(config));
-      return;
-    }
-
-    if (pathname === "/api/etoro/bot/audit") {
-      sendJson(response, 200, botAuditEvents(config));
-      return;
-    }
-
-    if (pathname === "/api/etoro/bot/events") {
-      sendJson(response, 200, botEventFeed(config));
       return;
     }
 
@@ -786,15 +794,26 @@ async function handleApiRoute(pathname, response, options) {
 }
 
 export function createRequestHandler(options = {}) {
+  const sessionEvents = [];
+  const moneyMakerAdapter = options.moneyMakerAdapter ?? createMoneyMakerAdapter({ runtimeRoot: options.moneyMakerRuntimeRoot, stateRoot: options.moneyMakerStateRoot });
   const providerCache = options.providerCache ?? createReadOnlyProviderCache({
     ttlMs: (config) => config.readCacheTtlMs ?? DEFAULT_READ_CACHE_TTL_MS,
   });
 
   return async (request, response) => {
-    const url = new URL(request.url, "http://localhost");
+    if (!validateDashboardRequestBoundary(request)) {
+      sendJson(response, 403, { ok: false, error: { code: "DASHBOARD_REQUEST_FORBIDDEN", message: "Requests require the local dashboard Host and same Origin." } });
+      return;
+    }
+    const url = new URL(request.url, `http://${getRequestHeader(request, "host")}`);
     const pathname = url.pathname;
 
     if (pathname.startsWith("/api/")) {
+      if (pathname === "/api/etoro/bot/operations") {
+        if (!["GET", "POST"].includes(request.method)) { sendJson(response, 405, { ok: false, error: { code: "METHOD_NOT_ALLOWED", message: "Offline operations support GET and POST only." } }); return; }
+        await handleApiRoute(pathname, response, { ...options, sessionEvents, moneyMakerAdapter, providerCache, request });
+        return;
+      }
       if (pathname === BOT_CONFIG_ROUTE) {
         if (!["GET", "PUT"].includes(request.method)) {
           sendJson(response, 405, {
@@ -805,7 +824,7 @@ export function createRequestHandler(options = {}) {
           return;
         }
 
-        await handleApiRoute(pathname, response, { ...options, providerCache, request });
+        await handleApiRoute(pathname, response, { ...options, sessionEvents, moneyMakerAdapter, providerCache, request });
         return;
       }
 
@@ -819,7 +838,7 @@ export function createRequestHandler(options = {}) {
           return;
         }
 
-        await handleApiRoute(pathname, response, { ...options, providerCache, request });
+        await handleApiRoute(pathname, response, { ...options, sessionEvents, moneyMakerAdapter, providerCache, request });
         return;
       }
 
@@ -832,7 +851,7 @@ export function createRequestHandler(options = {}) {
         return;
       }
 
-      await handleApiRoute(pathname, response, { ...options, providerCache, searchParams: url.searchParams });
+      await handleApiRoute(pathname, response, { ...options, sessionEvents, moneyMakerAdapter, providerCache, request, searchParams: url.searchParams });
       return;
     }
 

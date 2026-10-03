@@ -189,7 +189,85 @@ Set `ENABLE_DEMO_TRADE_PREVIEW=true` only when you want the local server to vali
 
 Set `ETORO_READ_CACHE_TTL_MS` if local read-only provider calls need a different short success-cache window. The default is `15000` milliseconds and the maximum is `300000` milliseconds. Provider 429, timeout, and 5xx failures are negative-cached for a short server-memory backoff so repeated local refreshes do not storm the provider.
 
-Simulation bot controls are stored server-side at `${HOME}/.config/etoro-dashboard/bot-config.json` by default. The saved config contains only predefined strategy, budget, market-group, instrument-class, and low-frequency cadence choices; it does not contain credentials or enable trading. Config updates are local-dashboard only: the server requires JSON, local Host/Origin headers, and the mutation-protection token delivered in the `x-etoro-dashboard-config-token` response header from `GET /api/etoro/bot/config`; the JSON body names the required request header but does not contain the token. Writes use a serialized temp-file-and-rename path with fsync where the local filesystem supports it. Strategy, parameter-schema, budget, market, run-mode, and cadence metadata now comes from the generated Money-maker contract under `contracts/generated/`, pinned by producer commit and SHA-256 provenance. `npm run contract:check` fails closed on artifact/provenance drift. Dashboard-selectable run modes are backtest-only; disabled execute policy metadata is visible but cannot be selected.
+Bot configuration at `${HOME}/.config/etoro-dashboard/bot-config.json` contains
+saved draft preferences. Saving strategy, budget or cadence choices does not
+reconfigure the approved diagnostic runner. PUT accepts the complete exact typed
+contract, including the fixed `minimumEvaluationIntervalMinutes: 240`, and
+rejects unknown fields, numeric strings and supplied `updatedAt`. Configuration
+metadata stays pinned to the existing generated Money Maker contract.
+
+### Isolated offline diagnostics
+
+Bot Control runs the actual Money Maker engine on the approved synthetic SPY
+fixture. Its fixed slow-trend strategy, USD 1,000 allocation and budget, USD 100
+reserve and USD 250 order limit come from the unchanged approved manifest. The
+202-event diagnostic has no investment-profit evidence, provider calls,
+credentials, account data, orders or training. It uses a separate Dashboard
+state root and never attaches to an installed worker or scheduler.
+
+Install the reviewed producer runtime once from a checkout containing commit
+`c17248ce097c3ed03e1e262be972023f48e63636`:
+
+```sh
+node scripts/setup-offline-runtime.mjs /absolute/path/to/Money-maker-3000
+npm run start:offline
+```
+
+Setup copies only pinned Git blobs, ignoring dirty checkout files, and verifies
+all 42 committed source, contract and fixture files. It preserves the complete
+committed fixture inventory and never regenerates contracts. The private
+runtime lives at
+`${HOME}/.local/share/etoro-dashboard/money-maker/c17248ce097c3ed03e1e262be972023f48e63636`
+with files mode `400` and directories mode `500`. Private operational files live
+separately at `${HOME}/.local/share/etoro-dashboard/offline-diagnostics` with
+files mode `600` and directory mode `700`. Missing, changed or extra runtime
+files, symlinks, hardlinks and unsafe private state fail closed.
+
+The fixed bridge uses Python 3.11 or newer: `/usr/local/bin/python3.13` on macOS,
+`/usr/bin/python3` on Linux. It runs with isolated imports, no site hooks, a
+minimal credential-free environment, a 20-second deadline and a 2 MB combined
+output limit. A missing interpreter or runtime leaves controls unavailable.
+Every invocation rechecks runtime provenance before importing producer code.
+
+`GET /api/etoro/bot/operations` reports actual operational state, lease and ledger
+integrity, diagnostic reasons, counts and the report observation time. Its
+30-second observation expiry is independent of the producer's 48-hour ledger
+age policy; the ledger report's fixed `generatedAt` is never freshness evidence.
+`GET /api/etoro/bot/capabilities` exposes one versioned adapter; future
+capabilities remain unavailable. Bot API audit/event feeds contain actual,
+bounded session events, and restart with an empty session history.
+
+Run once, block and re-enable use `POST /api/etoro/bot/operations` with the exact
+body `{action, operationId}`. Actions are `run-once`, `block` or `reenable`, and
+the operation ID is a UUID v4. Each accepted operation retains its original
+`startedAt` in the private journal; retrying the same ID confirms the existing
+completion instead of appending another ledger record. Pending occurrences may
+need the producer's 300-second lease to expire before recovery. The bounded
+journal retains up to 256 operations and refuses further new identities at
+capacity. Keep the private journal, lease and ledger together; deletion or
+corruption requires deliberate recovery, rather than silent recreation.
+
+Blocking runs engages the producer kill switch and fences subsequent
+completion. It does not terminate a subprocess or control a background
+scheduler. An operation already completed before the block remains completed.
+All mutations require the exact local HTTP Origin and Host (including port),
+JSON content type, and the `x-etoro-dashboard-csrf` request header carrying the
+token from `x-etoro-dashboard-config-token` on a config or operations read.
+Authoritative producer state is read back before action success is returned.
+
+For disposable browser validation, the offline launcher accepts only server
+operator environment overrides for isolated files:
+
+```sh
+DASHBOARD_OFFLINE_RUNTIME_ROOT=/private/verified/runtime \
+DASHBOARD_OFFLINE_STATE_ROOT=/private/isolated/state \
+DASHBOARD_OFFLINE_CONFIG_FILE=/private/isolated/bot-config.json \
+npm run start:offline
+```
+
+Browser requests cannot select executables, scripts, strategies, fixtures,
+filesystem paths or allocation parameters. The offline launcher continues to
+deny eToro credentials and provider access.
 
 ## Goals
 

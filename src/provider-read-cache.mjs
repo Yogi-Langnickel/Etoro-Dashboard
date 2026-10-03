@@ -59,6 +59,7 @@ function withCacheMetadata(result, cacheState, entry) {
       cachedAt: entry.cachedAt,
       expiresAt: entry.expiresAt,
       ttlMs: entry.ttlMs,
+      ...(entry.retryAt ? { retryAt: entry.retryAt, failureAt: entry.failureAt } : {}),
     },
   };
 }
@@ -86,6 +87,8 @@ function providerErrorWithCacheMetadata(serializedError, cacheState, entry) {
     cachedAt: entry.cachedAt,
     expiresAt: entry.expiresAt,
     ttlMs: entry.ttlMs,
+    retryAt: entry.retryAt,
+    failureAt: entry.failureAt,
     reason: serializedError.code,
   };
   return error;
@@ -118,10 +121,10 @@ export function createReadOnlyProviderCache({
       const resolvedFailureBackoffMs = resolveCacheTtlMs(failureBackoffMs, config);
       const existing = entries.get(key);
 
-      if (existing?.value && existing.expiresAtMs > nowMs) {
+      if (existing?.value && !existing.error && existing.expiresAtMs > nowMs) {
         return withCacheMetadata(existing.value, "hit", existing);
       }
-      if (existing?.error && existing.expiresAtMs > nowMs) {
+      if (existing?.error && existing.retryAtMs > nowMs) {
         if (existing.lastGood) return withCacheMetadata(existing.lastGood, "stale", existing);
         throw providerErrorWithCacheMetadata(existing.error, "backoff", existing);
       }
@@ -140,6 +143,7 @@ export function createReadOnlyProviderCache({
         expiresAtMs: nowMs + resolvedTtlMs,
         ttlMs: resolvedTtlMs,
         lastGood: existing?.value ?? existing?.lastGood,
+        lastGoodMetadata: existing?.lastGoodMetadata ?? (existing?.value ? { cachedAt: existing.cachedAt, expiresAt: existing.expiresAt, expiresAtMs: existing.expiresAtMs, ttlMs: existing.ttlMs } : null),
       };
 
       entry.inflight = fetchEndpoint(endpointName, { credentials: config })
@@ -150,6 +154,7 @@ export function createReadOnlyProviderCache({
           entry.cachedAt = new Date(cachedAtMs).toISOString();
           entry.expiresAtMs = cachedAtMs + resolvedTtlMs;
           entry.expiresAt = new Date(entry.expiresAtMs).toISOString();
+          entry.lastGoodMetadata = { cachedAt: entry.cachedAt, expiresAt: entry.expiresAt, expiresAtMs: entry.expiresAtMs, ttlMs: entry.ttlMs };
           delete entry.inflight;
           entries.set(key, entry);
           return entry.value;
@@ -166,10 +171,11 @@ export function createReadOnlyProviderCache({
             : 0;
           const effectiveBackoffMs = Math.max(resolvedFailureBackoffMs, providerBackoffMs);
           entry.error = serializeProviderError(error, config);
-          entry.cachedAt = new Date(backoffStartedAt).toISOString();
-          entry.expiresAtMs = backoffStartedAt + effectiveBackoffMs;
-          entry.expiresAt = new Date(entry.expiresAtMs).toISOString();
-          entry.ttlMs = effectiveBackoffMs;
+          entry.failureAt = new Date(backoffStartedAt).toISOString();
+          entry.retryAtMs = backoffStartedAt + effectiveBackoffMs;
+          entry.retryAt = new Date(entry.retryAtMs).toISOString();
+          if (entry.lastGoodMetadata) Object.assign(entry, entry.lastGoodMetadata);
+          else { entry.cachedAt = null; entry.expiresAt = null; entry.expiresAtMs = 0; entry.ttlMs = resolvedTtlMs; }
           delete entry.inflight;
           entries.set(key, entry);
           if (entry.lastGood) {

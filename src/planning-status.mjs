@@ -212,39 +212,14 @@ export function botSimulationRuns(config) {
   };
 }
 
-export function botAuditEvents(config) {
+export function botAuditEvents(config, sessionEvents = []) {
   return {
     ok: true,
     mode: "bot-simulation-monitor",
     readOnly: true,
     mutationRoutesEnabled: false,
-    credentialStatus: publicCredentialStatus(config),
-    auditEvents: [
-      {
-        eventId: "audit-001",
-        actor: "system",
-        action: "simulation_monitor_loaded",
-        entityRef: "bot-monitor",
-        outcome: "read-only",
-        createdAt: "2026-05-13T00:00:00.000Z",
-      },
-      {
-        eventId: "audit-002",
-        actor: "system",
-        action: "execution_routes_checked",
-        entityRef: "bot-monitor",
-        outcome: "absent",
-        createdAt: "2026-05-13T00:00:01.000Z",
-      },
-      {
-        eventId: "audit-003",
-        actor: "operator",
-        action: "local_strategy_preview_loaded",
-        entityRef: "dca-cash-reserve",
-        outcome: "not-persisted",
-        createdAt: "2026-05-14T00:00:00.000Z",
-      },
-    ],
+    source: "session-memory",
+    auditEvents: sessionEvents.slice(-20).reverse(),
     pagination: {
       limit: 20,
       nextCursor: null,
@@ -258,39 +233,17 @@ export function botAuditEvents(config) {
   };
 }
 
-export function botEventFeed(config) {
+export function botEventFeed(config, sessionEvents = []) {
   return {
     ok: true,
     mode: "bot-simulation-monitor",
     readOnly: true,
     mutationRoutesEnabled: false,
-    credentialStatus: publicCredentialStatus(config),
-    events: [
-      {
-        eventId: "event-001",
-        type: "decision",
-        severity: "info",
-        title: "DCA simulation skipped",
-        detail: "Money-maker historical market data inputs are not connected, so no candidate order was produced.",
-        createdAt: "2026-05-13T00:00:00.000Z",
-      },
-      {
-        eventId: "event-002",
-        type: "risk-veto",
-        severity: "warn",
-        title: "Rebalance blocked",
-        detail: "Deterministic backtest review is incomplete; risk engine remains fail-closed.",
-        createdAt: "2026-05-13T00:05:00.000Z",
-      },
-      {
-        eventId: "event-003",
-        type: "budget-check",
-        severity: "info",
-        title: "Budget guardrail loaded",
-        detail: "Simulation budget options are capped at USD 2,500 with daily and weekly loss stops.",
-        createdAt: "2026-05-14T00:00:00.000Z",
-      },
-    ],
+    source: "session-memory",
+    events: sessionEvents.slice(-20).reverse().map((event) => ({
+      eventId: event.eventId, type: "operation", severity: "info",
+      title: event.action, detail: event.outcome, createdAt: event.createdAt,
+    })),
     pagination: {
       limit: 20,
       nextCursor: null,
@@ -413,8 +366,8 @@ export async function botSnapshot(config, options) {
       },
     },
     runs: botSimulationRuns(config),
-    audit: botAuditEvents(config),
-    events: botEventFeed(config),
+    audit: botAuditEvents(config, options.sessionEvents),
+    events: botEventFeed(config, options.sessionEvents),
     tradeLog: botTradeLog(config),
     safeguards: {
       providerCalls: "blocked",

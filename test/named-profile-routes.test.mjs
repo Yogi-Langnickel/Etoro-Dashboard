@@ -21,7 +21,7 @@ const selected = (route, environment) => `${route}${route.includes("?") ? "&" : 
 
 async function call(handler, url) {
   const response = { status: null, body: "", writeHead(status) { this.status = status; }, end(body) { this.body = body; } };
-  await handler({ method: "GET", url, headers: {} }, response);
+  await handler({ method: "GET", url, headers: { host: "localhost:4173" } }, response);
   return { status: response.status, json: JSON.parse(response.body) };
 }
 
@@ -237,7 +237,7 @@ test("stale last-good readiness preserves failure category through backoff witho
     const stale = await call(handler, selected("/api/etoro/portfolio", "real"));
     assert.equal(stale.json.cache.state, "stale");
     assert.deepEqual(stale.json.data, initial.json.data);
-    assert.deepEqual(Object.keys(stale.json.cache).sort(), ["cachedAt", "expiresAt", "state", "ttlMs"]);
+    assert.deepEqual(Object.keys(stale.json.cache).sort(), ["cachedAt", "expiresAt", "failureAt", "retryAt", "state", "ttlMs"]);
     assert.equal(state.calls.length, callCount);
     assert.doesNotMatch(JSON.stringify(stale.json), /private failure|private timeout|provider-cache-failure/);
   }

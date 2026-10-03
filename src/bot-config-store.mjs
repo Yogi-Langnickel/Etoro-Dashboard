@@ -135,7 +135,10 @@ function normalizeStringArray(value, fieldName) {
     throw new BotConfigValidationError(`${fieldName} must be an array`, [fieldName]);
   }
 
-  return [...new Set(value.map((item) => String(item ?? "").trim()).filter(Boolean))];
+  if (value.some((item) => typeof item !== "string") || new Set(value).size !== value.length) {
+    throw new BotConfigValidationError(`${fieldName} must contain unique typed values`, [fieldName]);
+  }
+  return [...value];
 }
 
 function assertAllowed(value, allowedValues, fieldName) {
@@ -178,20 +181,24 @@ function assertMarketInstrumentCompatibility(allowedMarkets, allowedInstrumentCl
 }
 
 function normalizeBotConfig(input = {}) {
+  const fields = [...Object.keys(DEFAULT_BOT_CONFIG), "updatedAt"];
+  if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some((key) => !fields.includes(key)) || Object.keys(DEFAULT_BOT_CONFIG).some((key) => !Object.hasOwn(input, key))) {
+    throw new BotConfigValidationError("Bot config fields are invalid", ["config"]);
+  }
   const candidate = {
     ...DEFAULT_BOT_CONFIG,
     ...input,
   };
-  const runMode = String(candidate.runMode ?? "").trim();
-  const strategyId = String(candidate.strategyId ?? "").trim();
-  const budgetUsd = Number(candidate.budgetUsd);
+  const runMode = candidate.runMode;
+  const strategyId = candidate.strategyId;
+  const budgetUsd = candidate.budgetUsd;
   const allowedMarkets = normalizeStringArray(candidate.allowedMarkets, "allowedMarkets");
   const allowedInstrumentClasses = normalizeStringArray(
     candidate.allowedInstrumentClasses,
     "allowedInstrumentClasses",
   );
-  const cadence = String(candidate.cadence ?? "").trim();
-  const minimumEvaluationIntervalMinutes = Number(candidate.minimumEvaluationIntervalMinutes);
+  const cadence = candidate.cadence;
+  const minimumEvaluationIntervalMinutes = candidate.minimumEvaluationIntervalMinutes;
 
   assertAllowed(runMode, ALLOWED_BOT_RUN_MODES, "runMode");
   if (!BOT_RUN_MODE_POLICY[runMode]?.enabled) {
@@ -225,9 +232,9 @@ function normalizeBotConfig(input = {}) {
 
   if (
     !Number.isInteger(minimumEvaluationIntervalMinutes) ||
-    minimumEvaluationIntervalMinutes < MIN_BOT_EVALUATION_INTERVAL_MINUTES
+    minimumEvaluationIntervalMinutes !== MIN_BOT_EVALUATION_INTERVAL_MINUTES
   ) {
-    throw new BotConfigValidationError("minimumEvaluationIntervalMinutes is below the no-HFT floor", [
+    throw new BotConfigValidationError("minimumEvaluationIntervalMinutes must equal the approved contract value", [
       "minimumEvaluationIntervalMinutes",
     ]);
   }
@@ -248,6 +255,8 @@ export function publicBotConfigPayload(config, { source = "default", persisted =
   return {
     ok: true,
     mode: "bot-config",
+    purpose: "saved-draft-preferences",
+    runtimeApplied: false,
     readOnly: false,
     demoOnly: true,
     mutationRoutesEnabled: false,
@@ -289,6 +298,7 @@ export async function loadBotConfig({ configFile = DEFAULT_BOT_CONFIG_FILE, read
   try {
     const raw = await readFileImpl(configFile, "utf8");
     const parsed = JSON.parse(raw);
+    if (!Object.hasOwn(parsed ?? {}, "updatedAt") || typeof parsed.updatedAt !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(parsed.updatedAt) || !Number.isFinite(Date.parse(parsed.updatedAt))) throw new BotConfigValidationError("stored bot config timestamp is invalid", ["updatedAt"]);
     return {
       config: normalizeBotConfig(parsed),
       source: "server-local-file",
@@ -323,6 +333,8 @@ export async function saveBotConfig(
     now = () => new Date(),
   } = {},
 ) {
+  if (input && Object.hasOwn(input, "updatedAt")) throw new BotConfigValidationError("updatedAt is server-owned", ["updatedAt"]);
+  normalizeBotConfig(input);
   const config = normalizeBotConfig({
     ...input,
     updatedAt: now().toISOString(),

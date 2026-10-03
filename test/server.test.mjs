@@ -36,6 +36,7 @@ import {
   offlineEtoroConfig,
 } from "../src/offline-config.mjs";
 
+const COMPLETE_DRAFT_CONFIG = { runMode: "backtest", strategyId: "dca-cash-reserve", budgetUsd: 1000, allowedMarkets: ["US_EQUITIES"], allowedInstrumentClasses: ["ETF"], cadence: "daily", minimumEvaluationIntervalMinutes: 240 };
 const BOT_CONFIG_CSRF_RESPONSE_HEADER = "x-etoro-dashboard-config-token";
 const originalFetch = globalThis.fetch;
 before(() => { globalThis.fetch = async () => { throw new Error("Provider network access is denied in server unit tests"); }; });
@@ -55,7 +56,7 @@ async function callHandler(handler, { method = "GET", url = "/api/health", body 
     },
   };
 
-  await handler({ method, url, body, headers }, response);
+  await handler({ method, url, body, headers: { host: "localhost:4173", ...headers } }, response);
 
   return {
     status: response.status,
@@ -178,6 +179,8 @@ test("server exposes only internal API routes and no execution routes", () => {
     "/api/etoro/market/chart",
     "/api/etoro/demo/trading/status",
     "/api/etoro/demo/trading/preview",
+    "/api/etoro/bot/operations",
+    "/api/etoro/bot/capabilities",
     "/api/etoro/bot/status",
     "/api/etoro/bot/strategies",
     "/api/etoro/bot/runs",
@@ -433,8 +436,8 @@ test("bot snapshot batches monitor routes without execution data", async () => {
   assert.equal(typeof response.headers[BOT_CONFIG_CSRF_RESPONSE_HEADER], "string");
   assert.equal(response.text.includes(response.headers[BOT_CONFIG_CSRF_RESPONSE_HEADER]), false);
   assert.equal(response.json.runs.runs.length, 2);
-  assert.equal(response.json.audit.auditEvents.length, 3);
-  assert.equal(response.json.events.events.length, 3);
+  assert.equal(response.json.audit.auditEvents.length, 0);
+  assert.equal(response.json.events.events.length, 0);
   assert.equal(response.json.tradeLog.entries.length, 2);
   assert.equal(response.json.safeguards.executionRoutes, "absent");
   assert.equal(response.text.includes("server-api-secret"), false);
@@ -687,6 +690,7 @@ test("bot config update persists validated server-side config and redacts storag
   });
   const mutationProtection = await readBotConfigMutationProtection(handler);
   const body = {
+    ...COMPLETE_DRAFT_CONFIG,
     runMode: "backtest",
     strategyId: "threshold-rebalance",
     budgetUsd: 1500,
@@ -732,6 +736,7 @@ test("bot config update failures do not expose local storage paths", async () =>
     url: "/api/etoro/bot/config",
     headers: localBotConfigMutationHeaders(mutationProtection),
     body: JSON.stringify({
+      ...COMPLETE_DRAFT_CONFIG,
       strategyId: "threshold-rebalance",
       budgetUsd: 1500,
       allowedMarkets: ["US_EQUITIES"],
@@ -756,6 +761,7 @@ test("bot config saves through atomic temp file rename and fsync hooks", async (
 
   const saved = await saveBotConfig(
     {
+      ...COMPLETE_DRAFT_CONFIG,
       strategyId: "dca-cash-reserve",
       budgetUsd: 1000,
       allowedMarkets: ["US_EQUITIES"],
@@ -806,6 +812,7 @@ test("bot config rejects temp-file fsync failures and removes the temp file", as
   await assert.rejects(
     saveBotConfig(
       {
+        ...COMPLETE_DRAFT_CONFIG,
         strategyId: "dca-cash-reserve",
         budgetUsd: 1000,
         allowedMarkets: ["US_EQUITIES"],
@@ -866,6 +873,7 @@ test("bot config saves are serialized per config file", async () => {
   await Promise.all([
     saveBotConfig(
       {
+        ...COMPLETE_DRAFT_CONFIG,
         strategyId: "dca-cash-reserve",
         budgetUsd: 1000,
         allowedMarkets: ["US_EQUITIES"],
@@ -876,6 +884,7 @@ test("bot config saves are serialized per config file", async () => {
     ),
     saveBotConfig(
       {
+        ...COMPLETE_DRAFT_CONFIG,
         strategyId: "threshold-rebalance",
         budgetUsd: 1500,
         allowedMarkets: ["COMMODITIES"],
@@ -931,7 +940,7 @@ test("bot config update rejects missing token, cross-origin, and bad content typ
   assert.equal(missingToken.json.error.code, "BOT_CONFIG_MUTATION_FORBIDDEN");
   assert.match(missingToken.json.error.message, /token/);
   assert.equal(crossOrigin.status, 403);
-  assert.match(crossOrigin.json.error.message, /local dashboard origin/);
+  assert.match(crossOrigin.json.error.message, /local dashboard Host and same Origin/);
   assert.equal(badContentType.status, 415);
   assert.match(badContentType.json.error.message, /application\/json/);
   assert.equal(missingToken.text.includes("server-api-secret"), false);
@@ -946,6 +955,7 @@ test("bot config update rejects unsupported strategy, markets, and high-frequenc
     url: "/api/etoro/bot/config",
     headers: localBotConfigMutationHeaders(mutationProtection),
     body: JSON.stringify({
+      ...COMPLETE_DRAFT_CONFIG,
       strategyId: "uploaded-ai-scalper",
       budgetUsd: 10_000,
       allowedMarkets: ["CRYPTO"],
@@ -970,6 +980,7 @@ test("bot config rejects execute mode while retaining disabled policy metadata",
     url: "/api/etoro/bot/config",
     headers: localBotConfigMutationHeaders(mutationProtection),
     body: JSON.stringify({
+      ...COMPLETE_DRAFT_CONFIG,
       runMode: "execute",
       strategyId: "dca-cash-reserve",
       budgetUsd: 1000,
@@ -995,6 +1006,7 @@ test("bot config mirrors strategy registry rules for market, instrument, and cad
     url: "/api/etoro/bot/config",
     headers: localBotConfigMutationHeaders(mutationProtection),
     body: JSON.stringify({
+      ...COMPLETE_DRAFT_CONFIG,
       strategyId: "dca-cash-reserve",
       budgetUsd: 1000,
       allowedMarkets: ["FOREX"],
@@ -1007,6 +1019,7 @@ test("bot config mirrors strategy registry rules for market, instrument, and cad
     url: "/api/etoro/bot/config",
     headers: localBotConfigMutationHeaders(mutationProtection),
     body: JSON.stringify({
+      ...COMPLETE_DRAFT_CONFIG,
       strategyId: "threshold-rebalance",
       budgetUsd: 1000,
       allowedMarkets: ["US_EQUITIES"],
@@ -1019,6 +1032,7 @@ test("bot config mirrors strategy registry rules for market, instrument, and cad
     url: "/api/etoro/bot/config",
     headers: localBotConfigMutationHeaders(mutationProtection),
     body: JSON.stringify({
+      ...COMPLETE_DRAFT_CONFIG,
       strategyId: "news-aware-watchlist",
       budgetUsd: 1000,
       allowedMarkets: ["US_EQUITIES"],
@@ -1057,7 +1071,7 @@ test("bot config rejects unsupported methods and oversized request bodies", asyn
   assert.match(oversizedResponse.json.error.message, /bytes or smaller/);
 });
 
-test("bot audit and events are read-only synthetic feeds", async () => {
+test("bot audit and events contain genuine session events only", async () => {
   const audit = await callHandler(configuredHandler(), {
     url: "/api/etoro/bot/audit",
   });
@@ -1067,10 +1081,9 @@ test("bot audit and events are read-only synthetic feeds", async () => {
 
   assert.equal(audit.status, 200);
   assert.equal(events.status, 200);
-  assert.equal(audit.json.auditEvents[0].action, "simulation_monitor_loaded");
-  assert.equal(events.json.events[1].type, "risk-veto");
-  assert.match(events.json.events[0].detail, /historical market data/);
-  assert.match(events.json.events[1].detail, /Deterministic backtest review/);
+  assert.deepEqual(audit.json.auditEvents, []);
+  assert.deepEqual(events.json.events, []);
+  assert.equal(audit.json.source, "session-memory");
   assert.equal(audit.json.pagination.hasMore, false);
   assert.equal(events.json.pagination.nextCursor, null);
   assert.equal(audit.json.mutationRoutesEnabled, false);
@@ -1302,7 +1315,7 @@ test("demo trade preview rejects non-local or non-json requests before ticket pa
   assert.equal(crossOrigin.status, 403);
   assert.equal(badContentType.status, 415);
   assert.equal(missingOrigin.json.error.code, "DEMO_TRADE_PREVIEW_FORBIDDEN");
-  assert.equal(crossOrigin.json.error.code, "DEMO_TRADE_PREVIEW_FORBIDDEN");
+  assert.equal(crossOrigin.json.error.code, "DASHBOARD_REQUEST_FORBIDDEN");
   assert.equal(badContentType.json.error.code, "DEMO_TRADE_PREVIEW_FORBIDDEN");
   assert.equal(missingOrigin.text.includes("100000"), false);
   assert.equal(crossOrigin.text.includes("100000"), false);
@@ -1809,7 +1822,9 @@ test("read-only provider rate-limit failures use short backoff without exposing 
   assert.equal(fetchCount, 1);
   assert.equal(first.json.cache.state, "error");
   assert.equal(second.json.cache.state, "backoff");
-  assert.equal(second.json.cache.ttlMs, 2_000);
+  assert.equal(Date.parse(second.json.cache.retryAt) - Date.parse(second.json.cache.failureAt), 2_000);
+  assert.equal(second.json.cache.cachedAt, null);
+  assert.equal(second.json.cache.expiresAt, null);
   assert.equal(second.text.includes("server-api-secret"), false);
   assert.equal(second.text.includes("server-user-secret"), false);
 });
@@ -1833,7 +1848,7 @@ test("read-only provider honors a longer bounded provider backoff", async () => 
         retryAfterMs: 12_000,
       });
     }),
-    (error) => error.cache?.ttlMs === 12_000,
+    (error) => Date.parse(error.cache?.retryAt) - Date.parse(error.cache?.failureAt) === 12_000,
   );
 
   nowMs += 11_999;
